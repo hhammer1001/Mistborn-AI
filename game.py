@@ -2,7 +2,16 @@ import random
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
-
+"""
+while True:
+    try:
+        age = int(input("Enter your age: "))
+        if age < 0:
+            raise ValueError("Age cannot be negative")
+        break
+    except ValueError:
+        print("Invalid input. Please enter a positive integer.")
+"""
 
 
 class Game():
@@ -17,7 +26,8 @@ class Game():
         self.player3 = None
         self.player4 = None
         self.trash = Deck('empty')
-        
+        self.cardAbilities = []
+        self.market = []
          
 
     def start(self, names):
@@ -49,22 +59,30 @@ class Mission():
 
 class Deck():
 
-    def __init__(self, type):
+    def __init__(self, start, owner, game):
         #TODO
         pass
 
     
     class Card():
 
-        def __init__(self):
-            pass
+        def __init__(self, name, cost, deck):
+            self.name = name
+            self.deck = deck
+            self.cost = cost
+
+        def play(self):
+            for func, arg in self.deck.game.cardAbilities[self.name]:
+                self.deck.owner.func(arg)
+            
 
 
 
 class Player():
 
-    def __init__(self, turnOrder=1, name="B$", character='Kelsier'):
+    def __init__(self, gameName, turnOrder=1, name="B$", character='Kelsier'):
         self.name = name
+        self.game = gameName
         self.character = character
         self.curDamage = 0
         self.curMoney = 0
@@ -74,7 +92,7 @@ class Player():
         self.pMoney = 0
         self.pDraw = 0
         self.handSize = 5
-        self.deck = Deck(self.character)
+        # self.deck = Deck(self.character, self, )
         # self.discard = Deck('empty')
         self.atium = 0
         self.allies = Deck('empty')
@@ -182,8 +200,21 @@ class Player():
         elif self.lvl > 20:
             self.gainAtium(1)
 
-    
-
+    def seek(self, amount):
+        choices = []
+        for c in self.game.market:
+            if c.cost <= amount:
+                choices += c
+        print(list(zip(range(len(choices)), choices)))
+        while True:
+            try:
+                choice = int(input("Card number to seek: "))
+                if choice not in range(len(choices)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a card number to seek")
+        
 
 
 
