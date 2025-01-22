@@ -16,18 +16,23 @@ while True:
 
 class Game():
 
-    def __init__(self, numPlayers=2, charSelect=False,missions=sorted(random.sample(range(8), 3))):
+    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], ):
         self.numPlayers = numPlayers
-        self.characters = ['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy', ]
-        self.charSelect = charSelect
-        self.missions = missions
-        self.player1 = None
-        self.player2 = None
-        self.player3 = None
-        self.player4 = None
+        if randChars:
+            self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], numPlayers)
+        else:
+            self.characters = chars
+        self.missions = sorted(random.sample(range(8), 3))
+        self.player1 = Player(self, 0, names[0], self.characters[0])
+        self.player2 = Player(self, 1, names[1], self.characters[1])
+        if self.numPlayers > 2:
+            self.player3 = Player(self, 2, names[2], self.characters[2])
+        if self.numPlayers > 3:
+            self.player4 = Player(self, 3, names[3], self.characters[3])
         self.trash = Deck('empty')
-        self.cardAbilities = []
-        self.market = []
+        self.cardAbilities = [] #TODO
+        self.marketDeck = [] #TODO
+        self.market = self.marketDeck.flip(6)
          
 
     def start(self, names):
@@ -59,35 +64,47 @@ class Mission():
 
 class Deck():
 
-    def __init__(self, start, owner, game):
+    def __init__(self, start, owner, gameName):
+        self.game = gameName
         #TODO
         pass
 
+
+
+    def flip(self):
+        for x in range(6-len(self.game.market)):
+            newCard = self.draw(1)
+            self.game.market += [newCard]
+            print(f"{newCard} added to market")
     
     class Card():
 
-        def __init__(self, name, cost, deck):
+        def __init__(self, name, cost, deck, active):
             self.name = name
             self.deck = deck
             self.cost = cost
+            self.active = active
 
         def play(self):
             for func, arg in self.deck.game.cardAbilities[self.name]:
                 self.deck.owner.func(arg)
-            
+            #TODO
 
+        def __repr__(self):
+            return self.name
+        
 
 
 class Player():
 
-    def __init__(self, gameName, turnOrder=1, name="B$", character='Kelsier'):
+    def __init__(self, gameName, turnOrder, name="B$", character='Kelsier'):
         self.name = name
         self.game = gameName
         self.character = character
         self.curDamage = 0
         self.curMoney = 0
         self.curBoxings = 0
-        self.curHealth = 34 + 2 * turnOrder
+        self.curHealth = 36 + 2 * turnOrder
         self.pDamage = 0
         self.pMoney = 0
         self.pDraw = 0
@@ -186,10 +203,17 @@ class Player():
         self.pDamage += amount
 
     def refresh(self, amount):
-        #TODO
-        #probably just: print metals, input num, refresh chosen metal, but haven't decided how interface will look yet
-        pass
-
+        print(self.metals)
+        while True:
+            try:
+                choice = int(input("Metal number to refresh: "))
+                if choice not in range(len(8)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a metal number to refresh")
+        if self.metals[choice] == 2:
+            self.metals[choice] = 0
     def extraBurn(self, amount):
         self.burns += amount
 
@@ -214,6 +238,9 @@ class Player():
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to seek")
+        c.play()
+
+    def 
         
 
 
