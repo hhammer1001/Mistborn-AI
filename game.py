@@ -2,7 +2,7 @@ import random
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
-"""
+""" input formatting
 while True:
     try:
         age = int(input("Enter your age: "))
@@ -11,6 +11,18 @@ while True:
         break
     except ValueError:
         print("Invalid input. Please enter a positive integer.")
+
+while True:
+    try:
+        age = input(f"Discard {card} to prevent {card.active[1]} damage? Y/N")
+        if age not in ['y', 'n', 'Y', 'N']:
+            raise ValueError("Enter Y or N")
+        break
+    except ValueError:
+        print("Invalid input. Please enter Y or N")
+        pass
+if ans in ['y', 'Y']:
+
 """
 
 
@@ -23,12 +35,16 @@ class Game():
         else:
             self.characters = chars
         self.missions = sorted(random.sample(range(8), 3))
-        self.player1 = Player(self, 0, names[0], self.characters[0])
-        self.player2 = Player(self, 1, names[1], self.characters[1])
+        self.p1Deck = Deck(self.characters[0], self)
+        self.player1 = Player(self.p1Deck, self, 0, names[0], self.characters[0])
+        self.p2Deck = Deck(self.characters[1], self)
+        self.player2 = Player(self.p2Deck, self, 1, names[1], self.characters[1])
         if self.numPlayers > 2:
-            self.player3 = Player(self, 2, names[2], self.characters[2])
+            self.p3Deck = Deck(self.characters[2], self)
+            self.player3 = Player(self.p3Deck, self, 2, names[2], self.characters[2])
         if self.numPlayers > 3:
-            self.player4 = Player(self, 3, names[3], self.characters[3])
+            self.p4Deck = Deck(self.characters[3], self)
+            self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
         self.trash = Deck('empty')
         self.cardAbilities = [] #TODO
         self.marketDeck = [] #TODO
@@ -64,19 +80,33 @@ class Mission():
 
 class Deck():
 
-    def __init__(self, start, owner, gameName):
+    def __init__(self, start, gameName):
         self.game = gameName
-        #TODO
-        pass
+        self.hand = []
+        self.cards = [] #TODO
+        self.discard = []
+        self.inPlay = []
 
 
 
     def flip(self):
         for x in range(6-len(self.game.market)):
-            newCard = self.draw(1)
+            newCard = self.draw(1)[0]
             self.game.market += [newCard]
             print(f"{newCard} added to market")
     
+    def draw(self, amount):
+        out = []
+        for i in range(amount):
+            if self.cards == []:
+                self.discard = self.cards
+                random.shuffle(self.cards)
+                if self.cards == []:
+                    pass
+            out += [self.cards.pop(0)]
+        return out
+
+
     class Card():
 
         def __init__(self, name, cost, deck, active):
@@ -85,20 +115,20 @@ class Deck():
             self.cost = cost
             self.active = active
 
-        def play(self):
+        def play(self, owner):
             for func, arg in self.deck.game.cardAbilities[self.name]:
                 self.deck.owner.func(arg)
+            self.deck.inPlay += [self]
             #TODO
 
         def __repr__(self):
             return self.name
         
-
-
 class Player():
 
-    def __init__(self, gameName, turnOrder, name="B$", character='Kelsier'):
+    def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
         self.name = name
+        self.alive = True
         self.game = gameName
         self.character = character
         self.curDamage = 0
@@ -175,7 +205,11 @@ class Player():
         #TODO
 
     def eliminate(self, amount):
-        #TODO
+        for i in range(amount):
+            print(f"Hand is {list(zip(range(len(self.deck.hand)), self.deck.hand))}")
+            print(f"Play is {list(zip(range(len(self.deck.inPlay)), self.deck.inPlay))}")
+            print(f"Discard is {list(zip(range(len(self.deck.discard)), self.deck.discard))}")
+            #TODO
         pass
 
     def draw(self, amount):
@@ -186,8 +220,7 @@ class Player():
         self.atium += amount
 
     def train(self, amount):
-        self.train += amount
-        
+        self.train += amount 
 
     def killAlly(self, amount):
         #TODO
@@ -229,7 +262,7 @@ class Player():
         for c in self.game.market:
             if c.cost <= amount:
                 choices += c
-        print(list(zip(range(len(choices)), choices)))
+        print(f"Market is {list(zip(range(len(choices)), choices))}")
         while True:
             try:
                 choice = int(input("Card number to seek: "))
@@ -240,8 +273,27 @@ class Player():
                 print("Invalid input. Please choose a card number to seek")
         c.play()
 
-    def 
+    def takeDamage(self, amount):
+        for card in self.deck.hand:
+            if card.active[0] == "cloudP" and amount > 0:
+                while True:
+                    try:
+                        ans = input(f"Discard {card} to prevent {card.active[1]} damage? Y/N")
+                        if ans not in ['y', 'n', 'Y', 'N']:
+                            raise ValueError("Enter Y or N")
+                        break
+                    except ValueError:
+                        print("Invalid input. Please enter Y or N")
+                        pass
+                if ans in ['y', 'Y']:
+                    amount = max(amount - card.active[1], 0)
+        self.curHealth -= amount
+        if self.curHealth <= 0:
+            self.alive = False
+                
         
+    def playCard(self, card):
+        card.play(self)
 
 
 
