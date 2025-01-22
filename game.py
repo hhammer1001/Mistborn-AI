@@ -16,6 +16,7 @@ class Game():
         self.player2 = None
         self.player3 = None
         self.player4 = None
+        self.trash = Deck('empty')
         
          
 
@@ -33,125 +34,155 @@ class Game():
     def play():
         pass
             
-    class Mission():
+class Mission():
 
-        def __init__(self, name, tiers):
-            self.name = name
-            self.progress = 0
-            self.tiers = tiers[name]
-            self.distToNextTier = self.tiers[0]
+    def __init__(self, name, tiers):
+        self.name = name
+        self.progress = 0
+        self.tiers = tiers[name]
+        self.distToNextTier = self.tiers[0]
+        
+    def progress(self, amount):
+        self.progress += amount
+        # if self.progress > self.distToNextTier:
+        #     self.progress = self.progess - self.
+
+class Deck():
+
+    def __init__(self, type):
+        #TODO
+        pass
+
+    
+    class Card():
+
+        def __init__(self):
+            pass
+
+
+
+class Player():
+
+    def __init__(self, turnOrder=1, name="B$", character='Kelsier'):
+        self.name = name
+        self.character = character
+        self.curDamage = 0
+        self.curMoney = 0
+        self.curBoxings = 0
+        self.curHealth = 34 + 2 * turnOrder
+        self.pDamage = 0
+        self.pMoney = 0
+        self.pDraw = 0
+        self.handSize = 5
+        self.deck = Deck(self.character)
+        # self.discard = Deck('empty')
+        self.atium = 0
+        self.allies = Deck('empty')
+        self.metals = [0]*8
+        self.burns = 1
+        self.training = 0
+        self.trainingRewards = {3:['B', 1], 5:[self.level, 1], 8:[self.level, 2], 9:['B', 1], 11:['A', 1], 13:[self.level, 3], 15:['B', 1], 16:['A', 1]}
+        self.lvl = 0
+        if self.curHealth > 40:
+            self.curHealth = 40
+            self.curBoxings = 1
+        self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
+                                "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[3, 'D', 2, 'K', 1],[3, 'D', 3, 'K', 1],[2, 'Pd', 2, 'D', 1]], 
+                                "Keep Venture":[[4, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'Pm', 2, 'M', 3],], 
+                                "Skaa Caverns":[[5, 'R', 1, 'R', 1],[4, 'R', 1, 'R', 1],[3, 'B', 1, 'R', 8]], 
+                                "Pits Of Hathsin":[[4, 'M', 1, 'M', 1],[4, 'D', 2, 'H', 2],[4, 'A', 1, 'A', 1]], 
+                                "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
+                                "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
+                                "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
+        self.missionFuncs = {'D': self.damage,
+                                'M': self.money,
+                                'H': self.heal,
+                                'C': self.draw,
+                                'E': self.eliminate,
+                                'A': self.gainAtium,
+                                'T': self.train,
+                                'K': self.killAlly,
+                                'R': self.refresh,
+                                'B': self.extraBurn,
+                                'Pc': self.permDraw,
+                                'Pd': self.permDamage,
+                                'Pm': self.permMoney}
+
+
+
+    def charPower(self, tier):
+        if tier == 1:
+            if self.character == 'Kelsier':
+                self.damage(2)
+            elif self.character == 'Shan':
+                self.money(2)
+            elif self.character == 'Vin':
+                self.damage(1)
+                self.heal(1)
+                self.curMoney(1)
+            elif self.character == 'Marsh':
+                self.money(2)
             
-        def progress(self, amount):
-            self.progress += amount
-            # if self.progress > self.distToNextTier:
-            #     self.progress = self.progess - self.
 
-    class Player():
+    def damage(self, amount):
+        self.curDamage += amount
 
-        def __init__(self, turnOrder=1, name="B$", character='Kelsier'):
-            self.name = name
-            self.character = character
-            self.curDamage = 0
-            self.curMoney = 0
-            self.curBoxings = 0
-            self.curHealth = 34 + 2 * turnOrder
-            self.pDamage = 0
-            self.pMoney = 0
-            self.pDraw = 0
-            self.handSize = 5
-            self.deck = [] #TODO
-            if self.curHealth > 40:
-                self.curHealth = 40
-                self.curBoxings = 1
-            self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
-                                 "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[3, 'D', 2, 'K', 1],[3, 'D', 3, 'K', 1],[2, 'Pd', 2, 'D', 1]], 
-                                 "Keep Venture":[[4, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'Pm', 2, 'M', 3],], 
-                                 "Skaa Caverns":[[5, 'R', 1, 'R', 1],[4, 'R', 1, 'R', 1],[3, 'B', 1, 'R', 8]], 
-                                 "Pits Of Hathsin":[[4, 'M', 1, 'M', 1],[4, 'E', 1, 'E', 1],[4, 'E', 4, 'E', 1]], 
-                                 "Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
-                                 "Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
-                                 "Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], }
-            self.missionFuncs = {'D': self.damage,
-                                 'M': self.money,
-                                 'H': self.heal,
-                                 'C': self.draw,
-                                 'E': self.eliminate,
-                                 'A': self.atium,
-                                 'T': self.train,
-                                 'K': self.killAlly,
-                                 'R': self.refresh,
-                                 'B': self.extraBurn,
-                                 'Pc': self.permDraw,
-                                 'Pd': self.permDamage,
-                                 'Pm': self.permMoney}
+    def money(self, amount):
+        self.curMoney += amount
 
-        def charPower(self, tier):
-            if tier == 1:
-                if self.character == 'Kelsier':
-                    self.damage(2)
-                elif self.character == 'Shan':
-                    self.money(2)
-                elif self.character == 'Vin':
-                    self.damage(1)
-                    self.heal(1)
-                    self.curMoney(1)
-                elif self.character == 'Marsh':
-                    self.money(2)
-                
+    def heal(self, amount):
+        self.curHealth += amount
+        if self.curHealth > 40:
+            self.curHealth = 40
 
-        def damage(self, amount):
-            self.curDamage += amount
+    def mission(self, amount):
+        pass
+        #TODO
 
-        def money(self, amount):
-            self.curMoney += amount
+    def eliminate(self, amount):
+        #TODO
+        pass
 
-        def heal(self, amount):
-            self.curHealth += amount
-            if self.curHealth > 40:
-                self.curHealth = 40
+    def draw(self, amount):
+        #TODO
+        pass
 
-        def mission(self, amount):
-            pass
+    def gainAtium(self, amount):
+        self.atium += amount
 
-        def eliminate(self, amount):
-            print(f"{amount}done")
+    def train(self, amount):
+        self.train += amount
+        
 
-        def draw(self, amount):
-            #TODO
-            pass
+    def killAlly(self, amount):
+        #TODO
+        pass
 
-        def atium(self, amount):
-            #TODO
-            pass
+    def permDraw(self, amount):
+        self.pDraw += amount
 
-        def train(self, amount):
-            #TODO
-            pass
+    def permMoney(self, amount):
+        self.pMoney += amount
 
-        def killAlly(self, amount):
-            #TODO
-            pass
+    def permDamage(self, amount):
+        self.pDamage += amount
 
-        def permDraw(self, amount):
-            #TODO
-            pass
+    def refresh(self, amount):
+        #TODO
+        #probably just: print metals, input num, refresh chosen metal, but haven't decided how interface will look yet
+        pass
 
-        def permMoney(self, amount):
-            #TODO
-            pass
+    def extraBurn(self, amount):
+        self.burns += amount
 
-        def permDamage(self, amount):
-            #TODO
-            pass
+    def level(self, tier):
+        self.lvl = tier
+        if self.lvl in self.trainingRewards:
+            self.trainingRewards[self.lvl][0](self.trainingRewards[self.lvl][1])
+        elif self.lvl > 20:
+            self.gainAtium(1)
 
-        def refresh(self, amount):
-            #TODO
-            pass
-
-        def extraBurn(self, amount):
-            #TODO
-            pass
-
+    
 
 
 
@@ -161,4 +192,4 @@ test = Game()
 
 pTest = test.Player()
 
-# pTest.missionFuncs[pTest.missionTiers['Canton Of Orthodoxy'][1]](pTest.missionTiers['Canton Of Orthodoxy'][2])
+pTest.missionFuncs[pTest.missionTiers['Canton Of Orthodoxy'][0][1]](pTest.missionTiers['Canton Of Orthodoxy'][0][2])
