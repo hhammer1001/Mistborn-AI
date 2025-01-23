@@ -1,4 +1,5 @@
 import random
+import csv
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
@@ -45,10 +46,10 @@ class Game():
         if self.numPlayers > 3:
             self.p4Deck = Deck(self.characters[3], self)
             self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
-        self.trash = Deck('empty')
+        self.trash = Deck('empty', self)
         self.cardAbilities = [] #TODO
         self.marketDeck = [] #TODO
-        self.market = self.marketDeck.flip(6)
+        # self.market = self.marketDeck.flip(6) #TODO
          
 
     def start(self, names):
@@ -80,14 +81,23 @@ class Mission():
 
 class Deck():
 
-    def __init__(self, start, gameName):
+    def __init__(self, code, gameName):
         self.game = gameName
         self.hand = []
-        self.cards = [] #TODO
+        self.cards = []
+        if code in ['Kelsier', 'Shan']:
+            for c in deckInfo[0]:
+                data = cardLookup[c]
+                self.cards += [Card(c, data, self)]
+        elif code in ['Vin', 'Marsh', 'Prodigy']:
+            pass
+        
         self.discard = []
         self.inPlay = []
 
-
+    def __repr__(self):
+        out = self.cards + self.discard + self.hand + self.inPlay
+        return str(out)
 
     def flip(self):
         for x in range(6-len(self.game.market)):
@@ -107,28 +117,33 @@ class Deck():
         return out
 
 
-    class Card():
+class Card():
 
-        def __init__(self, name, cost, deck, active):
-            self.name = name
-            self.deck = deck
-            self.cost = cost
-            self.active = active
+    def __init__(self, name, data, deck):
+        #data = [Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
+        self.name = name
+        self.deck = deck
+        self.cost = data[0]
+        self.metal = data[1]
+        self.ability1 = [zip(data[2].split("."), data[3].split("."))]
+        # self.ability1
 
-        def play(self, owner):
-            for func, arg in self.deck.game.cardAbilities[self.name]:
-                self.deck.owner.func(arg)
-            self.deck.inPlay += [self]
-            #TODO
 
-        def __repr__(self):
-            return self.name
+    def play(self, owner):
+        for func, arg in self.ability1:
+            self.deck.owner.missionFuncs[func](int(arg))
+        self.deck.inPlay += [self]
+        #TODO
+
+    def __repr__(self):
+        return self.name
         
 class Player():
 
     def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
         self.name = name
         self.alive = True
+        self.allies = []
         self.game = gameName
         self.character = character
         self.curDamage = 0
@@ -142,7 +157,7 @@ class Player():
         # self.deck = Deck(self.character, self, )
         # self.discard = Deck('empty')
         self.atium = 0
-        self.allies = Deck('empty')
+        self.allies = Deck('empty', gameName)
         self.metals = [0]*8
         self.burns = 1
         self.training = 0
@@ -206,15 +221,33 @@ class Player():
 
     def eliminate(self, amount):
         for i in range(amount):
-            print(f"Hand is {list(zip(range(len(self.deck.hand)), self.deck.hand))}")
-            print(f"Play is {list(zip(range(len(self.deck.inPlay)), self.deck.inPlay))}")
-            print(f"Discard is {list(zip(range(len(self.deck.discard)), self.deck.discard))}")
-            #TODO
-        pass
-
+            h = len(self.deck.hand)
+            p = len(self.deck.inPlay)
+            d = len(self.deck.discard)
+            print(f"Hand is {list(zip(range(h), self.deck.hand))}")
+            print(f"Play is {list(zip(range(h,h+p), self.deck.inPlay))}")
+            print(f"Discard is {list(zip(range(h+p,h+d+p), self.deck.discard))}")
+            choices = self.deck.hand + self.deck.inPlay + self.deck.discard
+            while True:
+                try:
+                    choice = int(input("Pick the number to eliminate, or put -1 to not eliminate"))
+                    if choice not in range(-1,h+p+d):
+                        raise ValueError("Not a valid choice")
+                    break
+                except ValueError:
+                    print("Please enter a number shown or -1 to not eliminate")
+                    pass
+            if choice == -1:
+                break
+            elif choice < h:
+                self.deck.hand = self.deck.hand[:choice] + self.deck.hand[choice+1:]
+            elif choice < h+p:
+                self.deck.inPlay = self.deck.inPlay[:choice-h] + self.deck.inPlay[choice-h+1:]
+            else:
+                self.deck.discard = self.deck.discard[:choice-h-p] + self.deck.discard[choice-h-p+1:]
+    
     def draw(self, amount):
-        #TODO
-        pass
+        self.deck.draw(amount)
 
     def gainAtium(self, amount):
         self.atium += amount
@@ -298,8 +331,33 @@ class Player():
 
 
 
+# test = Game()
+
+# pTest = test.Player()
+
+# pTest.missionFuncs[pTest.missionTiers['Canton Of Orthodoxy'][0][1]](pTest.missionTiers['Canton Of Orthodoxy'][0][2])
+# test = [1,2,3]
+# print(test[:3]+test[:5])
+deckInfo = {0:[], 1:[], 2:[]}
+cardLookup = {}
+with open('starrterdecks.csv', newline='') as csvfile:
+    lines = csv.reader(csvfile, delimiter=' ', quotechar='|')
+    fixedLines = []
+    for row in lines:
+        # print(row)
+        if len(row) > 1:
+            row = [row[0] + row[1]]
+        fix = row[0].split(",")
+        fixedLines += [fix]
+# print(fixedLines)
+for row in fixedLines[1:]:
+    deckInfo[int(row[0])] += [row[1]]
+    cardLookup[row[1]] = row[2:]
+
 test = Game()
 
-pTest = test.Player()
+print(test.p1Deck)
 
-pTest.missionFuncs[pTest.missionTiers['Canton Of Orthodoxy'][0][1]](pTest.missionTiers['Canton Of Orthodoxy'][0][2])
+
+# for row in fixedLines:
+#     print(row)
