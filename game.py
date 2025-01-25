@@ -79,44 +79,6 @@ class Mission():
         # if self.progress > self.distToNextTier:
         #     self.progress = self.progess - self.
 
-class Deck():
-
-    def __init__(self, code, gameName):
-        self.game = gameName
-        self.hand = []
-        self.cards = []
-        if code in ['Kelsier', 'Shan']:
-            for c in deckInfo[0]:
-                data = cardLookup[c]
-                self.cards += [Card(c, data, self)]
-        elif code in ['Vin', 'Marsh', 'Prodigy']:
-            pass
-        
-        self.discard = []
-        self.inPlay = []
-
-    def __repr__(self):
-        out = self.cards + self.discard + self.hand + self.inPlay
-        return str(out)
-
-    def flip(self):
-        for x in range(6-len(self.game.market)):
-            newCard = self.draw(1)[0]
-            self.game.market += [newCard]
-            print(f"{newCard} added to market")
-    
-    def draw(self, amount):
-        out = []
-        for i in range(amount):
-            if self.cards == []:
-                self.discard = self.cards
-                random.shuffle(self.cards)
-                if self.cards == []:
-                    pass
-            out += [self.cards.pop(0)]
-        return out
-
-
 class Card():
 
     def __init__(self, name, data, deck):
@@ -237,14 +199,13 @@ class Player():
                 except ValueError:
                     print("Please enter a number shown or -1 to not eliminate")
                     pass
-            if choice == -1:
+            if choice == -1 :
                 break
-            elif choice < h:
-                self.deck.hand = self.deck.hand[:choice] + self.deck.hand[choice+1:]
-            elif choice < h+p:
-                self.deck.inPlay = self.deck.inPlay[:choice-h] + self.deck.inPlay[choice-h+1:]
             else:
-                self.deck.discard = self.deck.discard[:choice-h-p] + self.deck.discard[choice-h-p+1:]
+                self.deck.eliminate(choice)
+            
+            
+
     
     def draw(self, amount):
         self.deck.draw(amount)
