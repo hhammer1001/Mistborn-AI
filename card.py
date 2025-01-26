@@ -31,4 +31,6 @@ class Action(Card):
 
 class Ally(Card):
 
+    def play()
+
 class Funding(Card):

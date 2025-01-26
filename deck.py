@@ -2,11 +2,12 @@ import random
 
 class Deck():
 
-    def __init__(self, gameName):
+    def __init__(self, player, gameName):
         self.game = gameName
         self.hand = []
         self.cards = []
         self.discard = []
+        self.inPlay = []
     
     def draw(self, amount):
         for i in range(amount):
@@ -17,6 +18,9 @@ class Deck():
                     pass
             self.hand += [self.cards.pop(0)]
 
+    def __repr__(self):
+        out = self.cards + self.discard + self.hand + self.inPlay
+        return str(out)
 
     
 
