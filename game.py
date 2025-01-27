@@ -61,7 +61,7 @@ class Game():
         #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
         self.trash = Deck('empty', self)
         self.cardAbilities = [] #TODO
-        self.marketDeck = [] #TODO
+        self.market = [] #TODO
         # self.market = self.marketDeck.flip(6) #TODO
 
          
@@ -107,6 +107,7 @@ class Player():
 
     def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
         self.name = name
+        self.houseWarring = False
         self.alive = True
         self.allies = []
         self.game = gameName
@@ -171,7 +172,10 @@ class Player():
             
 
     def damage(self, amount):
-        self.curDamage += amount
+        if self.houseWarring:
+            self.mission(amount)
+        else:
+            self.curDamage += amount
 
     def money(self, amount):
         self.curMoney += amount
@@ -269,6 +273,91 @@ class Player():
     def permDamage(self, amount):
         self.pDamage += amount
 
+    def special1(self, amount):
+        #investigate
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                lowest = [1,0]
+                for i in range(len(ranks)):
+                    if i > 0 and i < ours:
+                        lowest[0] = 0
+                    elif i > ours:
+                        lowest[1] = 1
+                if lowest == [1,1]:
+                    count += 1
+        self.money(count)
+
+    def special2(self, amount):
+        #Eavesdrop1
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                lowest = [1,0]
+                for i in range(len(ranks)):
+                    if i > 0 and i < ours:
+                        lowest[0] = 0
+                    elif i > ours:
+                        lowest[1] = 1
+                if lowest == [1,1]:
+                    m.progress(self.turnOrder, 1)
+    
+    def special3(self, amount):
+        #Lookout
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                highest = True
+                for i in range(len(ranks)):
+                    if i > ours:
+                        highest = False
+                if highest:
+                    count += 1
+        self.draw(count)
+
+
+    def special4(self, amount):
+        #Hyperaware
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                highest = True
+                for i in range(len(ranks)):
+                    if i > ours:
+                        highest = False
+                if highest:
+                    count += 1
+        self.damage(count*3)
+
+    def special5(self, amount):
+        #Coppercloud
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                highest = True
+                for i in range(len(ranks)):
+                    if i > ours:
+                        highest = False
+                if highest:
+                    count += 1
+        if count > 0:
+            self.draw(1)
+
+
+    def special6(self, amount):
+        #House war tier 2
+        self.houseWarring = True
+
+
     def refresh(self, amount):
         print(self.metals)
         while True:
@@ -292,6 +381,11 @@ class Player():
             self.gainAtium(1)
 
     def seek(self, amount):
+        #negative code is for pierce tier 2 ability
+        twice = False
+        if amount < 0:
+            amount = amount * -1
+            twice = True
         choices = []
         for c in self.game.market:
             if c.cost <= amount:
@@ -302,14 +396,23 @@ class Player():
                 choice = int(input("Card number to seek: "))
                 if choice not in range(len(choices)):
                     raise ValueError("Choose a valid number")
+                if twice:
+                    choice2 = int(input("Second (different) Card number to seek: "))
+                    if choice2 not in range(len(choices)) or choice2 == choice:
+                        raise ValueError("Choose a valid number")
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to seek")
-        c.play()
+        #TODO Play choice
+        if twice:
+            #TODO play choice2
+            pass
+
+        
 
     def takeDamage(self, amount):
         for card in self.deck.hand:
-            if card.active[0] == "cloudP" and amount > 0:
+            if card.active[0] == "cloudP" and amount > 0 and card.active[1] > 0:
                 while True:
                     try:
                         ans = input(f"Discard {card} to prevent {card.active[1]} damage? Y/N")
@@ -357,8 +460,7 @@ for row in fixedLines[1:]:
 
 test = Game()
 
-test.players[0].mission(5)
-
+# test.players[0].seek(-5)
 
 # for row in fixedLines:
 #     print(row)

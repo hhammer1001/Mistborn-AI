@@ -33,4 +33,5 @@ class Ally(Card):
 
     def play()
 
+        #TODO ally death prevention with cloud negative numbers
 class Funding(Card):
