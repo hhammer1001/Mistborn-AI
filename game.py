@@ -1,6 +1,6 @@
 import random
 import csv
-import deck
+from deck import Deck
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
@@ -31,26 +31,39 @@ if ans in ['y', 'Y']:
 class Game():
 
     def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], ):
+
+        self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[9, 'E', 1, 'E', 1],[12, 'E', 4, 'E', 1]], 
+                                "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[7, 'D', 2, 'K', 1],[10, 'D', 3, 'K', 1],[12, 'Pd', 2, 'D', 1]], 
+                                "Keep Venture":[[4, 'M', 1, 'M', 1],[6, 'M', 1, 'M', 1],[8, 'M', 1, 'M', 1],[10, 'M', 1, 'M', 1],[12, 'Pm', 2, 'M', 3],], 
+                                "Skaa Caverns":[[5, 'R', 1, 'R', 1],[9, 'R', 1, 'R', 1],[12, 'B', 1, 'R', 8]], 
+                                "Pits Of Hathsin":[[4, 'M', 1, 'M', 1],[8, 'D', 2, 'H', 2],[12, 'A', 1, 'A', 1]], 
+                                "Kredik Shaw":[[4, 'D', 1, 'D', 1],[8, 'D', 1, 'D', 1],[12, 'Pd', 2, 'D', 2]], 
+                                "Crew Hideout":[[6, 'H', 4, 'H', 2],[12, 'H', 6, 'H', 2]], 
+                                "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[12, 'T', 1, 'T', 1]]}
         self.numPlayers = numPlayers
         if randChars:
             self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], numPlayers)
         else:
             self.characters = chars
-        self.missions = sorted(random.sample(range(8), 3))
-        self.p1Deck = Deck(self.characters[0], self)
-        self.player1 = Player(self.p1Deck, self, 0, names[0], self.characters[0])
-        self.p2Deck = Deck(self.characters[1], self)
-        self.player2 = Player(self.p2Deck, self, 1, names[1], self.characters[1])
-        if self.numPlayers > 2:
-            self.p3Deck = Deck(self.characters[2], self)
-            self.player3 = Player(self.p3Deck, self, 2, names[2], self.characters[2])
-        if self.numPlayers > 3:
-            self.p4Deck = Deck(self.characters[3], self)
-            self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
+        self.missionNames = [sorted(list(self.missionTiers.keys()))[i] for i in sorted(random.sample(range(8), 3))]
+        self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
+        self.decks = [Deck(self.characters[i], self) for i in range(numPlayers)]
+        self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
+        # self.p1Deck = Deck(self.characters[0], self)
+        # self.player1 = Player(self.p1Deck, self, 0, names[0], self.characters[0])
+        # self.p2Deck = Deck(self.characters[1], self)
+        # self.player2 = Player(self.p2Deck, self, 1, names[1], self.characters[1])
+        # if self.numPlayers > 2:
+        #     self.p3Deck = Deck(self.characters[2], self)
+        #     self.player3 = Player(self.p3Deck, self, 2, names[2], self.characters[2])
+        # if self.numPlayers > 3:
+        #     self.p4Deck = Deck(self.characters[3], self)
+        #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
         self.trash = Deck('empty', self)
         self.cardAbilities = [] #TODO
-        self.marketDeck = [] #TODO
+        self.market = [] #TODO
         # self.market = self.marketDeck.flip(6) #TODO
+
          
 
     def start(self, names):
@@ -69,21 +82,32 @@ class Game():
             
 class Mission():
 
-    def __init__(self, name, tiers):
+    def __init__(self, name, game, tiers):
         self.name = name
-        self.progress = 0
-        self.tiers = tiers[name]
-        self.distToNextTier = self.tiers[0]
+        self.game = game
+        self.tiers = self.game.missionTiers[name]
+        self.playerRanks = [0 for i in range(game.numPlayers)]
+        self.cutoffs = [x[0] for x in self.tiers]
         
-    def progress(self, amount):
-        self.progress += amount
-        # if self.progress > self.distToNextTier:
-        #     self.progress = self.progess - self.
+    def progress(self, playerNum, amount):
+        old = self.playerRanks[playerNum]
+        # self.playerRanks[playerNum] += amount
+        new = self.playerRanks[playerNum] + amount
+        for tier in self.tiers:
+            if old < tier[0] and new >= tier[0]:
+                self.game.players[playerNum].missionFuncs[tier[1]](tier[2])
+                if max(self.playerRanks) < tier[0]:
+                    self.game.players[playerNum].missionFuncs[tier[3]](tier[4])
+        self.playerRanks[playerNum] = new
+    
+    def display(self):
+        return f"Progress on {self.name} is {self.playerRanks}, tiers are {self.tiers}"
         
 class Player():
 
     def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
         self.name = name
+        self.houseWarring = False
         self.alive = True
         self.allies = []
         self.game = gameName
@@ -105,17 +129,18 @@ class Player():
         self.training = 0
         self.trainingRewards = {3:['B', 1], 5:[self.level, 1], 8:[self.level, 2], 9:['B', 1], 11:['A', 1], 13:[self.level, 3], 15:['B', 1], 16:['A', 1]}
         self.lvl = 0
+        self.turnOrder = turnOrder
         if self.curHealth > 40:
             self.curHealth = 40
             self.curBoxings = 1
-        self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
-                                "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[3, 'D', 2, 'K', 1],[3, 'D', 3, 'K', 1],[2, 'Pd', 2, 'D', 1]], 
-                                "Keep Venture":[[4, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'Pm', 2, 'M', 3],], 
-                                "Skaa Caverns":[[5, 'R', 1, 'R', 1],[4, 'R', 1, 'R', 1],[3, 'B', 1, 'R', 8]], 
-                                "Pits Of Hathsin":[[4, 'M', 1, 'M', 1],[4, 'D', 2, 'H', 2],[4, 'A', 1, 'A', 1]], 
-                                "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
-                                "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
-                                "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
+        # self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
+        #                         "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[3, 'D', 2, 'K', 1],[3, 'D', 3, 'K', 1],[2, 'Pd', 2, 'D', 1]], 
+        #                         "Keep Venture":[[4, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'Pm', 2, 'M', 3],], 
+        #                         "Skaa Caverns":[[5, 'R', 1, 'R', 1],[4, 'R', 1, 'R', 1],[3, 'B', 1, 'R', 8]], 
+        #                         "Pits Of Hathsin":[[4, 'M', 1, 'M', 1],[4, 'D', 2, 'H', 2],[4, 'A', 1, 'A', 1]], 
+        #                         "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
+        #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
+        #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
         self.missionFuncs = {'D': self.damage,
                                 'M': self.money,
                                 'H': self.heal,
@@ -147,7 +172,10 @@ class Player():
             
 
     def damage(self, amount):
-        self.curDamage += amount
+        if self.houseWarring:
+            self.mission(amount)
+        else:
+            self.curDamage += amount
 
     def money(self, amount):
         self.curMoney += amount
@@ -158,8 +186,47 @@ class Player():
             self.curHealth = 40
 
     def mission(self, amount):
-        pass
-        #TODO
+        prog = 0
+        for m in self.game.missions:
+            print(m.display())
+        while prog < amount:
+            print("Enter in amounts to progress on the three missions:")
+            while True:
+                try:
+                    first = int(input(f"Enter {self.game.missionNames[0]} amount: "))
+                    if first < 0 or first > amount - prog:
+                        raise ValueError("Negative or too high")
+                    break
+                except ValueError:
+                    print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
+            prog += first
+            while True:
+                try:
+                    second = int(input(f"Enter {self.game.missionNames[1]} amount: "))
+                    if second < 0 or second > amount - prog:
+                        raise ValueError("Negative or too high")
+                    break
+                except ValueError:
+                    print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
+            prog += second
+            while True:
+                try:
+                    third = int(input(f"Enter {self.game.missionNames[2]} amount: "))
+                    if third < 0 or third > amount - prog:
+                        raise ValueError("Negative or too high")
+                    break
+                except ValueError:
+                    print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
+            prog += third
+            if prog != amount:
+                print(f"Enter in amounts that sum to {amount} please")
+                prog = 0
+        amounts = [first, second, third]
+        for m in self.game.missions:
+            m.progress(self.turnOrder, amounts[0])
+            amounts = amounts[1:]
+        
+
 
     def eliminate(self, amount):
         for i in range(amount):
@@ -183,9 +250,6 @@ class Player():
                 break
             else:
                 self.deck.eliminate(choice)
-            
-            
-
     
     def draw(self, amount):
         self.deck.draw(amount)
@@ -208,6 +272,91 @@ class Player():
 
     def permDamage(self, amount):
         self.pDamage += amount
+
+    def special1(self, amount):
+        #investigate
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                lowest = [1,0]
+                for i in range(len(ranks)):
+                    if i > 0 and i < ours:
+                        lowest[0] = 0
+                    elif i > ours:
+                        lowest[1] = 1
+                if lowest == [1,1]:
+                    count += 1
+        self.money(count)
+
+    def special2(self, amount):
+        #Eavesdrop1
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                lowest = [1,0]
+                for i in range(len(ranks)):
+                    if i > 0 and i < ours:
+                        lowest[0] = 0
+                    elif i > ours:
+                        lowest[1] = 1
+                if lowest == [1,1]:
+                    m.progress(self.turnOrder, 1)
+    
+    def special3(self, amount):
+        #Lookout
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                highest = True
+                for i in range(len(ranks)):
+                    if i > ours:
+                        highest = False
+                if highest:
+                    count += 1
+        self.draw(count)
+
+
+    def special4(self, amount):
+        #Hyperaware
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                highest = True
+                for i in range(len(ranks)):
+                    if i > ours:
+                        highest = False
+                if highest:
+                    count += 1
+        self.damage(count*3)
+
+    def special5(self, amount):
+        #Coppercloud
+        count = 0
+        for m in self.game.missions:
+            ranks = m.playerRanks
+            ours = ranks[self.turnOrder]
+            if ours > 0:
+                highest = True
+                for i in range(len(ranks)):
+                    if i > ours:
+                        highest = False
+                if highest:
+                    count += 1
+        if count > 0:
+            self.draw(1)
+
+
+    def special6(self, amount):
+        #House war tier 2
+        self.houseWarring = True
+
 
     def refresh(self, amount):
         print(self.metals)
@@ -232,6 +381,11 @@ class Player():
             self.gainAtium(1)
 
     def seek(self, amount):
+        #negative code is for pierce tier 2 ability
+        twice = False
+        if amount < 0:
+            amount = amount * -1
+            twice = True
         choices = []
         for c in self.game.market:
             if c.cost <= amount:
@@ -242,14 +396,23 @@ class Player():
                 choice = int(input("Card number to seek: "))
                 if choice not in range(len(choices)):
                     raise ValueError("Choose a valid number")
+                if twice:
+                    choice2 = int(input("Second (different) Card number to seek: "))
+                    if choice2 not in range(len(choices)) or choice2 == choice:
+                        raise ValueError("Choose a valid number")
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to seek")
-        c.play()
+        #TODO Play choice
+        if twice:
+            #TODO play choice2
+            pass
+
+        
 
     def takeDamage(self, amount):
         for card in self.deck.hand:
-            if card.active[0] == "cloudP" and amount > 0:
+            if card.active[0] == "cloudP" and amount > 0 and card.active[1] > 0:
                 while True:
                     try:
                         ans = input(f"Discard {card} to prevent {card.active[1]} damage? Y/N")
@@ -297,8 +460,7 @@ for row in fixedLines[1:]:
 
 test = Game()
 
-print(test.p1Deck)
-
+# test.players[0].seek(-5)
 
 # for row in fixedLines:
 #     print(row)

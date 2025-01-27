@@ -34,6 +34,9 @@ class Ally(Card):
         owner.ally(self)
         
 
+    def play()
+
+        #TODO ally death prevention with cloud negative numbers
 class Funding(Card):
     def play(self, owner):
         owner.money(1)
