@@ -30,5 +30,11 @@ class Action(Card):
         # self.ability1
 
 class Ally(Card):
+    def play(self,owner):
+        owner.ally(self)
+        
 
 class Funding(Card):
+    def play(self, owner):
+        owner.money(1)
+

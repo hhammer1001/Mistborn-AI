@@ -43,9 +43,11 @@ class PlayerDeck(Deck):
     
     
     
-    def discardHand(self):
+    def cleanUp(self):
         self.discard += self.hand
+        self.discard += self.inPlay
         self.hand = []
+        self.inPlay = []
 
     def eliminate(self, choice):
             h = len(self.hand)
@@ -60,6 +62,14 @@ class PlayerDeck(Deck):
     
     def add(self, card):
         self.discard += [card]
+    
+    def play(self, choice):
+        card = self.hand[choice]
+        if card.play():
+            del self.hand(choice)
+            self.inPlay += [card]
+
+    
 
 class Market(Deck):
     def __init__(self, gameName):
