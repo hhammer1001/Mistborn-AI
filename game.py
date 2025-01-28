@@ -113,9 +113,6 @@ class Player():
         self.allies = []
         self.game = gameName
         self.character = character
-        self.curDamage = 0
-        self.curMoney = 0
-        self.curBoxings = 0
         self.curHealth = 36 + 2 * turnOrder
         self.pDamage = 0
         self.pMoney = 0
@@ -124,12 +121,19 @@ class Player():
         # self.discard = Deck('empty')
         self.atium = 0
         self.allies = Deck('empty', gameName)
-        self.metals = [0]*8
+        self.metalTokens = [0]*8 #0 available 1 burned 2 flared
+        self.metalAvailable = [0]*8
         self.burns = 1
         self.training = 0
         self.trainingRewards = {3:['B', 1], 5:[self.level, 1], 8:[self.level, 2], 9:['B', 1], 11:['A', 1], 13:[self.level, 3], 15:['B', 1], 16:['A', 1]}
         self.lvl = 0
         self.turnOrder = turnOrder
+
+        self.curDamage = 0
+        self.curMoney = 0
+        self.curMission = 0
+        self.curBoxings = 0
+
         if self.curHealth > 40:
             self.curHealth = 40
             self.curBoxings = 1
@@ -155,7 +159,24 @@ class Player():
                                 'Pd': self.permDamage,
                                 'Pm': self.permMoney}
 
+    def availableActions(self, game):
+        actions = ["endTurn"]
+        if self.curMission > 0:
+            for mission in game.missions:
+                if mission.playerRanks[self.turnOrder]< 12:
+                    actions += [f"advance mission {mission}"]
+        for card in self.deck.hand:
+            if not card.burned:
+                if not card.used1:
+                    actions += [f"burn {card}"]
+                    if ((card.metal == 16) and (2 in self.metalTokens)) or (self.metalTokens[(card.metal//2)*2] == 2) or (self.metalTokens[((card.metal//2)*2) + 1] == 2) : 
+                        actions += [f"refresh with {card}"]
+                    if self.metalAvailable[card.metal] >= card.:
+                        actions += [f"activate the first ability of {card}"]
+                elif (not card.used2) and ():
+                    actions += [f"activate the second ability of {card}"]
 
+        return actions
 
     def charPower(self, tier):
         if tier == 1:
