@@ -1,6 +1,7 @@
 import random
 import csv
 from deck import Deck
+import card
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
@@ -118,7 +119,6 @@ class Player():
         self.curHealth = 36 + 2 * turnOrder
         self.pDamage = 0
         self.pMoney = 0
-        self.pDraw = 0
         self.handSize = 5
         # self.deck = Deck(self.character, self, )
         # self.discard = Deck('empty')

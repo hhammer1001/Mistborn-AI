@@ -27,16 +27,54 @@ class Action(Card):
         self.cost = data[0]
         self.metal = data[1]
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
+        self.burned = False
+        self.used1 = False
+        self.used2 = False
         # self.ability1
+    
+    def burn(self, player):
+        self.burned == True
+        player.burn(metal)
+    
+    
+    def reset(self):
+        self.burned = False
+        self.used1 = False
+        self.used2 = False
+    
+    def activate():
+        if self.used1:
+            self.used2 = True
+            return self.2
+        self.used1 = True
+        return self.1
+
+
 
 class Ally(Card):
+    def __init__(self, name, data, deck):
+        #data = [Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
+        self.name = name
+        self.deck = deck
+        self.cost = data[0]
+        self.metal = data[1]
+        self.ability1 = [zip(data[2].split("."), data[3].split("."))]
+        self.used1 = False
+        self.used2 = False
+        # self.ability1
+    def reset(self):
+        self.used1 = False
+        self.used2 = False
+    
+    def activate():
+        if self.used1:
+            self.used2 = True
+            return self.2
+        self.used1 = True
+        return self.1
     def play(self,owner):
         owner.ally(self)
-        
 
-    def play()
-
-        #TODO ally death prevention with cloud negative numbers
 class Funding(Card):
     def play(self, owner):
         owner.money(1)

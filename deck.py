@@ -7,7 +7,6 @@ class Deck():
         self.hand = []
         self.cards = []
         self.discard = []
-        self.inPlay = []
     
     def draw(self, amount):
         for i in range(amount):
@@ -19,7 +18,7 @@ class Deck():
             self.hand += [self.cards.pop(0)]
 
     def __repr__(self):
-        out = self.cards + self.discard + self.hand + self.inPlay
+        out = self.cards + self.discard + self.hand
         return str(out)
 
     
@@ -42,16 +41,18 @@ class PlayerDeck(Deck):
         self.inPlay = []
     
     def __repr__(self):
-        out = self.cards + self.discard + self.hand + self.inPlay
+        out = self.cards + self.discard + self.hand
         return str(out)
     
     
     
-    def cleanUp(self):
+    def cleanUp(self, player):
+        for card in self.hand:
+            card.reset
         self.discard += self.hand
-        self.discard += self.inPlay
         self.hand = []
-        self.inPlay = []
+        self.draw(player.handSize)
+        
 
     def eliminate(self, choice):
             h = len(self.hand)
@@ -66,12 +67,7 @@ class PlayerDeck(Deck):
     
     def add(self, card):
         self.discard += [card]
-    
-    def play(self, choice):
-        card = self.hand[choice]
-        if card.play():
-            del self.hand(choice)
-            self.inPlay += [card]
+
 
     
 
@@ -82,6 +78,7 @@ class Market(Deck):
         random.shuffle(self.cards)
         self.draw(6)  
     
-    def remove(self, choice):
-        del self.cards[choice]
+    def pop(self, choice):
         self.draw(1)
+        return self.cards.pop(choice)
+        
