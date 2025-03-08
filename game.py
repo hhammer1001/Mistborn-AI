@@ -165,45 +165,68 @@ class Player():
                                 'T': self.train,
                                 'K': self.killAlly,
                                 'R': self.refresh,
-                                'B': self.extraBurn,
+                                'B': self.extraBurn,mission.playerRanks[self.turnOrder]< 12:
                                 'Pc': self.permDraw,
                                 'Pd': self.permDamage,
                                 'Pm': self.permMoney}
     def playTurn(self, game): 
         actions = self.availableActions(game)
-        
+        action = self.performAction(actions, game)
+        if action != "endTurn":
+            self.playTurn(game)
+
+    def performAction(self, actions, game):
+
+
+
     def availableActions(self, game):
-        actions = ["endTurn"]
+        #0 -> end turn
+        #1 -> advance mission
+        #2 -> burn card
+        #3 -> refresh with card
+        #4 -> activate ability 1 of card
+        #5 -> activate ability 2 of card
+        #6 -> activate ability 3 of card
+        #7 -> buy card
+        #8 -> buy and elim card
+        #9 -> use first ability of ally
+        #10 -> use second ability of ally
+        #11 -> use first character ability
+        #12 -> use third character ability
+        actions = [(0,)]
         if self.curMission > 0:
             for mission in game.missions:
                 if mission.playerRanks[self.turnOrder]< 12:
-                    actions += [f"advance mission {mission}"]
+                    actions += [(1, mission)]
+                    i += 1
         for card in self.deck.hand:
             if not card.burned:
                 if not card.used1:
-                    actions += [f"burn {card}"]
+                    actions += [(2, card)]
+                    i += 1
                     if ((card.metal == 16) and (2 in self.metalTokens)) or (self.metalTokens[(card.metal//2)*2] == 2) or (self.metalTokens[((card.metal//2)*2) + 1] == 2) : 
-                        actions += [f"refresh with {card}"]
+                        actions += [(3, card)]
+                        i += 1
                     if self.metalAvailable[card.metal]:
-                        actions += [f"activate the first ability of {card}"]
+                        actions += [(4, card)]
                 elif not card.used2:
                     if self.metalAvailable[card.metal]:
-                        actions += [f"activate the second ability of {card}"]
+                        actions += [(5, card)]
                 elif not card.used3:
                     if self.metalAvailable[card.metal]:
-                        actions += [f"activate the third ability of {card}"]
+                        actions += [(6, card)]
         for card in game.market.hand:
             if card.cost <= self.curMoney:
-                actions += [f"buy {card}"]
+                actions += [(7, card)]
                 if (self.training >= 8) and self.buyelim and isinstance(card, Action):
-                    actions += [f"buy and eliminate {card} using it's first ability"]
+                    actions += [(8, card)]
         for ally in self.allies:
             if not ally.used1:
                 if self.metalBurned[ally.metal] > 0:
-                    actions += [f"use the first ability of {ally}"]
+                    actions += [(9, ally)]
             elif not ally.used2: 
                 if self.metalBurned[ally.metal] > 1: # ack not doing this right
-                    actions += [f"use the second ability of {ally}"]
+                    actions += [(10, ally)]
         return actions
 
     def charPower(self, tier):
