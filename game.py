@@ -42,6 +42,7 @@ class Game():
                                 "Crew Hideout":[[6, 'H', 4, 'H', 2],[12, 'H', 6, 'H', 2]], 
                                 "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[12, 'T', 1, 'T', 1]]}
         self.numPlayers = numPlayers
+        self.winner = None
         if randChars:
             self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], numPlayers)
         else:
@@ -78,8 +79,17 @@ class Game():
                 char = random.choice(self.characters)
             players += [self.Player(names[i],char)]
 
-    def play():
-        pass
+    def play(self):
+        currCharacter = 0
+        while not self.winner:
+            self.players[currCharacter].playTurn(self)
+            currCharacter = (currCharacter + 1) % self.numPlayers
+        return self.winner
+
+        
+
+
+
             
 class Mission():
 
@@ -108,8 +118,6 @@ class Player():
 
     def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
         self.name = name
-        self.houseWarring = False
-        self.alive = True
         self.allies = []
         self.game = gameName
         self.character = character
@@ -123,9 +131,11 @@ class Player():
         self.allies = Deck('empty', gameName)
         self.metalTokens = [0]*8 #0 available 1 burned 2 flared
         self.metalAvailable = [0]*8
+        self.metalBurned = [0]*8
         self.burns = 1
         self.training = 0
         self.trainingRewards = {3:['B', 1], 5:[self.level, 1], 8:[self.level, 2], 9:['B', 1], 11:['A', 1], 13:[self.level, 3], 15:['B', 1], 16:['A', 1]}
+        self.buyelim = True
         self.lvl = 0
         self.turnOrder = turnOrder
 
@@ -145,6 +155,7 @@ class Player():
         #                         "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
         #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
         #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
+        self.houseWarring = False
         self.missionFuncs = {'D': self.damage,
                                 'M': self.money,
                                 'H': self.heal,
@@ -158,7 +169,9 @@ class Player():
                                 'Pc': self.permDraw,
                                 'Pd': self.permDamage,
                                 'Pm': self.permMoney}
-
+    def playTurn(self, game): 
+        actions = self.availableActions(game)
+        
     def availableActions(self, game):
         actions = ["endTurn"]
         if self.curMission > 0:
@@ -171,11 +184,26 @@ class Player():
                     actions += [f"burn {card}"]
                     if ((card.metal == 16) and (2 in self.metalTokens)) or (self.metalTokens[(card.metal//2)*2] == 2) or (self.metalTokens[((card.metal//2)*2) + 1] == 2) : 
                         actions += [f"refresh with {card}"]
-                    if self.metalAvailable[card.metal] >= card.:
+                    if self.metalAvailable[card.metal]:
                         actions += [f"activate the first ability of {card}"]
-                elif (not card.used2) and ():
-                    actions += [f"activate the second ability of {card}"]
-
+                elif not card.used2:
+                    if self.metalAvailable[card.metal]:
+                        actions += [f"activate the second ability of {card}"]
+                elif not card.used3:
+                    if self.metalAvailable[card.metal]:
+                        actions += [f"activate the third ability of {card}"]
+        for card in game.market.hand:
+            if card.cost <= self.curMoney:
+                actions += [f"buy {card}"]
+                if (self.training >= 8) and self.buyelim and isinstance(card, Action):
+                    actions += [f"buy and eliminate {card} using it's first ability"]
+        for ally in self.allies:
+            if not ally.used1:
+                if self.metalBurned[ally.metal] > 0:
+                    actions += [f"use the first ability of {ally}"]
+            elif not ally.used2: 
+                if self.metalBurned[ally.metal] > 1: # ack not doing this right
+                    actions += [f"use the second ability of {ally}"]
         return actions
 
     def charPower(self, tier):

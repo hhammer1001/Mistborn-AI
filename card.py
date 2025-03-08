@@ -61,10 +61,12 @@ class Ally(Card):
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
         self.used1 = False
         self.used2 = False
+        self.rioted = False
         # self.ability1
     def reset(self):
         self.used1 = False
         self.used2 = False
+        self.rioted = False
     
     def activate():
         if self.used1:
