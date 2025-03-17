@@ -41,7 +41,7 @@ class Game():
                                 "Kredik Shaw":[[4, 'D', 1, 'D', 1],[8, 'D', 1, 'D', 1],[12, 'Pd', 2, 'D', 2]], 
                                 "Crew Hideout":[[6, 'H', 4, 'H', 2],[12, 'H', 6, 'H', 2]], 
                                 "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[12, 'T', 1, 'T', 1]]}
-        self.metalCodes = []
+        self.metalCodes = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel"]
         self.numPlayers = numPlayers
         self.winner = None
         if randChars:
@@ -136,7 +136,9 @@ class Player():
         self.burns = 1
         self.training = 0
         self.trainingRewards = {3:['B', 1], 5:[self.level, 1], 8:[self.level, 2], 9:['B', 1], 11:['A', 1], 13:[self.level, 3], 15:['B', 1], 16:['A', 1]}
-        self.buyelim = True
+        self.charAbility1 = True
+        self.charAbility2 = True
+        self.charAbility3 = True
         self.lvl = 0
         self.turnOrder = turnOrder
 
@@ -174,7 +176,7 @@ class Player():
         actions = self.availableActions(game)
         action = self.selectAction(actions, game)
         if action != "endTurn":
-            self.performAction(action)
+            self.performAction(action, game)
             self.playTurn(game)
 
     def selectAction(self, actions, game):
@@ -185,9 +187,9 @@ class Player():
                 case 1:
                     print(f"Enter {i} to advance mission {action[1]}")
                 case 2:
-                    print(f"Enter {i} to burn the card {action[1]} for metals")
+                    print(f"Enter {i} to burn the card {action[1]} for {game.metalCodes[action[2]]}")
                 case 3:
-                    print(f"Enter {i} to use {action[1]} to refresh a metal")
+                    print(f"Enter {i} to use {action[1]} to refresh {game.metalCodes[action[2]]}")
                 case 4:
                     print(f"Enter {i} to activate ability 1 of the action {action[1]}") 
                 case 5:
@@ -195,7 +197,7 @@ class Player():
                 case 6:
                     print(f"Enter {i} to activate ability 3 of the action {action[1]}") 
                 case 7:
-                    print(f"Enter {i} to burn {action[1]}") 
+                    print(f"Enter {i} to burn {game.metalCodes[action[1]]}") 
                 case 8:
                     print(f"Enter {i} to buy {action[1]}") 
                 case 9:
@@ -220,7 +222,51 @@ class Player():
                 pass
             return actions[choice]
 
-
+    def performAction(self, action, game)
+        match action[0]:
+            case 0:
+                self.curBoxings += self.curMoney // 2
+                self.curMoney = 0
+                self.metalTokens = list(map(lambda x: 0 if x == 1 else x, self.metalTokens))
+                self.metalAvailable = [0]*8
+                self.metalBurned = [0]*8
+                self.charAbility1 = True
+                self.charAbility2 = True
+                self.charAbility3 = True
+                self.deck.cleanUp(self)
+            case 1:
+                self.curMission += -1
+                action[1].progress(self.turnOrder, 1)
+            case 2:
+                action[1].burned = True
+                self.metalAvailable[action[2]] += 1
+                self.metalBurned[action[2]] += 1
+            case 3:
+                action[1].burned = True
+                self.metalTokens[action[2]] = 0
+            case 4:
+                print(f"Enter {i} to activate ability 1 of the action {action[1]}") 
+            case 5:
+                print(f"Enter {i} to activate ability 2 of the action {action[1]}") 
+            case 6:
+                print(f"Enter {i} to activate ability 3 of the action {action[1]}") 
+            case 7:
+                self.metalTokens[action[1]] = 1
+                self.metalAvailable += 1
+                self.metalBurned += 1
+            case 8:
+                print(f"Enter {i} to buy {action[1]}") 
+            case 9:
+                print(f"Enter {i} to buy {action[1]} and then eliminate it using it's first ability") 
+            case 10:
+                print(f"Enter {i} to use the first ability of your ally {action[1]}") 
+            case 11:
+                print(f"Enter {i} to use the second ability of your ally {action[1]}") 
+            case 12:
+                print(f"Enter {i} to use your first character ability") 
+            case 13:
+                print(f"Enter {i} to use your third character ability") 
+                   
 
     def availableActions(self, game):
         #0 -> end turn
@@ -241,16 +287,20 @@ class Player():
         if self.curMission > 0:
             for mission in game.missions:
                 if mission.playerRanks[self.turnOrder]< 12:
-                    actions += [(1, mission)]
-                    i += 1
+                    actions += [(1, mission)]          
         for card in self.deck.hand:
             if not card.burned:
                 if not card.used1:
-                    actions += [(2, card)]
-                    i += 1
-                    if (2 in self.metalTokens) and ((card.metal == 16) or (self.metalTokens[(card.metal//2)*2] == 2) or (self.metalTokens[((card.metal//2)*2) + 1] == 2)) : 
-                        actions += [(3, card)]
-                        i += 1
+                    actions += [(2, card, (card.metal//2)*2), (2, card, (card.metal//2)*2 + 1)]
+                    if (card.metal == 16):
+                        for i, token in enumerate(self.metalTokens):
+                            if token == 2:
+                                actions += [(3, card, i)]
+                    else:
+                        if (self.metalTokens[(card.metal//2)*2] == 2): 
+                            actions += [(3, card, (card.metal//2)*2)]
+                        if (self.metalTokens[((card.metal//2)*2) + 1] == 2): 
+                            actions += [(3, card, ((card.metal//2)*2) + 1)]
                     if self.metalAvailable[card.metal]:
                         actions += [(4, card)]
                 elif not card.used2:
@@ -262,11 +312,11 @@ class Player():
         if self.metalTokens.count(1) < self.burns:
             for metal, burned in enumerate(self.metalTokens):
                 if burned == 0:
-                    actions += [(7, game.metalCodes[metal])]
+                    actions += [(7, metal)]
         for card in game.market.hand:
             if card.cost <= self.curMoney:
                 actions += [(8, card)]
-                if (self.training >= 8) and self.buyelim and isinstance(card, Action):
+                if (self.training >= 8) and self.charAbility2 and isinstance(card, Action):
                     actions += [(9, card)]
         for ally in self.allies:
             if not ally.used1:
