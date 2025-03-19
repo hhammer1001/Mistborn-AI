@@ -6,6 +6,7 @@ class Card():
         self.deck = deck
         self.cost = data[0]
         self.metal = data[1]
+        self.capacity = 0 # todo
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
         # self.ability1
 
@@ -28,8 +29,7 @@ class Action(Card):
         self.metal = data[1]
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
         self.burned = False
-        self.used1 = False
-        self.used2 = False
+        self.metalUsed = 0
         # self.ability1
     
     def burn(self, player):
@@ -39,15 +39,10 @@ class Action(Card):
     
     def reset(self):
         self.burned = False
-        self.used1 = False
-        self.used2 = False
+        self.metalUsed = 0
     
-    def activate():
-        if self.used1:
-            self.used2 = True
-            return self.2
-        self.used1 = True
-        return self.1
+    def activate(self, player):
+        #todo
 
 
 

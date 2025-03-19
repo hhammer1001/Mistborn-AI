@@ -52,6 +52,15 @@ class PlayerDeck(Deck):
         self.discard += self.hand
         self.hand = []
         self.draw(player.handSize)
+    
+    def playAllies(self, player):
+        allies = []
+        for card in self.hand:
+            if isinstance(card, Ally):
+                self.hand.remove(card)
+                allies += [card]
+        player.allies += allies
+
         
 
     def eliminate(self, choice):
@@ -78,7 +87,8 @@ class Market(Deck):
         random.shuffle(self.cards)
         self.draw(6)  
     
-    def pop(self, choice):
+    def buy(self, choice):
+        self.hand.remove(choice)
         self.draw(1)
-        return self.cards.pop(choice)
+
         
