@@ -62,7 +62,7 @@ class Game():
         # if self.numPlayers > 3:
         #     self.p4Deck = Deck(self.characters[3], self)
         #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
-        self.trash = Deck('empty', self)
+        self.trash = []
         self.cardAbilities = [] #TODO
         self.market = [] #TODO
         # self.market = self.marketDeck.flip(6) #TODO
@@ -86,6 +86,16 @@ class Game():
             self.players[currCharacter].playTurn(self)
             currCharacter = (currCharacter + 1) % self.numPlayers
         return self.winner
+    
+    def validTargets(self, player):
+        opp = self.players[(player.turnOrder + 1)%2]
+        taunters = []
+        for ally in opp.allies:
+            if ally.taunt:
+                taunters += [ally]
+        if taunters == []:
+            return opp.allies + [opp]
+        return taunters
 
 # test = Game()
 

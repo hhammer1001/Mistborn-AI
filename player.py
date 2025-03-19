@@ -87,10 +87,12 @@ class Player():
                 case 8:
                     print(f"Enter {i} to use the first ability of your ally {action[1]}") 
                 case 9:
-                    print(f"Enter {i} to use the second ability of your ally {action[1]}") 
+                    print(f"Enter {i} to use the second ability of your ally {action[1]}")
                 case 10:
-                    print(f"Enter {i} to use your first character ability") 
+                    print(f"Enter {i} to use assign damage to {action[1]}")  
                 case 11:
+                    print(f"Enter {i} to use your first character ability") 
+                case 12:
                     print(f"Enter {i} to use your third character ability") 
                    
         while True:
@@ -138,14 +140,20 @@ class Player():
                 self.deck.discard += [action[1]]
                 game.market.buy(action[1])
             case 7:
-                print(f"Enter {i} to buy {action[1]} and then eliminate it using it's first ability") 
+                self.curMoney -= action[1].cost
+                self.charAbility2 = False
+                game.trash += [action[1]]
+                game.market.buy(action[1])
+                action[1].ability1(self, game)
             case 8:
                 print(f"Enter {i} to use the first ability of your ally {action[1]}") 
             case 9:
                 print(f"Enter {i} to use the second ability of your ally {action[1]}") 
             case 10:
-                print(f"Enter {i} to use your first character ability") 
+                print(f"Enter {i} to use assign damage to {action[1]}")  
             case 11:
+                print(f"Enter {i} to use your first character ability") 
+            case 12:
                 print(f"Enter {i} to use your third character ability") 
                    
 
@@ -160,8 +168,9 @@ class Player():
         #7 -> buy and elim card
         #8 -> use first ability of ally
         #9 -> use second ability of ally
-        #10 -> use first character ability
-        #11 -> use third character ability
+        #10 -> assign damage to a valid target
+        #11 -> use first character ability
+        #12 -> use third character ability
         actions = [(0,)]
         if self.curMission > 0:
             for mission in game.missions:
@@ -198,6 +207,9 @@ class Player():
             elif not ally.used2: 
                 if self.metalBurned[ally.metal] > 1: # ack not doing this right
                     actions += [(9, ally)]
+        if self.curDamage > 0:
+            for target in game.validTargets(self):
+                actions += [(10, target)]
         return actions
 
     def charPower(self, tier):

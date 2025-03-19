@@ -57,6 +57,7 @@ class Ally(Card):
         self.used1 = False
         self.used2 = False
         self.rioted = False
+        self.taunt = False #todo
         # self.ability1
     def reset(self):
         self.used1 = False
