@@ -86,16 +86,28 @@ class Game():
             self.players[currCharacter].playTurn(self)
             currCharacter = (currCharacter + 1) % self.numPlayers
         return self.winner
-    
+    def attack(self, player):
+        opp = self.players[(player.turnOrder + 1)%2]
+        for ally in opp.allies:
+            if ally.taunt:
+                return
+        opp.health -= player.curDamage
     def validTargets(self, player):
         opp = self.players[(player.turnOrder + 1)%2]
         taunters = []
+        targets = []
         for ally in opp.allies:
             if ally.taunt:
                 taunters += [ally]
         if taunters == []:
-            return opp.allies + [opp]
-        return taunters
+            targets = opp.allies
+        else: 
+            targets = taunters
+        for target in targets:
+            if player.curDamage < target.health:
+                targets.remove(target)
+        return targets, opp
+
 
 # test = Game()
 

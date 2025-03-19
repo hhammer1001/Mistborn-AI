@@ -89,7 +89,7 @@ class Player():
                 case 9:
                     print(f"Enter {i} to use the second ability of your ally {action[1]}")
                 case 10:
-                    print(f"Enter {i} to use assign damage to {action[1]}")  
+                    print(f"Enter {i} to kill your opponent's {action[1]}")  
                 case 11:
                     print(f"Enter {i} to use your first character ability") 
                 case 12:
@@ -118,6 +118,9 @@ class Player():
                 self.charAbility2 = True
                 self.charAbility3 = True
                 self.deck.cleanUp(self)
+                game.attack(self)
+                self.curDamage = 0
+
             case 1:
                 self.curMission += -1
                 action[1].progress(self.turnOrder, 1)
@@ -150,13 +153,17 @@ class Player():
             case 9:
                 print(f"Enter {i} to use the second ability of your ally {action[1]}") 
             case 10:
-                print(f"Enter {i} to use assign damage to {action[1]}")  
+                self.curDamage -= action[1].health
+                action[2].killAlly(action[1])
+
             case 11:
                 print(f"Enter {i} to use your first character ability") 
             case 12:
                 print(f"Enter {i} to use your third character ability") 
                    
-
+    def killAlly(self, ally):
+        self.allies.remove(ally)
+        self.deck.discard += [ally]
     def availableActions(self, game):
         #0 -> end turn
         #1 -> advance mission
@@ -168,7 +175,7 @@ class Player():
         #7 -> buy and elim card
         #8 -> use first ability of ally
         #9 -> use second ability of ally
-        #10 -> assign damage to a valid target
+        #10 -> kill an ally
         #11 -> use first character ability
         #12 -> use third character ability
         actions = [(0,)]
@@ -207,9 +214,9 @@ class Player():
             elif not ally.used2: 
                 if self.metalBurned[ally.metal] > 1: # ack not doing this right
                     actions += [(9, ally)]
-        if self.curDamage > 0:
-            for target in game.validTargets(self):
-                actions += [(10, target)]
+        opp, targets = game.validTargets(self)
+        for target in targets:
+            actions += [(10, target, opp)]
         return actions
 
     def charPower(self, tier):
