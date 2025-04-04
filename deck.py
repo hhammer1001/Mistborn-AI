@@ -1,8 +1,10 @@
 import random
+import csv
+from card import Funding, Action, Ally
 
 class Deck():
 
-    def __init__(self, player, gameName):
+    def __init__(self, gameName):
         self.game = gameName
         self.hand = []
         self.cards = []
@@ -20,6 +22,16 @@ class Deck():
     def __repr__(self):
         out = self.cards + self.discard + self.hand
         return str(out)
+    
+    def dataToCard(self, data):
+        match data[0]:
+            case 1:
+                return Funding(data, self)
+            case 2:
+                return Action(data, self)
+            case 3:
+                return Ally(data, self)
+
 
     
 
@@ -28,17 +40,19 @@ class PlayerDeck(Deck):
 
     def __init__(self, gameName, code):
         super().__init__(gameName)
-
+        deckInfo = {0:[], 1:[]}
+        with open('starterdecks.csv', newline='') as csvfile:
+            lines = csv.reader(csvfile, delimiter=',', quotechar='|')
+            fixedLines = []
+            for row in lines:
+                deckInfo[int(row[0])] += [row[1:]]
         if code in ['Kelsier', 'Shan']:
             for c in deckInfo[0]:
-                data = cardLookup[c]
-                self.cards += [Card(c, data, self)]
+                self.cards += [self.dataToCard(c)]
         elif code in ['Vin', 'Marsh', 'Prodigy']:
-            pass
+            for c in deckInfo[1]:
+                self.cards += [self.dataToCard(c)]
         random.shuffle(self.cards)
-        
-        
-        self.inPlay = []
     
     def __repr__(self):
         out = self.cards + self.discard + self.hand

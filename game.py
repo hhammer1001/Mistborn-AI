@@ -1,6 +1,6 @@
 import random
 import csv
-from deck import Deck
+from deck import PlayerDeck, Deck
 import card
 from mission import Mission
 from player import Player
@@ -118,23 +118,18 @@ class Game():
 # pTest.missionFuncs[pTest.missionTiers['Canton Of Orthodoxy'][0][1]](pTest.missionTiers['Canton Of Orthodoxy'][0][2])
 # test = [1,2,3]
 # print(test[:3]+test[:5])
-deckInfo = {0:[], 1:[], 2:[]}
-cardLookup = {}
-with open('starterdecks.csv', newline='') as csvfile:
-    lines = csv.reader(csvfile, delimiter=' ', quotechar='|')
-    fixedLines = []
-    for row in lines:
-        # print(row)
-        if len(row) > 1:
-            row = [row[0] + row[1]]
-        fix = row[0].split(",")
-        fixedLines += [fix]
+# deckInfo = {0:[], 1:[], 2:[]}
+# with open('starterdecks.csv', newline='') as csvfile:
+#     lines = csv.reader(csvfile, delimiter=',', quotechar='|')
+#     fixedLines = []
+#     for row in lines:
+#         print(row)
+#         deckInfo[int(row[0])] += row[1:]
 # print(fixedLines)
-for row in fixedLines[1:]:
-    deckInfo[int(row[0])] += [row[1]]
-    cardLookup[row[1]] = row[2:]
-
-test = Game()
+p1 = PlayerDeck("g1", "Shan")
+print(p1)
+p2 = PlayerDeck("g1", "Vin")
+print(p2)
 
 # test.players[0].seek(-5)
 
