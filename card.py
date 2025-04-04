@@ -24,13 +24,25 @@ class Action(Card):
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
         super().__init__(data, deck)
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
-        self.burned = False
+        if self.data[8] == '':
+            if self.data[6] == '':
+                self.capacity = 1
+            else:
+                self.capacity = 2
+        else: 
+            self.capacity = 3
+        
         self.metalUsed = 0
-        # self.ability1
+        self.burned = False
+
     
     def burn(self, player):
         self.burned == True
         player.burn(metal)
+    
+    def addMetal(self, player):
+        self.metalUsed += 1
+
     
     
     def reset(self):

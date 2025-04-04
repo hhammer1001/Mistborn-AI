@@ -133,7 +133,7 @@ class Player():
                 self.metalTokens[action[2]] = 0
             case 4:
                 self.metalAvailable[action[1].metal] += -1
-                action[1].activateAbility(self)
+                action[1].addMetal(self)
             case 5:
                 self.metalTokens[action[1]] = 1
                 self.metalAvailable[action[1]] += 1

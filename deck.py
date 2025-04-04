@@ -20,8 +20,7 @@ class Deck():
             self.hand += [self.cards.pop(0)]
 
     def __repr__(self):
-        out = self.cards + self.discard + self.hand
-        return str(out)
+        return f"Deck: {str(self.cards)} \n Discard: {str(self.discard)} \n Hand: {str(self.hand)}"
     
     def dataToCard(self, data):
         match int(data[0]):
@@ -97,12 +96,17 @@ class PlayerDeck(Deck):
 class Market(Deck):
     def __init__(self, gameName):
         super().__init__(gameName)
-        #TODO self.cards = 
+        with open('marketdeck.csv', newline='') as csvfile:
+            lines = csv.reader(csvfile, delimiter=',', quotechar='|')
+            for row in lines:
+                self.cards += [self.dataToCard(row)]
         random.shuffle(self.cards)
         self.draw(6)  
     
     def buy(self, choice):
         self.hand.remove(choice)
         self.draw(1)
+    def __repr__(self):
+        return f"Market: {str(self.hand)}"
 
         

@@ -1,6 +1,6 @@
 import random
 import csv
-from deck import PlayerDeck, Deck
+from deck import PlayerDeck, Market
 import card
 from mission import Mission
 from player import Player
@@ -33,7 +33,7 @@ if ans in ['y', 'Y']:
 
 class Game():
 
-    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], ):
+    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan']):
 
         self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[9, 'E', 1, 'E', 1],[12, 'E', 4, 'E', 1]], 
                                 "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[7, 'D', 2, 'K', 1],[10, 'D', 3, 'K', 1],[12, 'Pd', 2, 'D', 1]], 
@@ -52,7 +52,7 @@ class Game():
             self.characters = chars
         self.missionNames = [sorted(list(self.missionTiers.keys()))[i] for i in sorted(random.sample(range(8), 3))]
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
-        self.decks = [Deck(self.characters[i], self) for i in range(numPlayers)]
+        self.decks = [PlayerDeck(self.characters[i], self) for i in range(numPlayers)]
         self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         # self.p1Deck = Deck(self.characters[0], self)
         # self.player1 = Player(self.p1Deck, self, 0, names[0], self.characters[0])
@@ -66,8 +66,7 @@ class Game():
         #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
         self.trash = []
         self.cardAbilities = [] #TODO
-        self.market = [] #TODO
-        # self.market = self.marketDeck.flip(6) #TODO
+        self.market = Market(self)
 
          
 
@@ -109,6 +108,8 @@ class Game():
             if player.curDamage < target.health:
                 targets.remove(target)
         return targets, opp
+    def __repr__(self):
+        return f"{str(self.market)}"
 
 
 # test = Game()
@@ -126,12 +127,12 @@ class Game():
 #         print(row)
 #         deckInfo[int(row[0])] += row[1:]
 # print(fixedLines)
-p1 = PlayerDeck("g1", "Shan")
-print(p1)
-p2 = PlayerDeck("g1", "Vin")
-print(p2)
-
+def main():
+    g = Game()
+    print(g)
 # test.players[0].seek(-5)
 
 # for row in fixedLines:
 #     print(row)
+if __name__ == '__main__':
+    main()
