@@ -51,7 +51,7 @@ class Player():
                                 'T': self.train,
                                 'K': self.killAlly,
                                 'R': self.refresh,
-                                'B': self.extraBurn,mission.playerRanks[self.turnOrder]< 12:
+                                'B': self.extraBurn,
                                 'Pc': self.permDraw,
                                 'Pd': self.permDamage,
                                 'Pm': self.permMoney}
@@ -106,7 +106,7 @@ class Player():
                 pass
             return actions[choice]
 
-    def performAction(self, action, game)
+    def performAction(self, action, game):
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2

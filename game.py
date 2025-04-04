@@ -2,6 +2,8 @@ import random
 import csv
 from deck import Deck
 import card
+from mission import Mission
+from player import Player
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 

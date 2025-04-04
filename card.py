@@ -41,8 +41,8 @@ class Action(Card):
         self.burned = False
         self.metalUsed = 0
     
-    def activate(self, player):
-        #todo
+    # def activate(self, player):
+    #     #todo
 
 
 
@@ -64,12 +64,12 @@ class Ally(Card):
         self.used2 = False
         self.rioted = False
     
-    def activate():
-        if self.used1:
-            self.used2 = True
-            return self.2
-        self.used1 = True
-        return self.1
+    # def activate():
+    #     if self.used1:
+    #         self.used2 = True
+    #         return self.2
+    #     self.used1 = True
+    #     return self.1
     def play(self,owner):
         owner.ally(self)
 
