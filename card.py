@@ -6,8 +6,7 @@ class Card():
         self.deck = deck
         self.cost = data[1]
         self.metal = data[2]
-        self.capacity = 0 # todo
-        self.ability1 = [zip(data[3].split("."), data[4].split("."))]
+        # self.ability1 = [zip(data[3].split("."), data[4].split("."))]
         # self.ability1
 
 
@@ -23,10 +22,7 @@ class Card():
 class Action(Card):
     def __init__(self, data, deck):
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
-        self.name = name
-        self.deck = deck
-        self.cost = data[0]
-        self.metal = data[1]
+        super().__init__(data, deck)
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
         self.burned = False
         self.metalUsed = 0
@@ -49,10 +45,7 @@ class Action(Card):
 class Ally(Card):
     def __init__(self, data, deck):
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
-        self.name = name
-        self.deck = deck
-        self.cost = data[0]
-        self.metal = data[1]
+        super().__init__(data, deck)
         self.ability1 = [zip(data[2].split("."), data[3].split("."))]
         self.used1 = False
         self.used2 = False

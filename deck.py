@@ -24,13 +24,13 @@ class Deck():
         return str(out)
     
     def dataToCard(self, data):
-        match data[0]:
+        match int(data[0]):
             case 1:
-                return Funding(data, self)
+                return Funding(data[1:], self)
             case 2:
-                return Action(data, self)
+                return Action(data[1:], self)
             case 3:
-                return Ally(data, self)
+                return Ally(data[1:], self)
 
 
     
