@@ -61,8 +61,8 @@ class Player():
     def turnHelper(self, game):
         actions = self.availableActions(game)
         action = self.selectAction(actions, game)
+        self.performAction(action, game)
         if action != "endTurn":
-            self.performAction(action, game)
             self.turnHelper(game)
 
     def selectAction(self, actions, game):

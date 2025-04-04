@@ -118,7 +118,7 @@ class Game():
 # print(test[:3]+test[:5])
 deckInfo = {0:[], 1:[], 2:[]}
 cardLookup = {}
-with open('starrterdecks.csv', newline='') as csvfile:
+with open('starterdecks.csv', newline='') as csvfile:
     lines = csv.reader(csvfile, delimiter=' ', quotechar='|')
     fixedLines = []
     for row in lines:
