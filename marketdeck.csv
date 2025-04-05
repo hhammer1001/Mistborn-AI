@@ -1,12 +1,12 @@
-2,Recover,2,0,M, H,2, 2,M, H,2, 2,,,,,,
-2,Strike,2,0,D, H,2, 1,,,,,,,H,1
-2,Strike,2,0,D, H,2, 1,,,,,,,H,1
-2,Brawl,4,0,D, M,3, 2,,,,,,,D,2
+2,Recover,2,0,M.H,2.2,M.H,2.2,,,,,,
+2,Strike,2,0,D.H,2.1,,,,,,,H,1
+2,Strike,2,0,D.H,2.1,,,,,,,H,1
+2,Brawl,4,0,D.M,3.2,,,,,,,D,2
 2,Survive,4,0,H,3,H,3,,,,,,
 2,Survive,4,0,H,3,H,3,,,,,,
 2,Crushing Blow,6,0,D,6,,,H,8,,,,
-2,Investigate,3,1,M, special1,1, 0,,,,,,,,
-2,Investigate,3,1,M, special1,1, 0,,,,,,,,
+2,Investigate,3,1,M.special1,1.0,,,,,,,,
+2,Investigate,3,1,M.special1,1.0,,,,,,,,
 2,Eavesdrop,3,1,special2,0,,,,,special,2,M,1
 2,Eavesdrop,3,1,special2,0,,,,,special,2,M,1
 2,Lookout,4,1,Mi,2,special3,0,,,,,,
@@ -14,49 +14,49 @@
 2,Hyperaware,6,1,Mi,3,,,special4,0,,,,
 2,Hunt,2,2,seek,3,,,,,,,,
 2,Hunt,2,2,seek,3,,,,,,,,
-2,Pursue,3,2,Mi, M,2, 2,,,,,,,Mi,1
-2,Infiltrate,3,2,D, M,2, 2,D, Mi,1, 2,,,,,,
+2,Pursue,3,2,Mi.M,2.2,,,,,,,Mi,1
+2,Infiltrate,3,2,D.M,2.2,D.Mi,1.2,,,,,,
 2,Unveil,5,2,Mi,3,seek,6,,,,,,
 2,Unveil,5,2,Mi,3,seek,6,,,,,,
-2,Pierce,6,2,Mi, seek,3, 5,,,Seek,-6,,,,
-2,Coppercloud,2,3,M, special5,1, 0,,,,,cloud,3,,
-2,Coppercloud,2,3,M, special5,1, 0,,,,,cloud,3,,
+2,Pierce,6,2,Mi.seek,3.5,,,Seek,-6,,,,
+2,Coppercloud,2,3,M.special5,1.0,,,,,cloud,3,,
+2,Coppercloud,2,3,M.special5,1.0,,,,,cloud,3,,
 2,Sneak,3,3,Mi,2,,,,,cloud,3,,
 2,Hide,4,3,H,3,,,,,cloud,-1,D,2
 2,Hide,4,3,H,3,,,,,cloud,-1,D,2
-2,Train In Secret,4,3,choose,(T, 1, D, 2, Mi, 2, H, 3),,,,,cloud,3,,
-2,Strategize,6,3,T, D, Mi, H, M,1, 1, 1, 1, 1,,,choose,(T, 1, D, 4, Mi, 3, H, 5, M, 5),,,,
-2,Enrage,2,4,D, M, riot,1, 2, 0,,,,,,,,
-2,Enrage,2,4,D, M, riot,1, 2, 0,,,,,,,,
+2,Train In Secret,4,3,choose,(T.1.D.2.Mi.2.H.3),,,,,cloud,3,,
+2,Strategize,6,3,T.D.Mi.H.M,1.1.1.1.1,,,choose,(T.1.D.4.Mi.3.H.5.M.5),,,,
+2,Enrage,2,4,D.M.riot,1.2.0,,,,,,,,
+2,Enrage,2,4,D.M.riot,1.2.0,,,,,,,,
 2,Charm,3,4,M,3,M,2,,,,,M,2
-2,Inspire,3,4,M, riot,3, 1,,,,,,,,
-2,Inspire,3,4,M, riot,3, 1,,,,,,,,
-2,Intimidate,3,4,M,3,M, C,1, 1,,,,,,
-2,House War,6,4,D, C,2, 2,,,special exchange dmg for mission,,,,,
-2,Con,2,5,Mi, M, E,1, 1, 1,,,,,,,Mi,1
-2,Con,2,5,Mi, M, E,1, 1, 1,,,,,,,Mi,1
+2,Inspire,3,4,M.riot,3.1,,,,,,,,
+2,Inspire,3,4,M.riot,3.1,,,,,,,,
+2,Intimidate,3,4,M,3,M.C,1.1,,,,,,
+2,House War,6,4,D.C,2.2,,,special exchange dmg for mission,,,,,
+2,Con,2,5,Mi.M.E,1.1.1,,,,,,,Mi,1
+2,Con,2,5,Mi.M.E,1.1.1,,,,,,,Mi,1
 2,Subdue,3,5,E,2,special,0,,,,,,
-2,Deceive,4,5,M, E,2, 2,Mi,2,,,,,,
-2,Deceive,4,5,M, E,2, 2,Mi,2,,,,,,
-2,Pacify,4,5,T, E,1, 1,,,,,,,T,1
-2,Dominate,6,5,Mi, E,2, 2,,,special exchange mission for dmg,,,,,
-2,Ironpull,2,6,D, pull,2, 1,,,,,,,,
-2,Ironpull,2,6,D, pull,2, 1,,,,,,,,
-2,Reposition,3,6,choose, R,(D, 2, M, 2), 1,,,,,,,D,1
-2,Crash,4,6,D, pull,2, 1,C,1,,,,,D,2
-2,Crash,4,6,D, pull,2, 1,C,1,,,,,D,2
-2,Rescue,4,6,D, M, pull,3, 2,,,,,,,,
-2,Ascendant,6,6,D, pull,4, 3,,,C,3,,,,
-2,Soar,2,7,push,1,M, special buy eliminated card,2, 0,,,,,Mi,1
-2,Soar,2,7,push,1,M, special buy eliminated card,2, 0,,,,,Mi,1
-2,Assassinate,3,7,D, push,3, 1,K,1,,,,,,
-2,Precise Shot,3,7,D, push,3, 1,,,special gain eliminated card to hand,,,,,
-2,Steelpush,3,7,choose,(T, 1, D, 3),D, Mi,1, 2,,,,,,
-2,Steelpush,3,7,choose,(T, 1, D, 3),D, Mi,1, 2,,,,,,
-2,Maelstrom,6,7,D, M,5, 2,,,kill all opponent allies and eliminate market,,,,,
-2,Balance,8,16,Mi, D,4, 4,,,,,,,,
-2,Preserve,8,16,Mi, D,5, 2,,,,,,,,
-2,Ruin,8,16,Mi, D,1, 7,,,,,,,,
+2,Deceive,4,5,M.E,2.2,Mi,2,,,,,,
+2,Deceive,4,5,M.E,2.2,Mi,2,,,,,,
+2,Pacify,4,5,T.E,1.1,,,,,,,T,1
+2,Dominate,6,5,Mi.E,2.2,,,special exchange mission for dmg,,,,,
+2,Ironpull,2,6,D.pull,2.1,,,,,,,,
+2,Ironpull,2,6,D.pull,2.1,,,,,,,,
+2,Reposition,3,6,choose.R,(D.2.M.2).1,,,,,,,D,1
+2,Crash,4,6,D.pull,2.1,C,1,,,,,D,2
+2,Crash,4,6,D.pull,2.1,C,1,,,,,D,2
+2,Rescue,4,6,D.M.pull,3.2,,,,,,,,
+2,Ascendant,6,6,D.pull,4.3,,,C,3,,,,
+2,Soar,2,7,push,1,M.special buy eliminated card,2,,,,,Mi,1
+2,Soar,2,7,push,1,M.special buy eliminated card,2,,,,,Mi,1
+2,Assassinate,3,7,D.push,3.1,K,1,,,,,,
+2,Precise Shot,3,7,D.push,3.1,,,special gain eliminated card to hand,,,,,
+2,Steelpush,3,7,choose,(T.1.D.3),D.Mi,1.2,,,,,,
+2,Steelpush,3,7,choose,(T.1.D.3),D.Mi,1.2,,,,,,
+2,Maelstrom,6,7,D.M,5.2,,,kill all opponent allies and eliminate market,,,,,
+2,Balance,8,16,Mi.D,4.4,,,,,,,,
+2,Preserve,8,16,Mi.D,5.2,,,,,,,,
+2,Ruin,8,16,Mi.D,1.7,,,,,,,,
 2,Confrontation,9,16,special play ability of eliminated card,0,special +2 atium = win,0,,,,,,
 3,Noble,2,-1,,,,,2,B,,,,
 3,Hazekillers,4,-1,,,,,3,,,,,
@@ -65,14 +65,14 @@
 3,Soldier,3,0,D,1,,,2,,,,,
 3,Pewterarm,5,0,D,2,,,3,,,,,
 3,Houselord,3,1,M,2,C,1,2,,,,,
-3,Tineye,5,1,M, Mi,2, 1,Mi,2,3,,,,,
+3,Tineye,5,1,M.Mi,2.1,Mi,2,3,,,,,
 3,Obligator,3,2,Seek ,1,,,2,,,,,
 3,Seeker,5,2,Seek,5,special,,3,,,,,
 3,Keeper,3,3,special,,,,2,,,,,
 3,Smoker,5,3,H,2,,,3,special,,,,
 3,Rebel,3,4,Riot,1,,,2,,,,,
 3,Rioter,5,4,M,3,D,2,3,,,,,
-3,Informant,3,5,Mi, special,1, 0,,,2,,,,,
+3,Informant,3,5,Mi.special,1.0,,,2,,,,,
 3,Soother,5,5,Mi,2,Soothe,2,3,,,,,
 3,Pickpocket,3,6,M,1,Pull,1,2,,,,,
 3,Lurcher,5,6,D,2,Pull,2,3,,,,,

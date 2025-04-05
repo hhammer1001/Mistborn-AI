@@ -23,7 +23,7 @@ class Action(Card):
     def __init__(self, data, deck):
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
         super().__init__(data, deck)
-        self.ability1 = [zip(data[2].split("."), data[3].split("."))]
+        self.data = data
         if self.data[8] == '':
             if self.data[6] == '':
                 self.capacity = 1
@@ -42,7 +42,12 @@ class Action(Card):
     
     def addMetal(self, player):
         self.metalUsed += 1
+        ability = self.data[(self.metalUsed + 1)*2]
+        if ability != '':
+            player.resolve(ability, self.data[(self.metalUsed + 1)*2 + 1])
 
+    def ability1(self, player):
+        player.resolve(self.data[4], self.data[5])
     
     
     def reset(self):

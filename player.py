@@ -147,7 +147,7 @@ class Player():
                 self.charAbility2 = False
                 game.trash += [action[1]]
                 game.market.buy(action[1])
-                action[1].ability1(self, game)
+                action[1].ability1(self)
             case 8:
                 print(f"Enter {i} to use the first ability of your ally {action[1]}") 
             case 9:
