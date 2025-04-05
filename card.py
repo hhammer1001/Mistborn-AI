@@ -38,7 +38,8 @@ class Action(Card):
     
     def burn(self, player):
         self.burned == True
-        player.burn(metal)
+        if (self.data[12] != ''):
+            player.resolve(self.data[12],self.data[12])
     
     def addMetal(self, player):
         self.metalUsed += 1

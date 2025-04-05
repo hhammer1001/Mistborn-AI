@@ -42,6 +42,14 @@ class Player():
         #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
         #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
         self.houseWarring = False
+        with open('characters.csv', newline='') as csvfile:
+            lines = csv.reader(csvfile, delimiter=',', quotechar='|')
+            for row in lines:
+                if row[0] == self.character:
+                    self.ability1metal = row[1]
+                    self.ability1effect = row[2]
+                    self.ability1amount = row[3]
+
         self.missionFuncs = {'D': self.damage,
                                 'M': self.money,
                                 'H': self.heal,
@@ -57,43 +65,67 @@ class Player():
                                 'Pm': self.permMoney}
     def playTurn(self, game):
         self.deck.playAllies() 
-        self.turnHelper(game)
-    def turnHelper(self, game):
+        self.resolve("T", "1")
+        self.takeActions(game)
+        self.assignDamage(game)
+        game.attack(self)
+
+    def takeActions(self, game):
         actions = self.availableActions(game)
         action = self.selectAction(actions, game)
         self.performAction(action, game)
-        if action != "endTurn":
-            self.turnHelper(game)
-
+        if action[0] != 0:
+            self.takeActions(game)
+    def assignDamage(self, game):
+        opp, targets = game.validTargets(self)
+        for i, target in enumerate(targets):
+            print(f"{i}: kill your opponent's {target}") 
+        print("-1: deal remaining damage to your opponent")
+        while True:
+            try:
+                choice = int(input("Enter the number assosciated with your chosen target"))
+                if choice not in range(-1,len(targets)):
+                    raise ValueError("Not a valid choice")
+                break
+            except ValueError:
+                print("Please make a valid choice")
+                pass
+            if(choice == -1):
+                return
+            else:
+                self.curDamage -= targets[choice].health
+                opp.killAlly(targets[choice])
+                assignDamage(game)
     def selectAction(self, actions, game):
         for i, action in enumerate(actions):
             match action[0]:
                 case 0:
-                    print(f"Enter {i} to end your turn")
+                    print(f"{i}: move to damage")
                 case 1:
-                    print(f"Enter {i} to advance mission {action[1]}")
+                    print(f"{i}: advance mission {action[1]}")
                 case 2:
-                    print(f"Enter {i} to burn the card {action[1]} for {game.metalCodes[action[2]]}")
+                    print(f"{i}: burn the card {action[1]} for {game.metalCodes[action[2]]}")
                 case 3:
-                    print(f"Enter {i} to use {action[1]} to refresh {game.metalCodes[action[2]]}")
+                    print(f"{i}: use {action[1]} to refresh {game.metalCodes[action[2]]}")
                 case 4:
-                    print(f"Enter {i} to put metal towards the abilities of {action[1]}") 
+                    print(f"{i}: put metal towards the abilities of {action[1]}") 
                 case 5:
-                    print(f"Enter {i} to burn {game.metalCodes[action[1]]}") 
+                    if self.metalTokens.count(1) < self.burns:
+                        print(f"{i}: burn {game.metalCodes[action[1]]}") 
+                    else:
+                        print(f"{i}: flare {game.metalCodes[action[1]]}")
                 case 6:
-                    print(f"Enter {i} to buy {action[1]}") 
+                    print(f"{i}: buy {action[1]}") 
                 case 7:
-                    print(f"Enter {i} to buy {action[1]} and then eliminate it using it's first ability") 
+                    print(f"{i}: buy {action[1]} and then eliminate it using it's first ability") 
                 case 8:
-                    print(f"Enter {i} to use the first ability of your ally {action[1]}") 
+                    print(f"{i}: use the first ability of your ally {action[1]}") 
                 case 9:
-                    print(f"Enter {i} to use the second ability of your ally {action[1]}")
+                    print(f"{i}: use the second ability of your ally {action[1]}") 
                 case 10:
-                    print(f"Enter {i} to kill your opponent's {action[1]}")  
+                    print(f"{i}: use your first character ability") 
                 case 11:
-                    print(f"Enter {i} to use your first character ability") 
-                case 12:
-                    print(f"Enter {i} to use your third character ability") 
+                    print(f"{i}: use your third character ability") 
                    
         while True:
             try:
@@ -125,7 +157,7 @@ class Player():
                 self.curMission += -1
                 action[1].progress(self.turnOrder, 1)
             case 2:
-                action[1].burned = True
+                action[1].burn()
                 self.metalAvailable[action[2]] += 1
                 self.metalBurned[action[2]] += 1
             case 3:
@@ -135,7 +167,10 @@ class Player():
                 self.metalAvailable[action[1].metal] += -1
                 action[1].addMetal(self)
             case 5:
-                self.metalTokens[action[1]] = 1
+                if self.metalTokens.count(1) < self.burns:
+                    self.metalTokens[action[1]] = 1
+                else: 
+                    self.metalTokens[action[1]] = 2
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
             case 6:
@@ -153,31 +188,28 @@ class Player():
             case 9:
                 print(f"Enter {i} to use the second ability of your ally {action[1]}") 
             case 10:
-                self.curDamage -= action[1].health
-                action[2].killAlly(action[1])
-
+                self.resolve(self.ability1effect, ability1amount)
+                self.charAbility1 = False
             case 11:
-                print(f"Enter {i} to use your first character ability") 
-            case 12:
-                print(f"Enter {i} to use your third character ability") 
+                self.resolve("D.Mi", "3.3")
+                self.charAbility3 = False 
                    
     def killAlly(self, ally):
         self.allies.remove(ally)
         self.deck.discard += [ally]
     def availableActions(self, game):
-        #0 -> end turn
+        #0 -> move to damage
         #1 -> advance mission
         #2 -> burn card
         #3 -> refresh with card
         #4 -> put a metal towards the abilities of card
-        #5 -> burn a metal
+        #5 -> burn/flare a metal
         #6 -> buy card
         #7 -> buy and elim card
         #8 -> use first ability of ally
         #9 -> use second ability of ally
-        #10 -> kill an ally
-        #11 -> use first character ability
-        #12 -> use third character ability
+        #10 -> use first character ability
+        #11 -> use third character ability
         actions = [(0,)]
         if self.curMission > 0:
             for mission in game.missions:
@@ -198,10 +230,10 @@ class Player():
                             actions += [(3, card, ((card.metal//2)*2) + 1)]
                 if self.metalAvailable[card.metal] and card.metalUsed < card.capacity:
                     actions += [(4, card)]
-        if self.metalTokens.count(1) < self.burns:
-            for metal, burned in enumerate(self.metalTokens):
-                if burned == 0:
-                    actions += [(5, metal)]
+        
+        for metal, burned in enumerate(self.metalTokens):
+            if burned == 0:
+                actions += [(5, metal)]
         for card in game.market.hand:
             if card.cost <= self.curMoney:
                 actions += [(6, card)]
@@ -214,9 +246,10 @@ class Player():
             elif not ally.used2: 
                 if self.metalBurned[ally.metal] > 1: # ack not doing this right
                     actions += [(9, ally)]
-        opp, targets = game.validTargets(self)
-        for target in targets:
-            actions += [(10, target, opp)]
+        if (self.charAbility1 and self.training >= 5):
+            actions += [(10,)]
+        if (self.charAbility3 and self.training >= 13):
+            actions += [(11,)]
         return actions
 
     def charPower(self, tier):
