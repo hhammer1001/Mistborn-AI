@@ -18,11 +18,10 @@ class Player():
         self.metalBurned = [0]*8 # for ally/character abilities
         self.burns = 1
         self.training = 0
-        self.trainingRewards = {3:['B', 1], 5:[self.level, 1], 8:[self.level, 2], 9:['B', 1], 11:['A', 1], 13:[self.level, 3], 15:['B', 1], 16:['A', 1]}
+        self.trainingRewards = {3:['B', 1], 9:['B', 1], 11:['A', 1], 15:['B', 1], 16:['A', 1]}
         self.charAbility1 = True
         self.charAbility2 = True
         self.charAbility3 = True
-        self.lvl = 0
         self.turnOrder = turnOrder
 
         self.curDamage = 0
@@ -41,7 +40,6 @@ class Player():
         #                         "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
         #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
         #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
-        self.houseWarring = False
         with open('characters.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in lines:
@@ -353,7 +351,12 @@ class Player():
         self.atium += amount
 
     def train(self, amount):
-        self.train += amount 
+        for i in range(amount):
+            self.training += 1
+            if self.training in self.trainingRewards:
+                self.resolve(self.trainingRewards[self.training][0], self.trainingRewards[self.training][1])
+            elif self.lvl > 20:
+                self.gainAtium(1)
 
     def killAlly(self, amount):
         #TODO
@@ -368,7 +371,7 @@ class Player():
     def permDamage(self, amount):
         self.pDamage += amount
 
-    def special1(self, amount):
+    def special1(self, amount=0):
         #investigate
         count = 0
         for m in self.game.missions:
@@ -385,7 +388,7 @@ class Player():
                     count += 1
         self.money(count)
 
-    def special2(self, amount):
+    def special2(self, amount=0):
         #Eavesdrop1
         for m in self.game.missions:
             ranks = m.playerRanks
@@ -400,7 +403,7 @@ class Player():
                 if lowest == [1,1]:
                     m.progress(self.turnOrder, 1)
     
-    def special3(self, amount):
+    def special3(self, amount=0):
         #Lookout
         count = 0
         for m in self.game.missions:
@@ -416,7 +419,7 @@ class Player():
         self.draw(count)
 
 
-    def special4(self, amount):
+    def special4(self, amount=0):
         #Hyperaware
         count = 0
         for m in self.game.missions:
@@ -431,7 +434,7 @@ class Player():
                     count += 1
         self.damage(count*3)
 
-    def special5(self, amount):
+    def special5(self, amount=0):
         #Coppercloud
         count = 0
         for m in self.game.missions:
@@ -448,10 +451,22 @@ class Player():
             self.draw(1)
 
 
-    def special6(self, amount):
+    def special6(self, amount=0):
         #House war tier 2
-        self.houseWarring = True
+        self.mission += self.damage
+        self.damage = 0
+    
+    def special7(self, amount=0):
+        #House war tier 3
+        self.damage += self.mission
+        self.mission = 0
 
+    def resolve(self, effect, amount):
+        if type(effect) == list:
+            for i in range(len(effect)):
+                self.missionFuncs[effect[i]](amount[i])
+        else:
+            self.missionFuncs[effect](amount)
 
     def refresh(self, amount):
         print(self.metals)
@@ -465,15 +480,10 @@ class Player():
                 print("Invalid input. Please choose a metal number to refresh")
         if self.metals[choice] == 2:
             self.metals[choice] = 0
+
+
     def extraBurn(self, amount):
         self.burns += amount
-
-    def level(self, tier):
-        self.lvl = tier
-        if self.lvl in self.trainingRewards:
-            self.trainingRewards[self.lvl][0](self.trainingRewards[self.lvl][1])
-        elif self.lvl > 20:
-            self.gainAtium(1)
 
     def seek(self, amount):
         #negative code is for pierce tier 2 ability
