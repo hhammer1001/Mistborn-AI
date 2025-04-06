@@ -513,7 +513,22 @@ class Player():
         self.deck.discard += choices[choice]
         game.market.buy(choices[choice])
 
-    def resolve(self, effect, amount):
+    def special9(self, amount=0):
+        #Soar
+        choices = filter(lambda x: x.cost <= self.curMoney, self.game.market.discard)
+        print(f"Choices are {list(zip(range(len(choices)), choices))}")
+        while True:
+            try:
+                choice = int(input("Card number to buy: "))
+                if choice not in range(len(choices)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a card number to gain")
+        self.discard += choices[choice]
+        self.game.market.discard.remove(choices[choice])
+
+    def resolve(self, effect, amount=0):
         if type(effect) == list:
             for i in range(len(effect)):
                 self.missionFuncs[effect[i]](amount[i])
