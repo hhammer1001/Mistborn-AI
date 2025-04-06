@@ -92,7 +92,7 @@ class Game():
         for ally in opp.allies:
             if ally.taunt:
                 return
-        opp.health -= player.curDamage
+        opp.takeDamage(player.curDamage)
     def validTargets(self, player):
         opp = self.players[(player.turnOrder + 1)%2]
         taunters = []
