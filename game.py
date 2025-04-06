@@ -108,6 +108,9 @@ class Game():
             if player.curDamage < target.health:
                 targets.remove(target)
         return targets, opp
+    def senseCheck(self, player):
+        opp = self.players[(player.turnOrder + 1)%2]
+        return opp.senseCheck()
     def __repr__(self):
         return f"{str(self.market)}"
 
