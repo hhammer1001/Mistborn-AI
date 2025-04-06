@@ -9,8 +9,7 @@ class Player():
         self.pDamage = 0
         self.pMoney = 0
         self.handSize = 5
-        # self.deck = Deck(self.character, self, )
-        # self.discard = Deck('empty')
+        self.deck = deck
         self.atium = 0
         self.allies = []
         self.metalTokens = [0]*8 #0 available 1 burned 2 flared
@@ -195,8 +194,25 @@ class Player():
                 self.charAbility3 = False 
                    
     def killAlly(self, ally):
+        
+        for card in self.deck.hand:
+            if card.data[10] == "cloudA":
+                while True:
+                    try:
+                        ans = input(f"Discard {card} to prevent {card.data[11]} damage? Y/N")
+                        if ans not in ['y', 'n', 'Y', 'N']:
+                            raise ValueError("Enter Y or N")
+                        break
+                    except ValueError:
+                        print("Invalid input. Please enter Y or N")
+                        pass
+                if ans in ['y', 'Y']:
+                    self.deck.hand.remove(card)
+                    self.deck.discard += [card]
+                    return
         self.allies.remove(ally)
         self.deck.discard += [ally]
+
     def availableActions(self, game):
         #0 -> move to damage
         #1 -> advance mission
@@ -355,10 +371,6 @@ class Player():
     def train(self, amount):
         self.train += amount 
 
-    def killAlly(self, amount):
-        #TODO
-        pass
-
     def permDraw(self, amount):
         self.pDraw += amount
 
@@ -507,10 +519,10 @@ class Player():
 
     def takeDamage(self, amount):
         for card in self.deck.hand:
-            if card.active[0] == "cloudP" and amount > 0 and card.active[1] > 0:
+            if card.data[10] == "cloudP":
                 while True:
                     try:
-                        ans = input(f"Discard {card} to prevent {card.active[1]} damage? Y/N")
+                        ans = input(f"Discard {card} to prevent {card.data[11]} damage? Y/N")
                         if ans not in ['y', 'n', 'Y', 'N']:
                             raise ValueError("Enter Y or N")
                         break
@@ -519,10 +531,9 @@ class Player():
                         pass
                 if ans in ['y', 'Y']:
                     amount = max(amount - card.active[1], 0)
+                    self.deck.hand.remove(card)
+                    self.deck.discard += [card]
         self.curHealth -= amount
         if self.curHealth <= 0:
             self.alive = False
                 
-        
-    def playCard(self, card):
-        card.play(self)
