@@ -469,9 +469,27 @@ class Player():
         self.damage = 0
     
     def special7(self, amount=0):
-        #House war tier 3
+        #Dominate tier 2
         self.damage += self.mission
         self.mission = 0
+
+    def special8(self, amount=0):
+        #Subdue
+        choices = []
+        for card in self.game.market.hand:
+            if card.cost <= 5:
+                choices += card
+        print(f"Choices are {list(zip(range(len(choices)), choices))}")
+        while True:
+            try:
+                choice = int(input("Card number to choose: "))
+                if choice not in range(len(choices)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a card number to gain")
+        self.deck.discard += choices[choice]
+        game.market.buy(choices[choice])
 
     def resolve(self, effect, amount):
         if type(effect) == list:
