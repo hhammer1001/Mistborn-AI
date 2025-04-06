@@ -140,6 +140,7 @@ class Player():
             case 0:
                 self.curBoxings += self.curMoney // 2
                 self.curMoney = 0
+                self.curMission = 0
                 self.metalTokens = list(map(lambda x: 0 if x == 1 else x, self.metalTokens))
                 self.metalAvailable = [0]*8
                 self.metalBurned = [0]*8
@@ -151,8 +152,12 @@ class Player():
                 self.curDamage = 0
 
             case 1:
-                self.curMission += -1
-                action[1].progress(self.turnOrder, 1)
+                sense = game.senseCheck(self)
+                if sense > 0:
+                    self.curMission -= sense
+                else:
+                    self.curMission += -1
+                    action[1].progress(self.turnOrder, 1)
             case 2:
                 action[1].burn()
                 self.metalAvailable[action[2]] += 1
@@ -190,7 +195,24 @@ class Player():
             case 11:
                 self.resolve("D.Mi", "3.3")
                 self.charAbility3 = False 
-                   
+    def senseCheck(self):
+        for card in self.deck.hand:
+            if card.data[10] == "sense":
+                while True:
+                    try:
+                        ans = input(f"Discard {card} to prevent {card.data[11]} mission? Y/N")
+                        if ans not in ['y', 'n', 'Y', 'N']:
+                            raise ValueError("Enter Y or N")
+                        break
+                    except ValueError:
+                        print("Invalid input. Please enter Y or N")
+                        pass
+                if ans in ['y', 'Y']:
+                    self.deck.hand.remove(card)
+                    self.deck.discard += [card]
+                    return card.data[11]
+                else:
+                    return 0                   
     def killAlly(self, ally):
         
         for card in self.deck.hand:
