@@ -182,7 +182,7 @@ class Player():
             case 7:
                 self.curMoney -= action[1].cost
                 self.charAbility2 = False
-                game.trash += [action[1]]
+                game.market.discard += [action[1]]
                 game.market.buy(action[1])
                 action[1].ability1(self)
             case 8:

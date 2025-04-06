@@ -81,11 +81,15 @@ class PlayerDeck(Deck):
             p = len(self.inPlay)
             d = len(self.discard)
             if choice < h:
-                self.deck.hand = self.deck.hand[:choice] + self.deck.hand[choice+1:]
+                self.hand = self.hand[:choice] + self.hand[choice+1:]
+                return self.hand[choice]
             elif choice < h+p:
-                self.deck.inPlay = self.deck.inPlay[:choice-h] + self.deck.inPlay[choice-h+1:]
+                self.inPlay = self.inPlay[:choice-h] + self.inPlay[choice-h+1:]
+                return self.inPlay[choice - h]
             else:
-                self.deck.discard = self.deck.discard[:choice-h-p] + self.deck.discard[choice-h-p+1:]
+                self.discard = self.discard[:choice-h-p] + self.discard[choice-h-p+1:]
+                return self.discard[choice - h - p]
+            
     
     def add(self, card):
         self.discard += [card]
