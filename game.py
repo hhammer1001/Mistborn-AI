@@ -64,7 +64,6 @@ class Game():
         # if self.numPlayers > 3:
         #     self.p4Deck = Deck(self.characters[3], self)
         #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
-        self.trash = []
         self.cardAbilities = [] #TODO
         self.market = Market(self)
 
@@ -93,10 +92,12 @@ class Game():
             if ally.taunt:
                 return
         opp.takeDamage(player.curDamage)
-    def validTargets(self, player):
+    def validTargets(self, player, ignoreDefender = False):
         opp = self.players[(player.turnOrder + 1)%2]
         taunters = []
         targets = []
+        if ignoreDefender:
+            return opp.allies, opp
         for ally in opp.allies:
             if ally.taunt:
                 taunters += [ally]
