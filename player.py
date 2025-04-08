@@ -14,7 +14,7 @@ class Player():
         self.deck = deck
         self.atium = 0
         self.allies = []
-        self.metalTokens = [0]*8 #0 available 1 burned 2 flared
+        self.metalTokens = [0]*9 #0 available 1 burned 2 flared atium is just number of tokens used this turn
         self.metalAvailable = [0]*9 # for spending on actions
         self.metalBurned = [0]*9 # for ally/character abilities
         self.burns = 1
@@ -111,7 +111,7 @@ class Player():
                 case 4:
                     print(f"{i}: put metal towards the abilities of {action[1]}") 
                 case 5:
-                    if (self.metalTokens.count(1) + self.metalBurned[8]) < self.burns:
+                    if (self.metalTokens.count(1) + self.metalTokens[8]) < self.burns:
                         print(f"{i}: burn {game.metalCodes[action[1]]}") 
                     else:
                         print(f"{i}: flare {game.metalCodes[action[1]]}")
@@ -146,6 +146,7 @@ class Player():
                 self.curMoney = self.pMoney
                 self.curMission = 0
                 self.metalTokens = list(map(lambda x: 0 if x == 1 else x, self.metalTokens))
+                self.metalTokens[8] = 0
                 self.metalAvailable = [0]*9
                 self.metalBurned = [0]*9
                 self.charAbility1 = True
@@ -175,10 +176,13 @@ class Player():
                     self.metalAvailable[8] -= 1
                     self.metalBurned[action[1].metal] += 1
             case 5:
-                if (self.metalTokens.count(1) + self.metalBurned[8]) < self.burns:
-                    self.metalTokens[action[1]] = 1
+                if action[1] == 8:
+                    self.metalTokens[8] += 1
                 else: 
-                    self.metalTokens[action[1]] = 2
+                    if (self.metalTokens.count(1) + self.metalTokens[8]) < self.burns:
+                        self.metalTokens[action[1]] = 1
+                    else: 
+                        self.metalTokens[action[1]] = 2
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
             case 6:
@@ -279,7 +283,7 @@ class Player():
         for metal, burned in enumerate(self.metalTokens):
             if burned == 0:
                 actions += [(5, metal)]
-        if (self.atium > 0) and ((self.metalTokens.count(1) + self.metalBurned[8]) < self.burns):
+        if (self.atium > 0) and ((self.metalTokens.count(1) + self.metalTokens[8]) < self.burns):
             actions += [(5, 8)]
         for card in game.market.hand:
             if card.cost <= self.curMoney:
