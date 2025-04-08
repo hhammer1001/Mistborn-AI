@@ -6,15 +6,17 @@ class Player():
         self.game = gameName
         self.character = character
         self.curHealth = 36 + 2 * turnOrder
+        
         self.pDamage = 0
         self.pMoney = 0
         self.handSize = 5
+        
         self.deck = deck
         self.atium = 0
         self.allies = []
         self.metalTokens = [0]*8 #0 available 1 burned 2 flared
-        self.metalAvailable = [0]*8 # for spending on actions
-        self.metalBurned = [0]*8 # for ally/character abilities
+        self.metalAvailable = [0]*9 # for spending on actions
+        self.metalBurned = [0]*9 # for ally/character abilities
         self.burns = 1
         self.training = 0
         self.trainingRewards = {3:['B', 1], 9:['B', 1], 11:['A', 1], 15:['B', 1], 16:['A', 1]}
@@ -27,6 +29,7 @@ class Player():
         self.curMoney = 0
         self.curMission = 0
         self.curBoxings = 0
+        self.atium = 0
 
         if self.curHealth > 40:
             self.curHealth = 40
@@ -66,6 +69,7 @@ class Player():
         self.takeActions(game)
         self.assignDamage(game)
         game.attack(self)
+        self.curDamage = self.pDamage
 
     def takeActions(self, game):
         actions = self.availableActions(game)
@@ -107,7 +111,7 @@ class Player():
                 case 4:
                     print(f"{i}: put metal towards the abilities of {action[1]}") 
                 case 5:
-                    if self.metalTokens.count(1) < self.burns:
+                    if (self.metalTokens.count(1) + self.metalBurned[8]) < self.burns:
                         print(f"{i}: burn {game.metalCodes[action[1]]}") 
                     else:
                         print(f"{i}: flare {game.metalCodes[action[1]]}")
@@ -139,17 +143,15 @@ class Player():
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2
-                self.curMoney = 0
+                self.curMoney = self.pMoney
                 self.curMission = 0
                 self.metalTokens = list(map(lambda x: 0 if x == 1 else x, self.metalTokens))
-                self.metalAvailable = [0]*8
-                self.metalBurned = [0]*8
+                self.metalAvailable = [0]*9
+                self.metalBurned = [0]*9
                 self.charAbility1 = True
                 self.charAbility2 = True
                 self.charAbility3 = True
                 self.deck.cleanUp(self)
-                game.attack(self)
-                self.curDamage = 0
 
             case 1:
                 sense = game.senseCheck(self)
@@ -166,10 +168,14 @@ class Player():
                 action[1].burned = True
                 self.metalTokens[action[2]] = 0
             case 4:
-                self.metalAvailable[action[1].metal] += -1
-                action[1].addMetal(self)
+                if self.metalAvailable[action[1].metal] > 0:
+                    self.metalAvailable[action[1].metal] -= 1
+                    action[1].addMetal(self)
+                else: 
+                    self.metalAvailable[8] -= 1
+                    self.metalBurned[action[1].metal] += 1
             case 5:
-                if self.metalTokens.count(1) < self.burns:
+                if (self.metalTokens.count(1) + self.metalBurned[8]) < self.burns:
                     self.metalTokens[action[1]] = 1
                 else: 
                     self.metalTokens[action[1]] = 2
@@ -254,8 +260,11 @@ class Player():
         for card in self.deck.hand:
             if not card.burned:
                 if card.metalUsed == 0:
-                    actions += [(2, card, (card.metal//2)*2), (2, card, (card.metal//2)*2 + 1)]
-                    if (card.metal == 16):
+                    if card.metal == 8:
+                        actions += [(2, 8)]
+                    else:
+                        actions += [(2, card, (card.metal//2)*2), (2, card, (card.metal//2)*2 + 1)]
+                    if (card.metal == 8):
                         for i, token in enumerate(self.metalTokens):
                             if token == 2:
                                 actions += [(3, card, i)]
@@ -270,6 +279,8 @@ class Player():
         for metal, burned in enumerate(self.metalTokens):
             if burned == 0:
                 actions += [(5, metal)]
+        if (self.atium > 0) and ((self.metalTokens.count(1) + self.metalBurned[8]) < self.burns):
+            actions += [(5, 8)]
         for card in game.market.hand:
             if card.cost <= self.curMoney:
                 actions += [(6, card)]
@@ -282,9 +293,9 @@ class Player():
             elif not ally.used2: 
                 if self.metalBurned[ally.metal] > 1: # ack not doing this right
                     actions += [(9, ally)]
-        if (self.charAbility1 and self.training >= 5):
+        if (self.charAbility1 and self.training >= 5) and self.metalBurned[self.ability1metal] > 0:
             actions += [(10,)]
-        if (self.charAbility3 and self.training >= 13):
+        if (self.charAbility3 and self.training >= 13) and self.metalBurned[8] > 0:
             actions += [(11,)]
         return actions
 
@@ -514,18 +525,31 @@ class Player():
         game.market.buy(choices[choice])
 
     def resolve(self, effect, amount):
-        if type(effect) == list:
-            for i in range(len(effect)):
-                self.missionFuncs[effect[i]](amount[i])
-        else:
-            self.missionFuncs[effect](amount)
+        elist = effect.split('.')
+        vlist = amount.split('.')
+        for i in range(effect.split('.')):
+            if effect[i] == "choose":
+                self.choose(amount[i])
+            self.missionFuncs[effect[i]](amount[i])
 
+    def choose(self, options):
+        ops = options[1:-1].split('/')
+        for i in range(len(ops) // 2):
+            print(f"{i}: {ops[2*i]}, {ops[2*i + 1]}")
+        while True:
+            try:
+                choice = int(input("Option to choose: "))
+                if choice not in range(len(ops)):
+                    raise ValueError("Choose a valid number")
+                resolve(ops[2*i], ops[2*i + 1])
+            except ValueError:
+                print("Invalid input. Please choose a metal number to refresh")
     def refresh(self, amount):
         print(self.metals)
         while True:
             try:
                 choice = int(input("Metal number to refresh: "))
-                if choice not in range(len(8)):
+                if choice not in range(8):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:

@@ -64,11 +64,10 @@ class Ally(Card):
     def __init__(self, data, deck):
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
         super().__init__(data, deck)
-        self.ability1 = [zip(data[2].split("."), data[3].split("."))]
         self.used1 = False
         self.used2 = False
         self.rioted = False
-        self.taunt = False #todo
+        self.taunt = (self.data[9] == 'D')
         # self.ability1
     def reset(self):
         self.used1 = False

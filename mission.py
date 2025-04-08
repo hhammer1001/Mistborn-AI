@@ -5,11 +5,9 @@ class Mission():
         self.game = game
         self.tiers = self.game.missionTiers[name]
         self.playerRanks = [0 for i in range(game.numPlayers)]
-        self.cutoffs = [x[0] for x in self.tiers]
         
     def progress(self, playerNum, amount):
         old = self.playerRanks[playerNum]
-        # self.playerRanks[playerNum] += amount
         new = self.playerRanks[playerNum] + amount
         for tier in self.tiers:
             if old < tier[0] and new >= tier[0]:

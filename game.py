@@ -43,7 +43,7 @@ class Game():
                                 "Kredik Shaw":[[4, 'D', 1, 'D', 1],[8, 'D', 1, 'D', 1],[12, 'Pd', 2, 'D', 2]], 
                                 "Crew Hideout":[[6, 'H', 4, 'H', 2],[12, 'H', 6, 'H', 2]], 
                                 "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[12, 'T', 1, 'T', 1]]}
-        self.metalCodes = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel"]
+        self.metalCodes = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel","atium"]
         self.numPlayers = numPlayers
         self.winner = None
         if randChars:
