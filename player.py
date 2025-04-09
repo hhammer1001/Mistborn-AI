@@ -14,7 +14,7 @@ class Player():
         self.deck = deck
         self.atium = 0
         self.allies = []
-        self.metalTokens = [0]*9 #0 available 1 burned 2 flared atium is just number of tokens used this turn
+        self.metalTokens = [0]*9 #0 available 1 burned 2 flared previous turn 3 refreshed 4 flared this turn atium is just number of tokens used this turn
         self.metalAvailable = [0]*9 # for spending on actions
         self.metalBurned = [0]*9 # for ally/character abilities
         self.burns = 1
@@ -62,7 +62,8 @@ class Player():
                                 'B': self.extraBurn,
                                 'Pc': self.permDraw,
                                 'Pd': self.permDamage,
-                                'Pm': self.permMoney}
+                                'Pm': self.permMoney,
+                                'Riot': self.riot}
     def playTurn(self, game):
         self.deck.playAllies() 
         self.resolve("T", "1")
@@ -111,7 +112,7 @@ class Player():
                 case 4:
                     print(f"{i}: put metal towards the abilities of {action[1]}") 
                 case 5:
-                    if (self.metalTokens.count(1) + self.metalTokens[8]) < self.burns:
+                    if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
                         print(f"{i}: burn {game.metalCodes[action[1]]}") 
                     else:
                         print(f"{i}: flare {game.metalCodes[action[1]]}")
@@ -138,14 +139,20 @@ class Player():
                 print("Please make a valid choice")
                 pass
             return actions[choice]
-
+    def resetToken(val):
+        if val in [1,3]:
+            return 0
+        if val == 4:
+            return 2
+        return val
+        
     def performAction(self, action, game):
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2
                 self.curMoney = self.pMoney
                 self.curMission = 0
-                self.metalTokens = list(map(lambda x: 0 if x == 1 else x, self.metalTokens))
+                self.metalTokens = list(self.resetToken, self.metalTokens)
                 self.metalTokens[8] = 0
                 self.metalAvailable = [0]*9
                 self.metalBurned = [0]*9
@@ -167,7 +174,10 @@ class Player():
                 self.metalBurned[action[2]] += 1
             case 3:
                 action[1].burned = True
-                self.metalTokens[action[2]] = 0
+                if self.metalTokens[action[2]] == 4:
+                    self.metalTokens[action[2]] = 3
+                else:
+                    self.metalTokens[action[2]] = 0
             case 4:
                 if self.metalAvailable[action[1].metal] > 0:
                     self.metalAvailable[action[1].metal] -= 1
@@ -179,10 +189,10 @@ class Player():
                 if action[1] == 8:
                     self.metalTokens[8] += 1
                 else: 
-                    if (self.metalTokens.count(1) + self.metalTokens[8]) < self.burns:
+                    if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
                         self.metalTokens[action[1]] = 1
                     else: 
-                        self.metalTokens[action[1]] = 2
+                        self.metalTokens[action[1]] = 4
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
             case 6:
@@ -196,9 +206,9 @@ class Player():
                 game.market.buy(action[1])
                 action[1].ability1(self)
             case 8:
-                print(f"Enter {i} to use the first ability of your ally {action[1]}") 
+                action[1].ability1(self)
             case 9:
-                print(f"Enter {i} to use the second ability of your ally {action[1]}") 
+                action[1].ability2(self) 
             case 10:
                 self.resolve(self.ability1effect, ability1amount)
                 self.charAbility1 = False
@@ -270,12 +280,13 @@ class Player():
                         actions += [(2, card, (card.metal//2)*2), (2, card, (card.metal//2)*2 + 1)]
                     if (card.metal == 8):
                         for i, token in enumerate(self.metalTokens):
-                            if token == 2:
+                            if token in [2,4]:
                                 actions += [(3, card, i)]
                     else:
-                        if (self.metalTokens[(card.metal//2)*2] == 2): 
+
+                        if (self.metalTokens[(card.metal//2)*2] in [2,4]): 
                             actions += [(3, card, (card.metal//2)*2)]
-                        if (self.metalTokens[((card.metal//2)*2) + 1] == 2): 
+                        if (self.metalTokens[((card.metal//2)*2) + 1] in [2,4]): 
                             actions += [(3, card, ((card.metal//2)*2) + 1)]
                 if self.metalAvailable[card.metal] and card.metalUsed < card.capacity:
                     actions += [(4, card)]
@@ -283,7 +294,7 @@ class Player():
         for metal, burned in enumerate(self.metalTokens):
             if burned == 0:
                 actions += [(5, metal)]
-        if (self.atium > 0) and ((self.metalTokens.count(1) + self.metalTokens[8]) < self.burns):
+        if (self.atium > 0) and ((self.metalTokens[:-1].count(1) + self.metalTokens[8]) < self.burns):
             actions += [(5, 8)]
         for card in game.market.hand:
             if card.cost <= self.curMoney:
@@ -291,11 +302,11 @@ class Player():
                 if (self.training >= 8) and self.charAbility2 and isinstance(card, Action):
                     actions += [(7, card)]
         for ally in self.allies:
-            if not ally.used1:
+            if not ally.available1:
                 if self.metalBurned[ally.metal] > 0:
                     actions += [(8, ally)]
-            elif not ally.used2: 
-                if self.metalBurned[ally.metal] > 1: # ack not doing this right
+            if not ally.available2: 
+                if self.metalBurned[ally.metal] > 1: 
                     actions += [(9, ally)]
         if (self.charAbility1 and self.training >= 5) and self.metalBurned[self.ability1metal] > 0:
             actions += [(10,)]
@@ -576,7 +587,23 @@ class Player():
         if self.metals[choice] == 2:
             self.metals[choice] = 0
 
-
+    def riot(self):
+        c = 0
+        riotable = []
+        for ally in self.allies:
+            if ally.availableRiot:
+                print(f"{c}: {ally}")
+                riotable += [ally]
+                c += 1
+        while True:
+            try:
+                choice = int(input("Ally to Riot: "))
+                if choice not in range(c):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a metal number to refresh")
+        riotable[choice].riot(self)
     def extraBurn(self, amount):
         self.burns += amount
 

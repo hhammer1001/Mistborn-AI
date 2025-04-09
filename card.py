@@ -39,7 +39,7 @@ class Action(Card):
     def burn(self, player):
         self.burned == True
         if (self.data[12] != ''):
-            player.resolve(self.data[12],self.data[12])
+            player.resolve(self.data[11],self.data[12])
     
     def addMetal(self, player):
         self.metalUsed += 1
@@ -48,7 +48,7 @@ class Action(Card):
             player.resolve(ability, self.data[(self.metalUsed + 1)*2 + 1])
 
     def ability1(self, player):
-        player.resolve(self.data[4], self.data[5])
+        player.resolve(self.data[3], self.data[4])
     
     
     def reset(self):
@@ -64,16 +64,28 @@ class Ally(Card):
     def __init__(self, data, deck):
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
         super().__init__(data, deck)
-        self.used1 = False
-        self.used2 = False
-        self.rioted = False
+        self.available1 = False
+        self.available2 = False
+        self.availableRiot = False
+        self.reset()
         self.taunt = (self.data[9] == 'D')
         # self.ability1
     def reset(self):
-        self.used1 = False
-        self.used2 = False
-        self.rioted = False
+        if self.data[3] != '':
+            self.available1 = True
+            self.availableRiot = True
+            if self.data[5] != '':
+                self.available2 = True
     
+    def ability1(self, player):
+        player.resolve(self.data[3], self.data[4])
+        self.available1 = False
+    def ability2(self, player):
+        player.resolve(self.data[5], self.data[6])
+        self.available2 = False
+    def riot(self, player):
+        player.resolve(self.data[3], self.data[4])
+        self.availableRiot = False
     # def activate():
     #     if self.used1:
     #         self.used2 = True
