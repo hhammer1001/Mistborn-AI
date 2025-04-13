@@ -385,7 +385,7 @@ class Player():
         
 
 
-    def eliminate(self, amount):
+    def eliminate(self, amount, game):
         for i in range(amount):
             h = len(self.deck.hand)
             p = len(self.deck.inPlay)
@@ -406,7 +406,7 @@ class Player():
             if choice == -1 :
                 break
             else:
-                self.deck.eliminate(choice)
+                game.market.discard += [self.deck.eliminate(choice)]
     
     def draw(self, amount):
         self.deck.draw(amount)
@@ -571,7 +571,7 @@ class Player():
                 choice = int(input("Option to choose: "))
                 if choice not in range(len(ops)):
                     raise ValueError("Choose a valid number")
-                resolve(ops[2*i], ops[2*i + 1])
+                self.resolve(ops[2*i], ops[2*i + 1])
             except ValueError:
                 print("Invalid input. Please choose a metal number to refresh")
     def refresh(self, amount):
