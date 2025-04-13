@@ -6,6 +6,7 @@ class Player():
         self.game = gameName
         self.character = character
         self.curHealth = 36 + 2 * turnOrder
+        self.smoking = False
         
         self.pDamage = 0
         self.pMoney = 0
@@ -250,6 +251,12 @@ class Player():
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
                     return
+        if(ally.data[0] == "Noble"):
+            self.extraBurn(-1)
+        if(ally.data[0] == "Crewleader"):
+            self.permDraw(-1)
+        if(ally.data[0] == "Smoker"):
+            self.smoking = False
         self.allies.remove(ally)
         self.deck.discard += [ally]
 
@@ -654,6 +661,8 @@ class Player():
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
         self.curHealth -= amount
+        if amount > 0 and self.smoking:
+            self.curHealth += 1
         if self.curHealth <= 0:
             self.alive = False
                 
