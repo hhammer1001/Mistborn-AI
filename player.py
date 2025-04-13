@@ -6,6 +6,7 @@ class Player():
         self.game = gameName
         self.character = character
         self.curHealth = 36 + 2 * turnOrder
+        self.smoking = False
         
         self.pDamage = 0
         self.pMoney = 0
@@ -56,7 +57,7 @@ class Player():
                                 'E': self.eliminate,
                                 'A': self.gainAtium,
                                 'T': self.train,
-                                'K': self.killAlly,
+                                'K': self.killEnemyAlly,
                                 'R': self.refresh,
                                 'B': self.extraBurn,
                                 'Pc': self.permDraw,
@@ -235,8 +236,26 @@ class Player():
                     return card.data[11]
                 else:
                     return 0                   
-    def killAlly(self, ally):
-        
+    
+    def killEnemyAlly(self, amount = 0):
+        options, opp = self.game.validTargets(self, ignoreDefender = True)
+        for ally in options:
+            print(f"{i}: {ally}")
+        while True:
+            try:
+                choice = int(input("Pick the ally to kill or pick -1 to stop"))
+                if choice not in range(-1,len(options)):
+                    raise ValueError("Not a valid choice")
+                break
+            except ValueError:
+                print("Please enter a number shown or -1 to not eliminate")
+                pass
+        if choice == -1 :
+            return
+        else:
+            opp.killAlly(options[choice])
+    
+    def killAlly(self, ally): 
         for card in self.deck.hand:
             if card.data[10] == "cloudA":
                 while True:
@@ -252,6 +271,12 @@ class Player():
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
                     return
+        if(ally.data[0] == "Noble"):
+            self.extraBurn(-1)
+        if(ally.data[0] == "Crewleader"):
+            self.permDraw(-1)
+        if(ally.data[0] == "Smoker"):
+            self.smoking = False
         self.allies.remove(ally)
         self.deck.discard += [ally]
 
@@ -388,6 +413,7 @@ class Player():
 
 
     def eliminate(self, amount):
+        game = self.game
         for i in range(amount):
             h = len(self.deck.hand)
             p = len(self.deck.inPlay)
@@ -408,7 +434,26 @@ class Player():
             if choice == -1 :
                 break
             else:
-                self.deck.eliminate(choice)
+                game.market.discard += [self.deck.eliminate(choice)]
+    
+    def pull(self, amount):
+        for i in range(amount):
+            for i, card in enumerate(self.deck.discard):
+                print(f"{i}: {card}")
+            while True:
+                try:
+                    choice = int(input("Pick the number to pull to the top of your deck or pick -1 to stop"))
+                    if choice not in range(-1,h+p+d):
+                        raise ValueError("Not a valid choice")
+                    break
+                except ValueError:
+                    print("Please enter a number shown or -1 to not eliminate")
+                    pass
+            if choice == -1 :
+                return
+            else:
+                self.deck.cards = [self.deck.discard[choice]] + self.deck.cards
+                self.deck.discard = self.deck.discard[:choice] + self.deck.discard[choice:]
     
     def draw(self, amount):
         self.deck.draw(amount)
@@ -695,6 +740,7 @@ class Player():
     def extraBurn(self, amount):
         self.burns += amount
 
+
     def seek(self, amount):
         #negative code is for pierce tier 2 ability or seeker tier 2
         seeker = False
@@ -747,6 +793,8 @@ class Player():
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
         self.curHealth -= amount
+        if amount > 0 and self.smoking:
+            self.curHealth += 1
         if self.curHealth <= 0:
             self.alive = False
                 

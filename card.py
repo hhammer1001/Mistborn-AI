@@ -94,7 +94,12 @@ class Ally(Card):
     #     self.used1 = True
     #     return self.1
     def play(self,owner):
-        owner.ally(self)
+        if self.data[0] == "Noble":
+            player.extraBurn(1)
+        if self.data[0] == "Crewleader":
+            player.permDraw(1)
+        if self.data[0] == "Smoker":
+            player.smoking = True
 
 class Funding(Card):
     def __init__(self, data, deck):
