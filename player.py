@@ -58,7 +58,7 @@ class Player():
                                 'E': self.eliminate,
                                 'A': self.gainAtium,
                                 'T': self.train,
-                                'K': self.killAlly,
+                                'K': self.killEnemyAlly,
                                 'R': self.refresh,
                                 'B': self.extraBurn,
                                 'Pc': self.permDraw,
@@ -234,8 +234,26 @@ class Player():
                     return card.data[11]
                 else:
                     return 0                   
-    def killAlly(self, ally):
-        
+    
+    def killEnemyAlly(self, amount = 0):
+        options, opp = self.game.validTargets(self, ignoreDefender = True)
+        for ally in options:
+            print(f"{i}: {ally}")
+        while True:
+            try:
+                choice = int(input("Pick the ally to kill or pick -1 to stop"))
+                if choice not in range(-1,len(options)):
+                    raise ValueError("Not a valid choice")
+                break
+            except ValueError:
+                print("Please enter a number shown or -1 to not eliminate")
+                pass
+        if choice == -1 :
+            return
+        else:
+            opp.killAlly(options[choice])
+    
+    def killAlly(self, ally): 
         for card in self.deck.hand:
             if card.data[10] == "cloudA":
                 while True:
@@ -418,8 +436,8 @@ class Player():
     
     def pull(self, amount):
         for i in range(amount):
-            for card in self.deck.discard:
-                print(f"i: {card}")
+            for i, card in enumerate(self.deck.discard):
+                print(f"{i}: {card}")
             while True:
                 try:
                     choice = int(input("Pick the number to pull to the top of your deck or pick -1 to stop"))
