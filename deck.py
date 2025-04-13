@@ -9,6 +9,7 @@ class Deck():
         self.hand = []
         self.cards = []
         self.discard = []
+        self.setAside = []
     
     def draw(self, amount):
         for i in range(amount):
@@ -65,6 +66,10 @@ class PlayerDeck(Deck):
         self.discard += self.hand
         self.hand = []
         self.draw(player.handSize)
+        self.hand += self.setAside
+        self.setAside = []
+        for card in self.game.market.hand:
+            card.sought = False
     
     def playAllies(self, player):
         allies = []
@@ -110,6 +115,7 @@ class Market(Deck):
     def buy(self, choice):
         self.hand.remove(choice)
         self.draw(1)
+    
     def __repr__(self):
         return f"Market: {str(self.hand)}"
 

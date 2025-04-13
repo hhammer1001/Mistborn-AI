@@ -6,6 +6,7 @@ class Card():
         self.deck = deck
         self.cost = data[1]
         self.metal = data[2]
+        self.sought = False
         # self.ability1 = [zip(data[3].split("."), data[4].split("."))]
         # self.ability1
 

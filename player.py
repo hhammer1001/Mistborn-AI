@@ -29,7 +29,6 @@ class Player():
         self.curMoney = 0
         self.curMission = 0
         self.curBoxings = 0
-        self.atium = 0
 
         if self.curHealth > 40:
             self.curHealth = 40
@@ -42,8 +41,8 @@ class Player():
         #                         "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
         #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
         #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
-        with open('characters.csv', newline='') as csvfile:
-            lines = csv.reader(csvfile, delimiter=',', quotechar='|')
+        with open('characters.csv', newline='') as csv:
+            lines = csv.reader(csv, delimiter=',', quotechar='|')
             for row in lines:
                 if row[0] == self.character:
                     self.ability1metal = row[1]
@@ -97,7 +96,9 @@ class Player():
             else:
                 self.curDamage -= targets[choice].health
                 opp.killAlly(targets[choice])
-                assignDamage(game)
+                self.assignDamage(game)
+
+
     def selectAction(self, actions, game):
         for i, action in enumerate(actions):
             match action[0]:
@@ -210,11 +211,12 @@ class Player():
             case 9:
                 action[1].ability2(self) 
             case 10:
-                self.resolve(self.ability1effect, ability1amount)
+                self.resolve(self.ability1effect, self.ability1amount)
                 self.charAbility1 = False
             case 11:
                 self.resolve("D.Mi", "3.3")
                 self.charAbility3 = False 
+
     def senseCheck(self):
         for card in self.deck.hand:
             if card.data[10] == "sense":
@@ -537,7 +539,7 @@ class Player():
             except ValueError:
                 print("Invalid input. Please choose a card number to gain")
         self.deck.discard += choices[choice]
-        game.market.buy(choices[choice])
+        self.game.market.buy(choices[choice])
 
     def special9(self, amount=0):
         #Soar
@@ -553,6 +555,91 @@ class Player():
                 print("Invalid input. Please choose a card number to gain")
         self.discard += choices[choice]
         self.game.market.discard.remove(choices[choice])
+
+    def special10(self, amount=0):
+        #Precise Shot
+        choices = []
+        choices = self.game.market.discard
+        print(f"Choices are {list(zip(range(len(choices)), choices))}")
+        while True:
+            try:
+                choice = int(input("Card number to choose: "))
+                if choice not in range(len(choices)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a card number to gain")
+        self.deck.discard += choices[choice]
+        self.game.discard.buy(choices[choice])
+
+    def special11(self, amount=0):
+        for player in self.game.players:
+            if player != self:
+                allies = [a for a in player.allies]
+                for ally in allies:
+                    player.killAlly(ally)
+        for i in range(6):
+            self.market.buy(0)
+    
+    def special12(self, amount=0):
+        #Confrontation1
+        choices = []
+        choices = self.game.market.discard
+        print(f"Choices are {list(zip(range(len(choices)), choices))}")
+        while True:
+            try:
+                choice = int(input("Card number to choose: "))
+                if choice not in range(len(choices)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a card number to gain")
+        choices[choice].ability1(self)
+    
+    def special13(self, amount=0):
+        #Confrontatio2
+        if self.metalAvailable[8] >= 2:
+            self.game.winner = self
+        print("You Win!")
+        exit()
+
+    def special14(self, amount=0):
+        #Informant
+        if len(self.deck.cards > 0):
+            print(f"The top card of your deck is {self.deck.cards[0]}")
+            while True:
+                choice = input("Do you want to Eliminate it? Y/N")
+                if choice in ['y', 'Y']:
+                    self.deck.cards.eliminate(0)
+                    break
+                elif choice in ['n', 'N']:
+                    break
+        else:
+            print("Your deck is empty")
+
+    def special15(self, amount=0):
+        #Keeper
+        if len(self.deck.hand > 0):
+            choices = self.deck.hand
+            print(f"Choices are {list(zip(range(len(choices)), choices))}")
+            while True:
+                try:
+                    choice = int(input("Card number to choose: "))
+                    if choice not in range(len(choices)):
+                        raise ValueError("Choose a valid number")
+                    break
+                except ValueError:
+                    print("Invalid input. Please choose a card number to gain")
+            self.deck.hand.remove(choices[choice])
+            self.deck.setAside += [choices[choice]]
+        else:
+            print("Your hand is empty")
+
+    def special16(self, amount=0):
+        #seeker 2
+        choice = self.game.market.hand.filter(lambda x: x.sought)[0]
+        choice.ability1(self)
+
 
     def resolve(self, effect, amount=0):
         elist = effect.split('.')
@@ -571,7 +658,7 @@ class Player():
                 choice = int(input("Option to choose: "))
                 if choice not in range(len(ops)):
                     raise ValueError("Choose a valid number")
-                resolve(ops[2*i], ops[2*i + 1])
+                self.resolve(ops[2*i], ops[2*i + 1])
             except ValueError:
                 print("Invalid input. Please choose a metal number to refresh")
     def refresh(self, amount):
@@ -604,15 +691,20 @@ class Player():
             except ValueError:
                 print("Invalid input. Please choose a metal number to refresh")
         riotable[choice].riot(self)
+
     def extraBurn(self, amount):
         self.burns += amount
 
     def seek(self, amount):
-        #negative code is for pierce tier 2 ability
+        #negative code is for pierce tier 2 ability or seeker tier 2
+        seeker = False
         twice = False
-        if amount < 0:
+        if amount == -6:
             amount = amount * -1
             twice = True
+        elif amount == -5:
+            amount = amount * -1
+            seeker = True
         choices = []
         for c in self.game.market:
             if c.cost <= amount:
@@ -630,11 +722,12 @@ class Player():
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to seek")
-        #TODO Play choice
+        choices[choice].ability1(self)
         if twice:
-            #TODO play choice2
-            pass
-
+            choices[choice2].ability1(self)
+        elif seeker:
+            choices[choice].sought = True
+        
         
 
     def takeDamage(self, amount):
