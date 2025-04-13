@@ -392,7 +392,8 @@ class Player():
         
 
 
-    def eliminate(self, amount, game):
+    def eliminate(self, amount):
+        game = self.game
         for i in range(amount):
             h = len(self.deck.hand)
             p = len(self.deck.inPlay)
@@ -414,6 +415,25 @@ class Player():
                 break
             else:
                 game.market.discard += [self.deck.eliminate(choice)]
+    
+    def pull(self, amount):
+        for i in range(amount):
+            for card in self.deck.discard:
+                print(f"i: {card}")
+            while True:
+                try:
+                    choice = int(input("Pick the number to pull to the top of your deck or pick -1 to stop"))
+                    if choice not in range(-1,h+p+d):
+                        raise ValueError("Not a valid choice")
+                    break
+                except ValueError:
+                    print("Please enter a number shown or -1 to not eliminate")
+                    pass
+            if choice == -1 :
+                return
+            else:
+                self.deck.cards = [self.deck.discard[choice]] + self.deck.cards
+                self.deck.discard = self.deck.discard[:choice] + self.deck.discard[choice:]
     
     def draw(self, amount):
         self.deck.draw(amount)
@@ -613,6 +633,7 @@ class Player():
         riotable[choice].riot(self)
     def extraBurn(self, amount):
         self.burns += amount
+
 
     def seek(self, amount):
         #negative code is for pierce tier 2 ability
