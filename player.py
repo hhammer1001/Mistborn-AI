@@ -239,7 +239,7 @@ class Player():
     
     def killEnemyAlly(self, amount = 0):
         options, opp = self.game.validTargets(self, ignoreDefender = True)
-        for ally in options:
+        for i, ally in enumerate(options):
             print(f"{i}: {ally}")
         while True:
             try:
@@ -443,7 +443,7 @@ class Player():
             while True:
                 try:
                     choice = int(input("Pick the number to pull to the top of your deck or pick -1 to stop"))
-                    if choice not in range(-1,h+p+d):
+                    if choice not in range(-1,len(self.deck.discard)):
                         raise ValueError("Not a valid choice")
                     break
                 except ValueError:
