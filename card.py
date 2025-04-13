@@ -93,7 +93,7 @@ class Ally(Card):
     #         return self.2
     #     self.used1 = True
     #     return self.1
-    def play(self,owner):
+    def play(self,player):
         if self.data[0] == "Noble":
             player.extraBurn(1)
         if self.data[0] == "Crewleader":
