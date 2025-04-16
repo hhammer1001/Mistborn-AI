@@ -106,4 +106,7 @@ class Funding(Card):
         super().__init__(data, deck)
     def play(self, owner):
         owner.money(1)
+    
+    def reset(self):
+        return
 

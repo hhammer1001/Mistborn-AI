@@ -78,13 +78,16 @@ class Player():
         self.curDamage = self.pDamage
 
     def takeActions(self, game):
+        print(f"Current Player: {self.name}, Money: {self.curMoney}, Mission: {self.curMission}, Damage: {self.curDamage}")
         actions = self.availableActions(game)
         action = self.selectAction(actions, game)
         self.performAction(action, game)
         if action[0] != 0:
             self.takeActions(game)
     def assignDamage(self, game):
-        opp, targets = game.validTargets(self)
+        targets, opp = game.validTargets(self)
+        if targets == []:
+            return
         for i, target in enumerate(targets):
             print(f"{i}: kill your opponent's {target}") 
         print("-1: deal remaining damage to your opponent")
@@ -692,8 +695,6 @@ class Player():
 
 
     def resolve(self, effect, amount=0):
-        print(effect)
-        print(amount)
         elist = effect.split('.')
         vlist = amount.split('.')
         for i in range(len(elist)):

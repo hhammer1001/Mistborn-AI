@@ -81,6 +81,8 @@ class PlayerDeck(Deck):
                 self.hand.remove(card)
                 card.play(player)
                 allies += [card]
+            if isinstance(card, Funding):
+                card.play(player)
         player.allies += allies
 
         
