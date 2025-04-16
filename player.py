@@ -1,3 +1,6 @@
+import csv
+from card import Funding, Ally, Action
+
 class Player():
 
     def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
@@ -42,8 +45,8 @@ class Player():
         #                         "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
         #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
         #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
-        with open('characters.csv', newline='') as csv:
-            lines = csv.reader(csv, delimiter=',', quotechar='|')
+        with open('characters.csv', newline='') as csvfile:
+            lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in lines:
                 if row[0] == self.character:
                     self.ability1metal = row[1]
@@ -63,9 +66,11 @@ class Player():
                                 'Pc': self.permDraw,
                                 'Pd': self.permDamage,
                                 'Pm': self.permMoney,
-                                'Riot': self.riot}
+                                'Riot': self.riot,
+                                'Mi': self.mission}
     def playTurn(self, game):
-        self.deck.playAllies() 
+        print(self.deck)
+        self.deck.playAllies(self) 
         self.resolve("T", "1")
         self.takeActions(game)
         self.assignDamage(game)
@@ -133,15 +138,15 @@ class Player():
                    
         while True:
             try:
-                choice = int(input("Enter the number assosciated with your chosen Action"))
+                choice = int(input("Enter the number assosciated with your chosen Action: \n"))
                 if choice not in range(0,len(actions)):
                     raise ValueError("Not a valid choice")
                 break
             except ValueError:
                 print("Please make a valid choice")
                 pass
-            return actions[choice]
-    def resetToken(val):
+        return actions[choice]
+    def resetToken(self, val):
         if val in [1,3]:
             return 0
         if val == 4:
@@ -154,7 +159,7 @@ class Player():
                 self.curBoxings += self.curMoney // 2
                 self.curMoney = self.pMoney
                 self.curMission = 0
-                self.metalTokens = list(self.resetToken, self.metalTokens)
+                self.metalTokens = list(map(self.resetToken, self.metalTokens))
                 self.metalTokens[8] = 0
                 self.metalAvailable = [0]*9
                 self.metalBurned = [0]*9
@@ -234,8 +239,7 @@ class Player():
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
                     return card.data[11]
-                else:
-                    return 0                   
+        return 0                   
     
     def killEnemyAlly(self, amount = 0):
         options, opp = self.game.validTargets(self, ignoreDefender = True)
@@ -299,6 +303,8 @@ class Player():
                 if mission.playerRanks[self.turnOrder]< 12:
                     actions += [(1, mission)]          
         for card in self.deck.hand:
+            if isinstance(card, Funding):
+                continue
             if not card.burned:
                 if card.metalUsed == 0:
                     if card.metal == 8:
@@ -318,7 +324,7 @@ class Player():
                 if self.metalAvailable[card.metal] and card.metalUsed < card.capacity:
                     actions += [(4, card)]
         
-        for metal, burned in enumerate(self.metalTokens):
+        for metal, burned in enumerate(self.metalTokens[:-1]):
             if burned == 0:
                 actions += [(5, metal)]
         if (self.atium > 0) and ((self.metalTokens[:-1].count(1) + self.metalTokens[8]) < self.burns):
@@ -356,10 +362,7 @@ class Player():
             
 
     def damage(self, amount):
-        if self.houseWarring:
-            self.mission(amount)
-        else:
-            self.curDamage += amount
+        self.curDamage += amount
 
     def money(self, amount):
         self.curMoney += amount
@@ -368,47 +371,49 @@ class Player():
         self.curHealth += amount
         if self.curHealth > 40:
             self.curHealth = 40
-
     def mission(self, amount):
-        prog = 0
-        for m in self.game.missions:
-            print(m.display())
-        while prog < amount:
-            print("Enter in amounts to progress on the three missions:")
-            while True:
-                try:
-                    first = int(input(f"Enter {self.game.missionNames[0]} amount: "))
-                    if first < 0 or first > amount - prog:
-                        raise ValueError("Negative or too high")
-                    break
-                except ValueError:
-                    print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
-            prog += first
-            while True:
-                try:
-                    second = int(input(f"Enter {self.game.missionNames[1]} amount: "))
-                    if second < 0 or second > amount - prog:
-                        raise ValueError("Negative or too high")
-                    break
-                except ValueError:
-                    print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
-            prog += second
-            while True:
-                try:
-                    third = int(input(f"Enter {self.game.missionNames[2]} amount: "))
-                    if third < 0 or third > amount - prog:
-                        raise ValueError("Negative or too high")
-                    break
-                except ValueError:
-                    print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
-            prog += third
-            if prog != amount:
-                print(f"Enter in amounts that sum to {amount} please")
-                prog = 0
-        amounts = [first, second, third]
-        for m in self.game.missions:
-            m.progress(self.turnOrder, amounts[0])
-            amounts = amounts[1:]
+        self.curMission += amount
+
+    # def mission(self, amount):
+    #     prog = 0
+    #     for m in self.game.missions:
+    #         print(m.display())
+    #     while prog < amount:
+    #         print("Enter in amounts to progress on the three missions:")
+    #         while True:
+    #             try:
+    #                 first = int(input(f"Enter {self.game.missionNames[0]} amount: "))
+    #                 if first < 0 or first > amount - prog:
+    #                     raise ValueError("Negative or too high")
+    #                 break
+    #             except ValueError:
+    #                 print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
+    #         prog += first
+    #         while True:
+    #             try:
+    #                 second = int(input(f"Enter {self.game.missionNames[1]} amount: "))
+    #                 if second < 0 or second > amount - prog:
+    #                     raise ValueError("Negative or too high")
+    #                 break
+    #             except ValueError:
+    #                 print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
+    #         prog += second
+    #         while True:
+    #             try:
+    #                 third = int(input(f"Enter {self.game.missionNames[2]} amount: "))
+    #                 if third < 0 or third > amount - prog:
+    #                     raise ValueError("Negative or too high")
+    #                 break
+    #             except ValueError:
+    #                 print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
+    #         prog += third
+    #         if prog != amount:
+    #             print(f"Enter in amounts that sum to {amount} please")
+    #             prog = 0
+    #     amounts = [first, second, third]
+    #     for m in self.game.missions:
+    #         m.progress(self.turnOrder, amounts[0])
+    #         amounts = amounts[1:]
         
 
 
@@ -466,7 +471,7 @@ class Player():
             self.training += 1
             if self.training in self.trainingRewards:
                 self.resolve(self.trainingRewards[self.training][0], self.trainingRewards[self.training][1])
-            elif self.lvl > 20:
+            elif self.training > 20:
                 self.gainAtium(1)
 
     def permDraw(self, amount):
@@ -687,12 +692,15 @@ class Player():
 
 
     def resolve(self, effect, amount=0):
+        print(effect)
+        print(amount)
         elist = effect.split('.')
         vlist = amount.split('.')
-        for i in range(effect.split('.')):
+        for i in range(len(elist)):
             if effect[i] == "choose":
-                self.choose(amount[i])
-            self.missionFuncs[effect[i]](amount[i])
+                self.choose(vlist[i])
+            else:
+                self.missionFuncs[elist[i]](int(vlist[i]))
 
     def choose(self, options):
         ops = options[1:-1].split('/')
@@ -798,3 +806,5 @@ class Player():
         if self.curHealth <= 0:
             self.alive = False
                 
+    def __repr__(self):
+        return f"{self.name}: {self.curHealth}"

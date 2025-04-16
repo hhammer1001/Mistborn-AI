@@ -18,3 +18,6 @@ class Mission():
     
     def display(self):
         return f"Progress on {self.name} is {self.playerRanks}, tiers are {self.tiers}"
+
+    def __repr__(self):
+        return self.name

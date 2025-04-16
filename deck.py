@@ -52,10 +52,13 @@ class PlayerDeck(Deck):
         elif code in ['Vin', 'Marsh', 'Prodigy']:
             for c in deckInfo[1]:
                 self.cards += [self.dataToCard(c)]
+        else:
+            print(code)
+            print("AAAA")
         random.shuffle(self.cards)
     
     def __repr__(self):
-        out = self.cards + self.discard + self.hand
+        out = f"Hand: {self.hand}"
         return str(out)
     
     

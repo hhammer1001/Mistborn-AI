@@ -34,7 +34,7 @@ if ans in ['y', 'Y']:
 class Game():
 
     def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan']):
-
+        self.market = Market(self)
         self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[9, 'E', 1, 'E', 1],[12, 'E', 4, 'E', 1]], 
                                 "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[7, 'D', 2, 'K', 1],[10, 'D', 3, 'K', 1],[12, 'Pd', 2, 'D', 1]], 
                                 "Keep Venture":[[4, 'M', 1, 'M', 1],[6, 'M', 1, 'M', 1],[8, 'M', 1, 'M', 1],[10, 'M', 1, 'M', 1],[12, 'Pm', 2, 'M', 3],], 
@@ -52,8 +52,12 @@ class Game():
             self.characters = chars
         self.missionNames = [sorted(list(self.missionTiers.keys()))[i] for i in sorted(random.sample(range(8), 3))]
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
-        self.decks = [PlayerDeck(self.characters[i], self) for i in range(numPlayers)]
+        self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
+        for deck in self.decks:
+            print(deck)
         self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
+        for player in self.players:
+            player.deck.cleanUp(player)
         # self.p1Deck = Deck(self.characters[0], self)
         # self.player1 = Player(self.p1Deck, self, 0, names[0], self.characters[0])
         # self.p2Deck = Deck(self.characters[1], self)
@@ -65,7 +69,7 @@ class Game():
         #     self.p4Deck = Deck(self.characters[3], self)
         #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
         self.cardAbilities = [] #TODO
-        self.market = Market(self)
+
 
          
 
@@ -83,6 +87,7 @@ class Game():
     def play(self):
         currCharacter = 0
         while not self.winner:
+            print(self)
             self.players[currCharacter].playTurn(self)
             currCharacter = (currCharacter + 1) % self.numPlayers
         return self.winner
@@ -113,7 +118,11 @@ class Game():
         opp = self.players[(player.turnOrder + 1)%2]
         return opp.senseCheck()
     def __repr__(self):
-        return f"{str(self.market)}"
+        ret = f"{str(self.market)}"
+        for player in self.players:
+            ret += "\n"
+            ret += f"{str(player)}"
+        return ret
 
 
 # test = Game()
@@ -133,7 +142,7 @@ class Game():
 # print(fixedLines)
 def main():
     g = Game()
-    print(g)
+    g.play()
 # test.players[0].seek(-5)
 
 # for row in fixedLines:
