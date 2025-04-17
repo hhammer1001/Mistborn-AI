@@ -4,8 +4,8 @@ from card import Funding, Action, Ally
 
 class Deck():
 
-    def __init__(self, gameName):
-        self.game = gameName
+    def __init__(self, game):
+        self.game = game
         self.hand = []
         self.cards = []
         self.discard = []
@@ -14,10 +14,11 @@ class Deck():
     def draw(self, amount):
         for i in range(amount):
             if self.cards == []:
-                self.discard = self.cards
+                self.cards = self.discard 
+                self.discard = []
                 random.shuffle(self.cards)
                 if self.cards == []:
-                    pass
+                    return
             self.hand += [self.cards.pop(0)]
 
     def __repr__(self):
@@ -38,8 +39,8 @@ class Deck():
 
 class PlayerDeck(Deck):
 
-    def __init__(self, gameName, code):
-        super().__init__(gameName)
+    def __init__(self, game, code):
+        super().__init__(game)
         deckInfo = {0:[], 1:[]}
         with open('starterdecks.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
@@ -52,10 +53,8 @@ class PlayerDeck(Deck):
         elif code in ['Vin', 'Marsh', 'Prodigy']:
             for c in deckInfo[1]:
                 self.cards += [self.dataToCard(c)]
-        else:
-            print(code)
-            print("AAAA")
         random.shuffle(self.cards)
+        self.draw(6)
     
     def __repr__(self):
         out = f"Hand: {self.hand}"
@@ -65,7 +64,7 @@ class PlayerDeck(Deck):
     
     def cleanUp(self, player):
         for card in self.hand:
-            card.reset
+            card.reset()
         self.discard += self.hand
         self.hand = []
         self.draw(player.handSize)
@@ -74,7 +73,7 @@ class PlayerDeck(Deck):
         for card in self.game.market.hand:
             card.sought = False
     
-    def playAllies(self, player):
+    def playAlliesandFunding(self, player):
         allies = []
         for card in self.hand:
             if isinstance(card, Ally):
@@ -84,8 +83,6 @@ class PlayerDeck(Deck):
             if isinstance(card, Funding):
                 card.play(player)
         player.allies += allies
-
-        
 
     def eliminate(self, choice):
             h = len(self.hand)
@@ -100,8 +97,7 @@ class PlayerDeck(Deck):
             else:
                 self.discard = self.discard[:choice-h-p] + self.discard[choice-h-p+1:]
                 return self.discard[choice - h - p]
-            
-    
+
     def add(self, card):
         self.discard += [card]
 
@@ -109,8 +105,8 @@ class PlayerDeck(Deck):
     
 
 class Market(Deck):
-    def __init__(self, gameName):
-        super().__init__(gameName)
+    def __init__(self, game):
+        super().__init__(game)
         with open('marketdeck.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in lines:

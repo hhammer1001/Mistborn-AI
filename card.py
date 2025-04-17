@@ -8,15 +8,6 @@ class Card():
         self.cost = int(data[1])
         self.metal = int(data[2])
         self.sought = False
-        # self.ability1 = [zip(data[3].split("."), data[4].split("."))]
-        # self.ability1
-
-
-    def play(self, owner):
-        for func, arg in self.ability1:
-            self.deck.owner.missionFuncs[func](int(arg))
-        self.deck.inPlay += [self]
-        #TODO
 
     def __repr__(self):
         return self.name
@@ -56,21 +47,19 @@ class Action(Card):
         self.burned = False
         self.metalUsed = 0
     
-    # def activate(self, player):
-    #     #todo
 
 
 
 class Ally(Card):
     def __init__(self, data, deck):
-        #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
+        #data = [name,Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,activ abil,activ amt,burn abil,burn amt]
         super().__init__(data, deck)
         self.available1 = False
         self.available2 = False
         self.availableRiot = False
         self.reset()
-        self.taunt = (self.data[9] == 'D')
-        # self.ability1
+        self.defender = (self.data[9] == 'D')
+
     def reset(self):
         if self.data[3] != '':
             self.available1 = True
@@ -87,12 +76,6 @@ class Ally(Card):
     def riot(self, player):
         player.resolve(self.data[3], self.data[4])
         self.availableRiot = False
-    # def activate():
-    #     if self.used1:
-    #         self.used2 = True
-    #         return self.2
-    #     self.used1 = True
-    #     return self.1
     def play(self,player):
         if self.data[0] == "Noble":
             player.extraBurn(1)
@@ -106,7 +89,6 @@ class Funding(Card):
         super().__init__(data, deck)
     def play(self, owner):
         owner.money(1)
-    
     def reset(self):
         return
 

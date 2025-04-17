@@ -54,33 +54,7 @@ class Game():
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
         self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
-        for player in self.players:
-            player.deck.cleanUp(player)
-        # self.p1Deck = Deck(self.characters[0], self)
-        # self.player1 = Player(self.p1Deck, self, 0, names[0], self.characters[0])
-        # self.p2Deck = Deck(self.characters[1], self)
-        # self.player2 = Player(self.p2Deck, self, 1, names[1], self.characters[1])
-        # if self.numPlayers > 2:
-        #     self.p3Deck = Deck(self.characters[2], self)
-        #     self.player3 = Player(self.p3Deck, self, 2, names[2], self.characters[2])
-        # if self.numPlayers > 3:
-        #     self.p4Deck = Deck(self.characters[3], self)
-        #     self.player4 = Player(self.p4Deck, self, 3, names[3], self.characters[3])
-        self.cardAbilities = [] #TODO
 
-
-         
-
-    def start(self, names):
-        players = []
-        for i in range(self.numPlayers):
-            if self.charSelect:
-                char = ""
-                while char not in self.characters:
-                    char = input(f"What character? Choices are: {self.characters}")
-            else:
-                char = random.choice(self.characters)
-            players += [self.Player(names[i],char)]
 
     def play(self):
         currCharacter = 0
@@ -89,32 +63,38 @@ class Game():
             self.players[currCharacter].playTurn(self)
             currCharacter = (currCharacter + 1) % self.numPlayers
         return self.winner
+
     def attack(self, player):
         opp = self.players[(player.turnOrder + 1)%2]
         for ally in opp.allies:
-            if ally.taunt:
+            if ally.defender:
                 return
         opp.takeDamage(player.curDamage)
+        if not opp.alive:
+            self.winner = player
+
     def validTargets(self, player, ignoreDefender = False):
         opp = self.players[(player.turnOrder + 1)%2]
-        taunters = []
+        defenders = []
         targets = []
         if ignoreDefender:
             return opp.allies, opp
         for ally in opp.allies:
-            if ally.taunt:
-                taunters += [ally]
-        if taunters == []:
+            if ally.defender:
+                defenders += [ally]
+        if defenders == []:
             targets = opp.allies
         else: 
-            targets = taunters
+            targets = defenders
         for target in targets:
             if player.curDamage < target.health:
                 targets.remove(target)
         return targets, opp
+
     def senseCheck(self, player):
         opp = self.players[(player.turnOrder + 1)%2]
         return opp.senseCheck()
+
     def __repr__(self):
         ret = f"{str(self.market)}"
         for player in self.players:
@@ -122,28 +102,10 @@ class Game():
             ret += f"{str(player)}"
         return ret
 
-
-# test = Game()
-
-# pTest = test.Player()
-
-# pTest.missionFuncs[pTest.missionTiers['Canton Of Orthodoxy'][0][1]](pTest.missionTiers['Canton Of Orthodoxy'][0][2])
-# test = [1,2,3]
-# print(test[:3]+test[:5])
-# deckInfo = {0:[], 1:[], 2:[]}
-# with open('starterdecks.csv', newline='') as csvfile:
-#     lines = csv.reader(csvfile, delimiter=',', quotechar='|')
-#     fixedLines = []
-#     for row in lines:
-#         print(row)
-#         deckInfo[int(row[0])] += row[1:]
-# print(fixedLines)
 def main():
     g = Game()
-    g.play()
-# test.players[0].seek(-5)
+    winner = g.play()
+    print(f"The winner is {winner}!!!!!")
 
-# for row in fixedLines:
-#     print(row)
 if __name__ == '__main__':
     main()

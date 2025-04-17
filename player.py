@@ -3,10 +3,10 @@ from card import Funding, Ally, Action
 
 class Player():
 
-    def __init__(self, deck, gameName, turnOrder, name="B$", character='Kelsier'):
+    def __init__(self, deck, game, turnOrder, name="B$", character='Kelsier'):
         self.name = name
         self.allies = []
-        self.game = gameName
+        self.game = game
         self.character = character
         self.curHealth = 36 + 2 * turnOrder
         self.smoking = False
@@ -28,6 +28,7 @@ class Player():
         self.charAbility2 = True
         self.charAbility3 = True
         self.turnOrder = turnOrder
+        self.alive = True
 
         self.curDamage = 0
         self.curMoney = 0
@@ -37,14 +38,7 @@ class Player():
         if self.curHealth > 40:
             self.curHealth = 40
             self.curBoxings = 1
-        # self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[4, 'E', 1, 'E', 1],[3, 'E', 4, 'E', 1]], 
-        #                         "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[3, 'D', 2, 'K', 1],[3, 'D', 3, 'K', 1],[2, 'Pd', 2, 'D', 1]], 
-        #                         "Keep Venture":[[4, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'M', 1, 'M', 1],[2, 'Pm', 2, 'M', 3],], 
-        #                         "Skaa Caverns":[[5, 'R', 1, 'R', 1],[4, 'R', 1, 'R', 1],[3, 'B', 1, 'R', 8]], 
-        #                         "Pits Of Hathsin":[[4, 'M', 1, 'M', 1],[4, 'D', 2, 'H', 2],[4, 'A', 1, 'A', 1]], 
-        #                         "Kredik Shaw":[[4, 'D', 1, 'D', 1],[4, 'D', 1, 'D', 1],[4, 'Pd', 2, 'D', 2]], 
-        #                         "Crew Hideout":[[6, 'H', 4, 'H', 2],[6, 'H', 6, 'H', 2]], 
-        #                         "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[6, 'T', 1, 'T', 1]]}
+        
         with open('characters.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in lines:
@@ -66,11 +60,30 @@ class Player():
                                 'Pc': self.permDraw,
                                 'Pd': self.permDamage,
                                 'Pm': self.permMoney,
-                                'Riot': self.riot,
-                                'Mi': self.mission}
+                                'riot': self.riot,
+                                'Mi': self.mission, 
+                                'seek': self.seek,
+                                'pull': self.pull,
+                                'push': self.push,
+                                'special1': self.special1,
+                                'special2': self.special2,
+                                'special3': self.special3,
+                                'special4': self.special4,
+                                'special5': self.special5,
+                                'special6': self.special6,
+                                'special7': self.special7,
+                                'special8': self.special8,
+                                'special9': self.special9,
+                                'special10': self.special10,
+                                'special11': self.special11,
+                                'special12': self.special12,
+                                'special13': self.special13,
+                                'special14': self.special14,
+                                'special15': self.special15,
+                                'special16': self.special16}
     def playTurn(self, game):
         print(self.deck)
-        self.deck.playAllies(self) 
+        self.deck.playAlliesandFunding(self) 
         self.resolve("T", "1")
         self.takeActions(game)
         self.assignDamage(game)
@@ -84,6 +97,7 @@ class Player():
         self.performAction(action, game)
         if action[0] != 0:
             self.takeActions(game)
+    
     def assignDamage(self, game):
         targets, opp = game.validTargets(self)
         if targets == []:
@@ -149,6 +163,7 @@ class Player():
                 print("Please make a valid choice")
                 pass
         return actions[choice]
+
     def resetToken(self, val):
         if val in [1,3]:
             return 0
@@ -170,6 +185,8 @@ class Player():
                 self.charAbility2 = True
                 self.charAbility3 = True
                 self.deck.cleanUp(self)
+                for ally in self.allies:
+                    ally.reset()
 
             case 1:
                 sense = game.senseCheck(self)
@@ -350,20 +367,6 @@ class Player():
             actions += [(11,)]
         return actions
 
-    def charPower(self, tier):
-        if tier == 1:
-            if self.character == 'Kelsier':
-                self.damage(2)
-            elif self.character == 'Shan':
-                self.money(2)
-            elif self.character == 'Vin':
-                self.damage(1)
-                self.heal(1)
-                self.curMoney(1)
-            elif self.character == 'Marsh':
-                self.money(2)
-            
-
     def damage(self, amount):
         self.curDamage += amount
 
@@ -377,49 +380,6 @@ class Player():
     def mission(self, amount):
         self.curMission += amount
 
-    # def mission(self, amount):
-    #     prog = 0
-    #     for m in self.game.missions:
-    #         print(m.display())
-    #     while prog < amount:
-    #         print("Enter in amounts to progress on the three missions:")
-    #         while True:
-    #             try:
-    #                 first = int(input(f"Enter {self.game.missionNames[0]} amount: "))
-    #                 if first < 0 or first > amount - prog:
-    #                     raise ValueError("Negative or too high")
-    #                 break
-    #             except ValueError:
-    #                 print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
-    #         prog += first
-    #         while True:
-    #             try:
-    #                 second = int(input(f"Enter {self.game.missionNames[1]} amount: "))
-    #                 if second < 0 or second > amount - prog:
-    #                     raise ValueError("Negative or too high")
-    #                 break
-    #             except ValueError:
-    #                 print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
-    #         prog += second
-    #         while True:
-    #             try:
-    #                 third = int(input(f"Enter {self.game.missionNames[2]} amount: "))
-    #                 if third < 0 or third > amount - prog:
-    #                     raise ValueError("Negative or too high")
-    #                 break
-    #             except ValueError:
-    #                 print("Invalid input. Please enter a positive integer that is not more than the remaining mission amount")
-    #         prog += third
-    #         if prog != amount:
-    #             print(f"Enter in amounts that sum to {amount} please")
-    #             prog = 0
-    #     amounts = [first, second, third]
-    #     for m in self.game.missions:
-    #         m.progress(self.turnOrder, amounts[0])
-    #         amounts = amounts[1:]
-        
-
-
     def eliminate(self, amount):
         game = self.game
         for i in range(amount):
@@ -429,7 +389,6 @@ class Player():
             print(f"Hand is {list(zip(range(h), self.deck.hand))}")
             print(f"Play is {list(zip(range(h,h+p), self.deck.inPlay))}")
             print(f"Discard is {list(zip(range(h+p,h+d+p), self.deck.discard))}")
-            choices = self.deck.hand + self.deck.inPlay + self.deck.discard
             while True:
                 try:
                     choice = int(input("Pick the number to eliminate, or put -1 to not eliminate"))
@@ -455,7 +414,7 @@ class Player():
                         raise ValueError("Not a valid choice")
                     break
                 except ValueError:
-                    print("Please enter a number shown or -1 to not eliminate")
+                    print("Please enter a number shown or -1 to not pull")
                     pass
             if choice == -1 :
                 return
@@ -478,7 +437,7 @@ class Player():
                 self.gainAtium(1)
 
     def permDraw(self, amount):
-        self.pDraw += amount
+        self.handSize += amount
 
     def permMoney(self, amount):
         self.pMoney += amount
@@ -694,7 +653,7 @@ class Player():
         choice.ability1(self)
 
 
-    def resolve(self, effect, amount=0):
+    def resolve(self, effect, amount):
         elist = effect.split('.')
         vlist = amount.split('.')
         for i in range(len(elist)):
@@ -714,7 +673,8 @@ class Player():
                     raise ValueError("Choose a valid number")
                 self.resolve(ops[2*i], ops[2*i + 1])
             except ValueError:
-                print("Invalid input. Please choose a metal number to refresh")
+                print("Invalid input.")
+    
     def refresh(self, amount):
         print(self.metals)
         while True:
@@ -727,8 +687,24 @@ class Player():
                 print("Invalid input. Please choose a metal number to refresh")
         if self.metals[choice] == 2:
             self.metals[choice] = 0
+        if self.metals[choice] == 4:
+            self.metals[choice] = 3
 
-    def riot(self):
+    def push(self, amount = 1):
+        for i, card in enumerate(self.game.market.hand):
+            print(f"{i}: {card}")
+        while True:
+            try:
+                choice = int(input("Press -1 to not push or choose a card to push"))
+                if choice not in range(-1, c):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input.")
+        self.game.market.discard += self.game.market.hand[choice]
+        self.game.market.buy(self.game.market.hand[choice])
+
+    def riot(self, amount):
         c = 0
         riotable = []
         for ally in self.allies:
@@ -743,7 +719,7 @@ class Player():
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
-                print("Invalid input. Please choose a metal number to refresh")
+                print("Invalid input.")
         riotable[choice].riot(self)
 
     def extraBurn(self, amount):
@@ -761,9 +737,13 @@ class Player():
             amount = amount * -1
             seeker = True
         choices = []
-        for c in self.game.market:
+        for c in self.game.market.hand:
             if c.cost <= amount:
                 choices += c
+        if choices == []:
+            return 
+        if len(choices) == 1:
+            twice = False
         print(f"Market is {list(zip(range(len(choices)), choices))}")
         while True:
             try:
