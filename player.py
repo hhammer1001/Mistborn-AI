@@ -100,8 +100,17 @@ class Player():
     
     def assignDamage(self, game):
         targets, opp = game.validTargets(self)
-        if targets == []:
+        choice = self.assignDamageIn(targets)
+        if(choice == -1):
             return
+        else:
+            self.curDamage -= targets[choice].health
+            opp.killAlly(targets[choice])
+            self.assignDamage(game)
+    
+    def assignDamageIn(self, targets):
+        if targets == []:
+            return -1
         for i, target in enumerate(targets):
             print(f"{i}: kill your opponent's {target}") 
         print("-1: deal remaining damage to your opponent")
@@ -114,12 +123,7 @@ class Player():
             except ValueError:
                 print("Please make a valid choice")
                 pass
-            if(choice == -1):
-                return
-            else:
-                self.curDamage -= targets[choice].health
-                opp.killAlly(targets[choice])
-                self.assignDamage(game)
+        return choice
 
 
     def selectAction(self, actions, game):
@@ -246,23 +250,34 @@ class Player():
     def senseCheck(self):
         for card in self.deck.hand:
             if card.data[10] == "sense":
-                while True:
-                    try:
-                        ans = input(f"Discard {card} to prevent {card.data[11]} mission? Y/N")
-                        if ans not in ['y', 'n', 'Y', 'N']:
-                            raise ValueError("Enter Y or N")
-                        break
-                    except ValueError:
-                        print("Invalid input. Please enter Y or N")
-                        pass
+                ans = self.senseCheckIn(card)
                 if ans in ['y', 'Y']:
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
                     return card.data[11]
         return 0                   
     
+    def senseCheckIn(self, card):
+        while True:
+            try:
+                ans = input(f"Discard {card} to prevent {card.data[11]} mission? Y/N")
+                if ans not in ['y', 'n', 'Y', 'N']:
+                    raise ValueError("Enter Y or N")
+                break
+            except ValueError:
+                print("Invalid input. Please enter Y or N")
+                pass
+        return ans
+
     def killEnemyAlly(self, amount = 0):
         options, opp = self.game.validTargets(self, ignoreDefender = True)
+        choice = self.killEnemyAllyIn(options)
+        if choice == -1 :
+            return
+        else:
+            opp.killAlly(options[choice])
+    
+    def killEnemyAllyIn(self, allies):
         for i, ally in enumerate(options):
             print(f"{i}: {ally}")
         while True:
@@ -274,23 +289,12 @@ class Player():
             except ValueError:
                 print("Please enter a number shown or -1 to not eliminate")
                 pass
-        if choice == -1 :
-            return
-        else:
-            opp.killAlly(options[choice])
+        return choice
     
     def killAlly(self, ally): 
         for card in self.deck.hand:
             if card.data[10] == "cloudA":
-                while True:
-                    try:
-                        ans = input(f"Discard {card} to prevent {card.data[11]} damage? Y/N")
-                        if ans not in ['y', 'n', 'Y', 'N']:
-                            raise ValueError("Enter Y or N")
-                        break
-                    except ValueError:
-                        print("Invalid input. Please enter Y or N")
-                        pass
+                ans = self.cloudAlly(card, ally)
                 if ans in ['y', 'Y']:
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
@@ -303,6 +307,19 @@ class Player():
             self.smoking = False
         self.allies.remove(ally)
         self.deck.discard += [ally]
+    
+    def cloudAlly(self, card, ally):
+        while True:
+            try:
+                ans = input(f"Discard {card} to save {ally}?")
+                if ans not in ['y', 'n', 'Y', 'N']:
+                    raise ValueError("Enter Y or N")
+                break
+            except ValueError:
+                print("Invalid input. Please enter Y or N")
+                pass
+        return ans
+
 
     def availableActions(self, game):
         #0 -> move to damage
@@ -383,44 +400,50 @@ class Player():
     def eliminate(self, amount):
         game = self.game
         for i in range(amount):
-            h = len(self.deck.hand)
-            p = len(self.deck.inPlay)
-            d = len(self.deck.discard)
-            print(f"Hand is {list(zip(range(h), self.deck.hand))}")
-            print(f"Play is {list(zip(range(h,h+p), self.deck.inPlay))}")
-            print(f"Discard is {list(zip(range(h+p,h+d+p), self.deck.discard))}")
-            while True:
-                try:
-                    choice = int(input("Pick the number to eliminate, or put -1 to not eliminate"))
-                    if choice not in range(-1,h+p+d):
-                        raise ValueError("Not a valid choice")
-                    break
-                except ValueError:
-                    print("Please enter a number shown or -1 to not eliminate")
-                    pass
+            choice = self.eliminateIn()
             if choice == -1 :
                 break
             else:
                 game.market.discard += [self.deck.eliminate(choice)]
     
+    def eliminateIn(self):
+        h = len(self.deck.hand)
+        d = len(self.deck.discard)
+        print(f"Hand is {list(zip(range(h), self.deck.hand))}")
+        print(f"Discard is {list(zip(range(h+p,h+d+p), self.deck.discard))}")
+        while True:
+            try:
+                choice = int(input("Pick the number to eliminate, or put -1 to not eliminate"))
+                if choice not in range(-1,h+d):
+                    raise ValueError("Not a valid choice")
+                break
+            except ValueError:
+                print("Please enter a number shown or -1 to not eliminate")
+                pass
+        return choice
+    
     def pull(self, amount):
         for i in range(amount):
-            for i, card in enumerate(self.deck.discard):
-                print(f"{i}: {card}")
-            while True:
-                try:
-                    choice = int(input("Pick the number to pull to the top of your deck or pick -1 to stop"))
-                    if choice not in range(-1,len(self.deck.discard)):
-                        raise ValueError("Not a valid choice")
-                    break
-                except ValueError:
-                    print("Please enter a number shown or -1 to not pull")
-                    pass
+            choice = self.pullIn()
             if choice == -1 :
                 return
             else:
                 self.deck.cards = [self.deck.discard[choice]] + self.deck.cards
                 self.deck.discard = self.deck.discard[:choice] + self.deck.discard[choice:]
+    
+    def pullIn(self):
+        for i, card in enumerate(self.deck.discard):
+            print(f"{i}: {card}")
+        while True:
+            try:
+                choice = int(input("Pick the number to pull to the top of your deck or pick -1 to stop"))
+                if choice not in range(-1,len(self.deck.discard)):
+                    raise ValueError("Not a valid choice")
+                break
+            except ValueError:
+                print("Please enter a number shown or -1 to not pull")
+                pass
+        return choice
     
     def draw(self, amount):
         self.deck.draw(amount)
