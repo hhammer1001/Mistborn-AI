@@ -250,8 +250,7 @@ class Player():
     def senseCheck(self):
         for card in self.deck.hand:
             if card.data[10] == "sense":
-                ans = self.senseCheckIn(card)
-                if ans in ['y', 'Y']:
+                if self.senseCheckIn(card):
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
                     return card.data[11]
@@ -267,7 +266,7 @@ class Player():
             except ValueError:
                 print("Invalid input. Please enter Y or N")
                 pass
-        return ans
+        return (ans in ['y', 'Y'])
 
     def killEnemyAlly(self, amount = 0):
         options, opp = self.game.validTargets(self, ignoreDefender = True)
@@ -294,8 +293,7 @@ class Player():
     def killAlly(self, ally): 
         for card in self.deck.hand:
             if card.data[10] == "cloudA":
-                ans = self.cloudAlly(card, ally)
-                if ans in ['y', 'Y']:
+                if self.cloudAlly(card, ally):
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
                     return
@@ -318,7 +316,7 @@ class Player():
             except ValueError:
                 print("Invalid input. Please enter Y or N")
                 pass
-        return ans
+        return (ans in ['y', 'Y'])
 
 
     def availableActions(self, game):
@@ -564,46 +562,56 @@ class Player():
         for card in self.game.market.hand:
             if card.cost <= 5:
                 choices += card
+        choice = self.subdueIn(choices)
+        if choice == -1:
+            return
+        self.deck.discard += choices[choice]
+        self.game.market.buy(choices[choice])
+
+    def subdueIn(self, choices):
+        if choices == []:
+            return -1
         print(f"Choices are {list(zip(range(len(choices)), choices))}")
         while True:
             try:
                 choice = int(input("Card number to choose: "))
-                if choice not in range(len(choices)):
+                if choice not in range(len(-1, choices)):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to gain")
-        self.deck.discard += choices[choice]
-        self.game.market.buy(choices[choice])
+        return choice
 
     def special9(self, amount=0):
         #Soar
         choices = filter(lambda x: x.cost <= self.curMoney, self.game.market.discard)
+        choice = self.soarIn(choices)
+        if choice == -1:
+            return
+        self.discard += choices[choice]
+        self.game.market.discard.remove(choices[choice])
+
+    def soarIn(self, choices):
+        if choices == []:
+            return -1
         print(f"Choices are {list(zip(range(len(choices)), choices))}")
         while True:
             try:
-                choice = int(input("Card number to buy: "))
-                if choice not in range(len(choices)):
+                choice = int(input("Card number to buy or -1 to skip: "))
+                if choice not in range(len(-1, choices)):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to gain")
-        self.discard += choices[choice]
-        self.game.market.discard.remove(choices[choice])
+        return choice
 
     def special10(self, amount=0):
         #Precise Shot
         choices = []
         choices = self.game.market.discard
-        print(f"Choices are {list(zip(range(len(choices)), choices))}")
-        while True:
-            try:
-                choice = int(input("Card number to choose: "))
-                if choice not in range(len(choices)):
-                    raise ValueError("Choose a valid number")
-                break
-            except ValueError:
-                print("Invalid input. Please choose a card number to gain")
+        choice = self.soarIn(choices)
+        if choice == -1:
+            return
         self.deck.discard += choices[choice]
         self.game.discard.buy(choices[choice])
 
@@ -620,6 +628,53 @@ class Player():
         #Confrontation1
         choices = []
         choices = self.game.market.discard
+        choice = confrontationIn(choices)
+        if choice == -1:
+            return
+        choices[choice].ability1(self)
+
+    def confrontationIn(self, choices):
+        print(f"Choices are {list(zip(range(len(choices)), choices))}")
+        print("choose -1 to skip")
+        while True:
+            try:
+                choice = int(input("Card number to choose: "))
+                if choice not in range(-1, len(choices)):
+                    raise ValueError("Choose a valid number")
+                break
+            except ValueError:
+                print("Invalid input. Please choose a card number to gain")
+        return choice
+
+    
+    def special13(self, amount=0):
+        #Confrontation2
+        self.game.winner = self
+
+    def special14(self, amount=0):
+        #Informant
+        if len(self.deck.cards > 0) and informantIn(self.deck.cards[0]):
+            self.deck.eliminate(len(self.deck.hand))
+
+    def informantIn(self, card):
+        print(f"The top card of your deck is {card}")
+        while True:
+            choice = input("Do you want to Eliminate it? Y/N")
+            if choice in ['y', 'Y', 'n', 'N']:
+                break
+        return (choice in ['y', 'Y'])
+
+    def special15(self, amount=0):
+        #Keeper
+        if len(self.deck.hand > 0):
+            choices = self.deck.hand
+            choice = self.keeperIn(choices)
+            self.deck.hand.remove(choices[choice])
+            self.deck.setAside += [choices[choice]]
+        else:
+            print("Your hand is empty")
+    
+    def keeperIn(self, choices):
         print(f"Choices are {list(zip(range(len(choices)), choices))}")
         while True:
             try:
@@ -629,47 +684,7 @@ class Player():
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to gain")
-        choices[choice].ability1(self)
     
-    def special13(self, amount=0):
-        #Confrontatio2
-        if self.metalAvailable[8] >= 2:
-            self.game.winner = self
-        print("You Win!")
-        exit()
-
-    def special14(self, amount=0):
-        #Informant
-        if len(self.deck.cards > 0):
-            print(f"The top card of your deck is {self.deck.cards[0]}")
-            while True:
-                choice = input("Do you want to Eliminate it? Y/N")
-                if choice in ['y', 'Y']:
-                    self.deck.cards.eliminate(0)
-                    break
-                elif choice in ['n', 'N']:
-                    break
-        else:
-            print("Your deck is empty")
-
-    def special15(self, amount=0):
-        #Keeper
-        if len(self.deck.hand > 0):
-            choices = self.deck.hand
-            print(f"Choices are {list(zip(range(len(choices)), choices))}")
-            while True:
-                try:
-                    choice = int(input("Card number to choose: "))
-                    if choice not in range(len(choices)):
-                        raise ValueError("Choose a valid number")
-                    break
-                except ValueError:
-                    print("Invalid input. Please choose a card number to gain")
-            self.deck.hand.remove(choices[choice])
-            self.deck.setAside += [choices[choice]]
-        else:
-            print("Your hand is empty")
-
     def special16(self, amount=0):
         #seeker 2
         choice = self.game.market.hand.filter(lambda x: x.sought)[0]
@@ -687,6 +702,10 @@ class Player():
 
     def choose(self, options):
         ops = options[1:-1].split('/')
+        choice = self.chooseIn(ops)
+        self.resolve(ops[2*choice], ops[2*choice + 1])
+    
+    def chooseIn(self, options):
         for i in range(len(ops) // 2):
             print(f"{i}: {ops[2*i]}, {ops[2*i + 1]}")
         while True:
@@ -694,12 +713,21 @@ class Player():
                 choice = int(input("Option to choose: "))
                 if choice not in range(len(ops)):
                     raise ValueError("Choose a valid number")
-                self.resolve(ops[2*i], ops[2*i + 1])
+                break
+                
             except ValueError:
                 print("Invalid input.")
+        return choice
     
     def refresh(self, amount):
-        print(self.metals)
+        choice = self.refreshIn()
+        if self.metals[choice] == 2:
+            self.metals[choice] = 0
+        if self.metals[choice] == 4:
+            self.metals[choice] = 3
+    
+    def refreshIn(self):
+        print(self.game.metalCodes)
         while True:
             try:
                 choice = int(input("Metal number to refresh: "))
@@ -708,12 +736,13 @@ class Player():
                 break
             except ValueError:
                 print("Invalid input. Please choose a metal number to refresh")
-        if self.metals[choice] == 2:
-            self.metals[choice] = 0
-        if self.metals[choice] == 4:
-            self.metals[choice] = 3
+        return choice
 
     def push(self, amount = 1):
+        choice = pushIn()
+        self.game.market.discard += self.game.market.hand[choice]
+        self.game.market.buy(self.game.market.hand[choice])
+    def pushIn(self):
         for i, card in enumerate(self.game.market.hand):
             print(f"{i}: {card}")
         while True:
@@ -724,17 +753,19 @@ class Player():
                 break
             except ValueError:
                 print("Invalid input.")
-        self.game.market.discard += self.game.market.hand[choice]
-        self.game.market.buy(self.game.market.hand[choice])
+        return choice
 
     def riot(self, amount):
         c = 0
         riotable = []
         for ally in self.allies:
             if ally.availableRiot:
-                print(f"{c}: {ally}")
                 riotable += [ally]
-                c += 1
+        choice = riotIn(riotable)
+        choice.riot(self)
+    def riotIn(self, riotable):
+        for i, ally in enumerate(riotable):
+            print(f"{c}: {ally}")
         while True:
             try:
                 choice = int(input("Ally to Riot: "))
@@ -743,7 +774,7 @@ class Player():
                 break
             except ValueError:
                 print("Invalid input.")
-        riotable[choice].riot(self)
+        return riotable[choice]
 
     def extraBurn(self, amount):
         self.burns += amount
@@ -767,6 +798,14 @@ class Player():
             return 
         if len(choices) == 1:
             twice = False
+        choice, choice2 = seekIn(twice, choices)
+        choices[choice].ability1(self)
+        if twice:
+            choices[choice2].ability1(self)
+        elif seeker:
+            choices[choice].sought = True
+
+    def seekIn(self, twice, choices):
         print(f"Market is {list(zip(range(len(choices)), choices))}")
         while True:
             try:
@@ -777,30 +816,20 @@ class Player():
                     choice2 = int(input("Second (different) Card number to seek: "))
                     if choice2 not in range(len(choices)) or choice2 == choice:
                         raise ValueError("Choose a valid number")
+                    else:
+                        choice2 = -1
                 break
             except ValueError:
                 print("Invalid input. Please choose a card number to seek")
-        choices[choice].ability1(self)
-        if twice:
-            choices[choice2].ability1(self)
-        elif seeker:
-            choices[choice].sought = True
+        return choice, choice2
         
         
 
     def takeDamage(self, amount):
         for card in self.deck.hand:
             if card.data[10] == "cloudP":
-                while True:
-                    try:
-                        ans = input(f"Discard {card} to prevent {card.data[11]} damage? Y/N")
-                        if ans not in ['y', 'n', 'Y', 'N']:
-                            raise ValueError("Enter Y or N")
-                        break
-                    except ValueError:
-                        print("Invalid input. Please enter Y or N")
-                        pass
-                if ans in ['y', 'Y']:
+                
+                if cloudP(card):
                     amount = max(amount - card.active[1], 0)
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
@@ -809,6 +838,18 @@ class Player():
             self.curHealth += 1
         if self.curHealth <= 0:
             self.alive = False
+
+    def cloudP(self, card):
+        while True:
+            try:
+                ans = input(f"Discard {card} to prevent {card.data[11]} damage? Y/N")
+                if ans not in ['y', 'n', 'Y', 'N']:
+                    raise ValueError("Enter Y or N")
+                break
+            except ValueError:
+                print("Invalid input. Please enter Y or N")
+                pass
+        return (ans in ['y', 'Y'])
                 
     def __repr__(self):
         return f"{self.name}: {self.curHealth}"
