@@ -698,7 +698,11 @@ class Player():
             if elist[i] == "choose":
                 self.choose(vlist[i])
             else:
-                self.missionFuncs[elist[i]](int(vlist[i]))
+                print(effect)
+                print(amount)
+                e = elist[i]
+                v = int(vlist[i])
+                self.missionFuncs[e](v)
 
     def choose(self, options):
         ops = options[1:-1].split('/')

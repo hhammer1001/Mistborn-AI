@@ -45,7 +45,7 @@
 2,Reposition,3,6,choose.R,(D.2.M.2).1,,,,,,,D,1
 2,Crash,4,6,D.pull,2.1,C,1,,,,,D,2
 2,Crash,4,6,D.pull,2.1,C,1,,,,,D,2
-2,Rescue,4,6,D.M.pull,3.2,,,,,,,,
+2,Rescue,4,6,D.M.pull,3.2.1,,,,,,,,
 2,Ascendant,6,6,D.pull,4.3,,,C,3,,,,
 2,Soar,2,7,push,1,M.special buy eliminated card,2,,,,,Mi,1
 2,Soar,2,7,push,1,M.special buy eliminated card,2,,,,,Mi,1
