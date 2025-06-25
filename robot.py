@@ -57,7 +57,8 @@ class RandomBot(Player):
     
     def chooseIn(self, options):
         #each effect takes two indices. for the first effect return 0, and for the second return 2 etc.
-        return random.randint(0, (len(options) // 2) - 1)
+        k = (len(options) // 2) - 1
+        return random.randint(0, k)
     
     def refreshIn(self):
         #return the index of the metal to refresh

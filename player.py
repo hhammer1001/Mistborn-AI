@@ -696,10 +696,10 @@ class Player():
         vlist = amount.split('.')
         for i in range(len(elist)):
             if elist[i] == "choose":
-                self.choose(vlist[i])
-            else:
                 print(effect)
                 print(amount)
+                self.choose(vlist[i])
+            else:
                 e = elist[i]
                 v = int(vlist[i])
                 self.missionFuncs[e](v)
