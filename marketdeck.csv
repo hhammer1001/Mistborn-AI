@@ -77,6 +77,6 @@
 3,Pickpocket,3,6,M,1,pull,1,2,,,,,
 3,Lurcher,5,6,D,2,pull,2,3,,,,,
 3,Mercenary,3,7,D,1,special10,0,2,,,,,
-3,Coinshot,5,7,D,2,K,,3,,,,,
+3,Coinshot,5,7,D,2,K,1,3,,,,,
 3,Kandra,6,8,Mi,3,Mi,3,3,,,,,
 3,Inquisitor,6,8,D,4,D,4,4,,,,,

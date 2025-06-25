@@ -58,6 +58,8 @@ class Game():
             self.players = [RandomBot(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         else: 
             self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
+        for i in range(numPlayers):
+            self.decks[i].cleanUp(self.players[i])
 
 
     def play(self):

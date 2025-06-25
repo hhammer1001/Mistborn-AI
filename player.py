@@ -83,7 +83,6 @@ class Player():
                                 'special16': self.special16}
     def playTurn(self, game):
         print(self.deck)
-        self.deck.playAlliesandFunding(self) 
         self.resolve("T", "1")
         self.takeActions(game)
         self.assignDamage(game)
@@ -176,6 +175,7 @@ class Player():
         return val
         
     def performAction(self, action, game):
+        print(action)
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2
@@ -370,10 +370,10 @@ class Player():
                 if (self.training >= 8) and self.charAbility2 and isinstance(card, Action):
                     actions += [(7, card)]
         for ally in self.allies:
-            if not ally.available1:
+            if ally.available1:
                 if self.metalBurned[ally.metal] > 0:
                     actions += [(8, ally)]
-            if not ally.available2: 
+            if ally.available2: 
                 if self.metalBurned[ally.metal] > 1: 
                     actions += [(9, ally)]
         if (self.charAbility1 and self.training >= 5) and self.metalBurned[int(self.ability1metal)] > 0:
@@ -444,7 +444,7 @@ class Player():
         return choice
     
     def draw(self, amount):
-        self.deck.draw(amount)
+        self.deck.draw(amount, self)
 
     def gainAtium(self, amount):
         self.atium += amount
@@ -511,7 +511,7 @@ class Player():
                         highest = False
                 if highest:
                     count += 1
-        self.draw(count)
+        self.draw(count, self)
 
 
     def special4(self, amount=0):
@@ -561,11 +561,11 @@ class Player():
         choices = []
         for card in self.game.market.hand:
             if card.cost <= 5:
-                choices += card
+                choices += [card]
         choice = self.subdueIn(choices)
         if choice == -1:
             return
-        self.deck.discard += choices[choice]
+        self.deck.discard += [choices[choice]]
         self.game.market.buy(choices[choice])
 
     def subdueIn(self, choices):
@@ -584,11 +584,11 @@ class Player():
 
     def special9(self, amount=0):
         #Soar
-        choices = filter(lambda x: x.cost <= self.curMoney, self.game.market.discard)
+        choices = list(filter(lambda x: x.cost <= self.curMoney, self.game.market.discard))
         choice = self.soarIn(choices)
         if choice == -1:
             return
-        self.discard += choices[choice]
+        self.deck.discard += [choices[choice]]
         self.game.market.discard.remove(choices[choice])
 
     def soarIn(self, choices):
@@ -612,8 +612,7 @@ class Player():
         choice = self.soarIn(choices)
         if choice == -1:
             return
-        self.deck.discard += choices[choice]
-        self.game.discard.buy(choices[choice])
+        self.deck.discard += [choices[choice]]
 
     def special11(self, amount=0):
         for player in self.game.players:
@@ -653,8 +652,9 @@ class Player():
 
     def special14(self, amount=0):
         #Informant
-        if len(self.deck.cards > 0) and informantIn(self.deck.cards[0]):
-            self.deck.eliminate(len(self.deck.hand))
+        if len(self.deck.cards) > 0 and self.informantIn(self.deck.cards[0]):
+            self.game.market.discard += [self.deck.cards[0]]
+            self.deck.cards = self.deck.cards[1:]
 
     def informantIn(self, card):
         print(f"The top card of your deck is {card}")
@@ -666,11 +666,12 @@ class Player():
 
     def special15(self, amount=0):
         #Keeper
-        if len(self.deck.hand > 0):
+        if len(self.deck.hand) > 0:
             choices = self.deck.hand
             choice = self.keeperIn(choices)
-            self.deck.hand.remove(choices[choice])
             self.deck.setAside += [choices[choice]]
+            self.deck.hand.remove(choices[choice])
+            
         else:
             print("Your hand is empty")
     
@@ -687,8 +688,9 @@ class Player():
     
     def special16(self, amount=0):
         #seeker 2
-        choice = self.game.market.hand.filter(lambda x: x.sought)[0]
-        choice.ability1(self)
+        choice = list(filter(lambda x: x.sought, self.game.market.hand))
+        if(choice != []):
+            choice[0].ability1(self)
 
 
     def resolve(self, effect, amount):
@@ -696,8 +698,7 @@ class Player():
         vlist = amount.split('.')
         for i in range(len(elist)):
             if elist[i] == "choose":
-                print(effect)
-                print(amount)
+
                 self.choose(vlist[i])
             else:
                 e = elist[i]
@@ -725,10 +726,10 @@ class Player():
     
     def refresh(self, amount):
         choice = self.refreshIn()
-        if self.metals[choice] == 2:
-            self.metals[choice] = 0
-        if self.metals[choice] == 4:
-            self.metals[choice] = 3
+        if self.metalTokens[choice] == 2:
+            self.metalTokens[choice] = 0
+        if self.metalTokens[choice] == 4:
+            self.metalTokens[choice] = 3
     
     def refreshIn(self):
         print(self.game.metalCodes)
@@ -744,8 +745,11 @@ class Player():
 
     def push(self, amount = 1):
         choice = self.pushIn()
-        self.game.market.discard += self.game.market.hand[choice]
-        self.game.market.buy(self.game.market.hand[choice])
+        if choice > -1:
+            print(choice)
+            print(self.game.market)
+            self.game.market.discard += [self.game.market.hand[choice]]
+            self.game.market.buy(self.game.market.hand[choice])
     def pushIn(self):
         for i, card in enumerate(self.game.market.hand):
             print(f"{i}: {card}")
@@ -798,13 +802,13 @@ class Player():
             seeker = True
         choices = []
         for c in self.game.market.hand:
-            if c.cost <= amount:
-                choices += c
+            if c.cost <= amount and isinstance(c, Action):
+                choices += [c]
         if choices == []:
             return 
         if len(choices) == 1:
             twice = False
-        choice, choice2 = seekIn(twice, seeker, choices)
+        choice, choice2 = self.seekIn(twice, seeker, choices)
         choices[choice].ability1(self)
         if twice:
             choices[choice2].ability1(self)

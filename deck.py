@@ -54,35 +54,52 @@ class PlayerDeck(Deck):
             for c in deckInfo[1]:
                 self.cards += [self.dataToCard(c)]
         random.shuffle(self.cards)
-        self.draw(6)
+
     
     def __repr__(self):
         out = f"Hand: {self.hand}"
         return str(out)
     
     
-    
+    def draw(self, amount, player):
+        for i in range(amount):
+            if self.cards == []:
+                self.cards = self.discard 
+                self.discard = []
+                random.shuffle(self.cards)
+                if self.cards == []:
+                    return
+            card = self.cards.pop(0)
+            if isinstance(card, Ally):
+                card.play(player)
+                player.allies += [card]
+            else:
+                self.hand += [card]
+            if isinstance(card, Funding):
+                card.play(player)
+            
     def cleanUp(self, player):
         for card in self.hand:
             card.reset()
         self.discard += self.hand
         self.hand = []
-        self.draw(player.handSize)
+        self.draw(player.handSize, player)
         self.hand += self.setAside
         self.setAside = []
         for card in self.game.market.hand:
             card.sought = False
     
-    def playAlliesandFunding(self, player):
-        allies = []
-        for card in self.hand:
-            if isinstance(card, Ally):
-                self.hand.remove(card)
-                card.play(player)
-                allies += [card]
-            if isinstance(card, Funding):
-                card.play(player)
-        player.allies += allies
+    # def playAlliesandFunding(self, player):
+    #     allies = []
+    #     for card in self.hand:
+    #         if isinstance(card, Ally):
+    #             card.play(player)
+    #             allies += [card]
+    #         if isinstance(card, Funding):
+    #             card.play(player)
+    #     for ally in allies:
+    #         self.hand.remove(ally)
+    #     player.allies += allies
 
     def eliminate(self, choice):
             h = len(self.hand)

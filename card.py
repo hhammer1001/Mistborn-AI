@@ -29,7 +29,7 @@ class Action(Card):
 
     
     def burn(self, player):
-        self.burned == True
+        self.burned = True
         if (self.data[12] != ''):
             player.resolve(self.data[11],self.data[12])
     
@@ -75,8 +75,9 @@ class Ally(Card):
         player.resolve(self.data[5], self.data[6])
         self.available2 = False
     def riot(self, player):
-        player.resolve(self.data[3], self.data[4])
         self.availableRiot = False
+        player.resolve(self.data[3], self.data[4])
+        
     def play(self,player):
         if self.data[0] == "Noble":
             player.extraBurn(1)

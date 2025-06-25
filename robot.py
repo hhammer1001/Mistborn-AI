@@ -66,7 +66,7 @@ class RandomBot(Player):
 
     def pushIn(self):
         #return the index of the market card to push
-        return random.randint(-1, 6)
+        return random.randint(-1, 5)
     
     def riotIn(self, riotable):
         #choose the ally from the list of valid allies to riot
