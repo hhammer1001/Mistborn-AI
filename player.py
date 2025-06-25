@@ -711,7 +711,7 @@ class Player():
         while True:
             try:
                 choice = int(input("Option to choose: "))
-                if choice not in range(len(ops)):
+                if choice not in range(len(ops) // 2):
                     raise ValueError("Choose a valid number")
                 break
                 
@@ -748,7 +748,7 @@ class Player():
         while True:
             try:
                 choice = int(input("Press -1 to not push or choose a card to push"))
-                if choice not in range(-1, c):
+                if choice not in range(-1, 6):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
@@ -798,14 +798,14 @@ class Player():
             return 
         if len(choices) == 1:
             twice = False
-        choice, choice2 = seekIn(twice, choices)
+        choice, choice2 = seekIn(twice, seeker, choices)
         choices[choice].ability1(self)
         if twice:
             choices[choice2].ability1(self)
         elif seeker:
             choices[choice].sought = True
 
-    def seekIn(self, twice, choices):
+    def seekIn(self, twice, seeker, choices):
         print(f"Market is {list(zip(range(len(choices)), choices))}")
         while True:
             try:
