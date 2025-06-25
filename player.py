@@ -23,7 +23,7 @@ class Player():
         self.metalBurned = [0]*9 # for ally/character abilities
         self.burns = 1
         self.training = 0
-        self.trainingRewards = {3:['B', 1], 9:['B', 1], 11:['A', 1], 15:['B', 1], 16:['A', 1]}
+        self.trainingRewards = {3:['B', '1'], 9:['B', '1'], 11:['A', '1'], 15:['B', '1'], 16:['A', '1']}
         self.charAbility1 = True
         self.charAbility2 = True
         self.charAbility3 = True
@@ -200,7 +200,7 @@ class Player():
                     self.curMission += -1
                     action[1].progress(self.turnOrder, 1)
             case 2:
-                action[1].burn()
+                action[1].burn(self)
                 self.metalAvailable[action[2]] += 1
                 self.metalBurned[action[2]] += 1
             case 3:
@@ -376,7 +376,7 @@ class Player():
             if not ally.available2: 
                 if self.metalBurned[ally.metal] > 1: 
                     actions += [(9, ally)]
-        if (self.charAbility1 and self.training >= 5) and self.metalBurned[self.ability1metal] > 0:
+        if (self.charAbility1 and self.training >= 5) and self.metalBurned[int(self.ability1metal)] > 0:
             actions += [(10,)]
         if (self.charAbility3 and self.training >= 13) and self.metalBurned[8] > 0:
             actions += [(11,)]
@@ -695,7 +695,7 @@ class Player():
         elist = effect.split('.')
         vlist = amount.split('.')
         for i in range(len(elist)):
-            if effect[i] == "choose":
+            if elist[i] == "choose":
                 self.choose(vlist[i])
             else:
                 self.missionFuncs[elist[i]](int(vlist[i]))
@@ -739,7 +739,7 @@ class Player():
         return choice
 
     def push(self, amount = 1):
-        choice = pushIn()
+        choice = self.pushIn()
         self.game.market.discard += self.game.market.hand[choice]
         self.game.market.buy(self.game.market.hand[choice])
     def pushIn(self):
@@ -761,8 +761,10 @@ class Player():
         for ally in self.allies:
             if ally.availableRiot:
                 riotable += [ally]
-        choice = riotIn(riotable)
-        choice.riot(self)
+        if(len(riotable) > 0):
+            choice = self.riotIn(riotable)
+            choice.riot(self)
+        
     def riotIn(self, riotable):
         for i, ally in enumerate(riotable):
             print(f"{c}: {ally}")

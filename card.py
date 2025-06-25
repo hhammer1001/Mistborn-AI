@@ -58,6 +58,7 @@ class Ally(Card):
         self.available2 = False
         self.availableRiot = False
         self.reset()
+        self.health = int(self.data[7])
         self.defender = (self.data[9] == 'D')
 
     def reset(self):
