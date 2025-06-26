@@ -66,7 +66,7 @@ class RandomBot(Player):
 
     def pushIn(self):
         #return the index of the market card to push
-        return random.randint(-1, 5)
+        return random.randint(0, len(self.game.market.hand)) - 1
     
     def riotIn(self, riotable):
         #choose the ally from the list of valid allies to riot
@@ -86,6 +86,7 @@ class RandomBot(Player):
     def cloudP(self, card):
         #return a bool to decide if the card should be discarded to cloudp
         return random.random() > 0.5
+        
 
 class EliBot(Player):
     def assignDamageIn(self, targets):
@@ -150,7 +151,7 @@ class EliBot(Player):
 
     def pushIn(self):
         #return the index of the market card to push
-        return random.randint(-1, 5)
+        return random.randint(0, len(self.game.market.hand)) - 1
     
     def riotIn(self, riotable):
         #choose the ally from the list of valid allies to riot
@@ -158,15 +159,17 @@ class EliBot(Player):
     
     def seekIn(self, twice, seeker, choices):
         #im not going to try to explain this one... Henry I blame you for what's going on here
-        choice = random.randint(0, len(choices) - 1)
+        choice = random.randint(-1, len(choices) - 1)
         if twice:
-            choice2 = random.randint(0, len(choices) - 2)
+            choice2 = random.randint(-1, len(choices) - 2)
         else:
             choice2 = -1
-        if choice == choice2:
+        if choice == choice2 and choice > -1:
             choice2 += 1
         return choice, choice2
     
     def cloudP(self, card):
         #return a bool to decide if the card should be discarded to cloudp
         return random.random() > 0.5
+    
+

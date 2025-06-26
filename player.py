@@ -511,7 +511,7 @@ class Player():
                         highest = False
                 if highest:
                     count += 1
-        self.draw(count, self)
+        self.draw(count)
 
 
     def special4(self, amount=0):
@@ -548,13 +548,13 @@ class Player():
 
     def special6(self, amount=0):
         #House war tier 2
-        self.mission += self.damage
-        self.damage = 0
+        self.curMission += self.curDamage
+        self.curDamage = 0
     
     def special7(self, amount=0):
         #Dominate tier 2
-        self.damage += self.mission
-        self.mission = 0
+        self.curDamage += self.curMission
+        self.curMission = 0
 
     def special8(self, amount=0):
         #Subdue
@@ -621,16 +621,19 @@ class Player():
                 for ally in allies:
                     player.killAlly(ally)
         for i in range(6):
-            self.market.buy(0)
+            self.game.market.buy(0)
     
     def special12(self, amount=0):
         #Confrontation1
         choices = []
-        choices = self.game.market.discard
-        choice = confrontationIn(choices)
-        if choice == -1:
-            return
-        choices[choice].ability1(self)
+        for card in self.game.market.discard:
+            if isinstance(card, Action):
+                choices += [card]
+        if len(choices) > 0:
+            choice = self.confrontationIn(choices)
+            if choice == -1:
+                return
+            choices[choice].ability1(self)
 
     def confrontationIn(self, choices):
         print(f"Choices are {list(zip(range(len(choices)), choices))}")
@@ -672,8 +675,8 @@ class Player():
             self.deck.setAside += [choices[choice]]
             self.deck.hand.remove(choices[choice])
             
-        else:
-            print("Your hand is empty")
+        # else:
+        #     print("Your hand is empty")
     
     def keeperIn(self, choices):
         print(f"Choices are {list(zip(range(len(choices)), choices))}")
@@ -756,7 +759,7 @@ class Player():
         while True:
             try:
                 choice = int(input("Press -1 to not push or choose a card to push"))
-                if choice not in range(-1, 6):
+                if choice not in range(-1, len(self.game.market.hand)):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
