@@ -74,12 +74,12 @@ class RandomBot(Player):
     
     def seekIn(self, twice, seeker, choices):
         #im not going to try to explain this one... Henry I blame you for what's going on here
-        choice = random.randint(0, len(choices) - 1)
+        choice = random.randint(-1, len(choices) - 1)
         if twice:
-            choice2 = random.randint(0, len(choices) - 2)
+            choice2 = random.randint(-1, len(choices) - 2)
         else:
             choice2 = -1
-        if choice == choice2:
+        if choice == choice2 and choice > -1:
             choice2 += 1
         return choice, choice2
     

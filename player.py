@@ -82,7 +82,7 @@ class Player():
                                 'special15': self.special15,
                                 'special16': self.special16}
     def playTurn(self, game):
-        print(self.deck)
+        # print(self.deck)
         self.resolve("T", "1")
         self.takeActions(game)
         self.assignDamage(game)
@@ -90,7 +90,7 @@ class Player():
         self.curDamage = self.pDamage
 
     def takeActions(self, game):
-        print(f"Current Player: {self.name}, Money: {self.curMoney}, Mission: {self.curMission}, Damage: {self.curDamage}")
+        # print(f"Current Player: {self.name}, Money: {self.curMoney}, Mission: {self.curMission}, Damage: {self.curDamage}")
         actions = self.availableActions(game)
         action = self.selectAction(actions, game)
         self.performAction(action, game)
@@ -175,7 +175,7 @@ class Player():
         return val
         
     def performAction(self, action, game):
-        print(action)
+        # print(action)
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2
@@ -343,7 +343,7 @@ class Player():
             if not card.burned:
                 if card.metalUsed == 0:
                     if card.metal == 8:
-                        actions += [(2, 8)]
+                        actions += [(2, card, 8)]
                     else:
                         actions += [(2, card, (card.metal//2)*2), (2, card, (card.metal//2)*2 + 1)]
                     if (card.metal == 8):
@@ -732,7 +732,7 @@ class Player():
             self.metalTokens[choice] = 3
     
     def refreshIn(self):
-        print(self.game.metalCodes)
+        # print(self.game.metalCodes)
         while True:
             try:
                 choice = int(input("Metal number to refresh: "))
@@ -746,8 +746,8 @@ class Player():
     def push(self, amount = 1):
         choice = self.pushIn()
         if choice > -1:
-            print(choice)
-            print(self.game.market)
+            # print(choice)
+            # print(self.game.market)
             self.game.market.discard += [self.game.market.hand[choice]]
             self.game.market.buy(self.game.market.hand[choice])
     def pushIn(self):
@@ -809,22 +809,25 @@ class Player():
         if len(choices) == 1:
             twice = False
         choice, choice2 = self.seekIn(twice, seeker, choices)
-        choices[choice].ability1(self)
-        if twice:
-            choices[choice2].ability1(self)
-        elif seeker:
-            choices[choice].sought = True
+        if(choice > -1):
+            choices[choice].ability1(self)
+            if twice:
+                choices[choice2].ability1(self)
+            elif seeker:
+                choices[choice].sought = True
+    
+        
 
     def seekIn(self, twice, seeker, choices):
         print(f"Market is {list(zip(range(len(choices)), choices))}")
         while True:
             try:
-                choice = int(input("Card number to seek: "))
-                if choice not in range(len(choices)):
+                choice = int(input("Card number to seek or -1 to not: "))
+                if choice not in range(-1, len(choices)):
                     raise ValueError("Choose a valid number")
                 if twice:
-                    choice2 = int(input("Second (different) Card number to seek: "))
-                    if choice2 not in range(len(choices)) or choice2 == choice:
+                    choice2 = int(input("Second (different) Card number to seek or -1 to not: "))
+                    if choice2 not in range(-1, len(choices)) or choice2 == choice:
                         raise ValueError("Choose a valid number")
                     else:
                         choice2 = -1
