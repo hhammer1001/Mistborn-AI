@@ -620,8 +620,8 @@ class Player():
                 allies = [a for a in player.allies]
                 for ally in allies:
                     player.killAlly(ally)
-        for i in range(6):
-            self.game.market.buy(0)
+        for i in range(len(self.game.market.hand)):
+            self.game.market.buy(self.game.market.hand[0])
     
     def special12(self, amount=0):
         #Confrontation1
