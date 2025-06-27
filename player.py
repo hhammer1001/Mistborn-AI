@@ -155,7 +155,6 @@ class Player():
                     print(f"{i}: use your first character ability") 
                 case 11:
                     print(f"{i}: use your third character ability") 
-                   
         while True:
             try:
                 choice = int(input("Enter the number assosciated with your chosen Action: \n"))
@@ -276,7 +275,7 @@ class Player():
         else:
             opp.killAlly(options[choice])
     
-    def killEnemyAllyIn(self, allies):
+    def killEnemyAllyIn(self, options):
         for i, ally in enumerate(options):
             print(f"{i}: {ally}")
         while True:
@@ -289,7 +288,7 @@ class Player():
                 print("Please enter a number shown or -1 to not eliminate")
                 pass
         return choice
-    
+
     def killAlly(self, ally): 
         for card in self.deck.hand:
             if card.data[10] == "cloudA":
@@ -305,7 +304,7 @@ class Player():
             self.smoking = False
         self.allies.remove(ally)
         self.deck.discard += [ally]
-    
+
     def cloudAlly(self, card, ally):
         while True:
             try:
@@ -317,7 +316,6 @@ class Player():
                 print("Invalid input. Please enter Y or N")
                 pass
         return (ans in ['y', 'Y'])
-
 
     def availableActions(self, game):
         #0 -> move to damage
@@ -403,12 +401,12 @@ class Player():
                 break
             else:
                 game.market.discard += [self.deck.eliminate(choice)]
-    
+
     def eliminateIn(self):
         h = len(self.deck.hand)
         d = len(self.deck.discard)
         print(f"Hand is {list(zip(range(h), self.deck.hand))}")
-        print(f"Discard is {list(zip(range(h+p,h+d+p), self.deck.discard))}")
+        print(f"Discard is {list(zip(range(h,h+d), self.deck.discard))}")
         while True:
             try:
                 choice = int(input("Pick the number to eliminate, or put -1 to not eliminate"))
@@ -419,7 +417,7 @@ class Player():
                 print("Please enter a number shown or -1 to not eliminate")
                 pass
         return choice
-    
+
     def pull(self, amount):
         for i in range(amount):
             choice = self.pullIn()
@@ -428,7 +426,7 @@ class Player():
             else:
                 self.deck.cards = [self.deck.discard[choice]] + self.deck.cards
                 self.deck.discard = self.deck.discard[:choice] + self.deck.discard[choice:]
-    
+
     def pullIn(self):
         for i, card in enumerate(self.deck.discard):
             print(f"{i}: {card}")
@@ -442,7 +440,7 @@ class Player():
                 print("Please enter a number shown or -1 to not pull")
                 pass
         return choice
-    
+
     def draw(self, amount):
         self.deck.draw(amount, self)
 
@@ -714,12 +712,12 @@ class Player():
         self.resolve(ops[2*choice], ops[2*choice + 1])
     
     def chooseIn(self, options):
-        for i in range(len(ops) // 2):
-            print(f"{i}: {ops[2*i]}, {ops[2*i + 1]}")
+        for i in range(len(options) // 2):
+            print(f"{i}: {options[2*i]}, {options[2*i + 1]}")
         while True:
             try:
                 choice = int(input("Option to choose: "))
-                if choice not in range(len(ops) // 2):
+                if choice not in range(len(options) // 2):
                     raise ValueError("Choose a valid number")
                 break
                 
@@ -777,7 +775,7 @@ class Player():
             choice.riot(self)
         
     def riotIn(self, riotable):
-        for i, ally in enumerate(riotable):
+        for c, ally in enumerate(riotable):
             print(f"{c}: {ally}")
         while True:
             try:
@@ -845,7 +843,7 @@ class Player():
         for card in self.deck.hand:
             if card.data[10] == "cloudP":
                 
-                if cloudP(card):
+                if self.cloudP(card):
                     amount = max(amount - card.active[1], 0)
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
