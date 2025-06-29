@@ -4,7 +4,7 @@ from deck import PlayerDeck, Market
 import card
 from mission import Mission
 from player import Player
-from robot import RandomBot, EliBot
+from robot import RandomBot, EliBot, HammerBot
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
