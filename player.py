@@ -155,6 +155,8 @@ class Player():
                     print(f"{i}: use your first character ability") 
                 case 11:
                     print(f"{i}: use your third character ability") 
+                case 12:
+                    print(f"{i}: use an atium token to for {game.metalCodes[action[2]]}")
         while True:
             try:
                 choice = int(input("Enter the number assosciated with your chosen Action: \n"))
@@ -245,6 +247,15 @@ class Player():
             case 11:
                 self.resolve("D.Mi", "3.3")
                 self.charAbility3 = False 
+            case 12:
+                if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
+                    self.metalTokens[action[1]] = 1
+                else: 
+                    self.metalTokens[action[1]] = 4
+                self.metalAvailable[action[1]] += 1
+                self.metalBurned[action[1]] += 1
+                self.metalBurned[action[8]] += 1
+
 
     def senseCheck(self):
         for card in self.deck.hand:
@@ -350,7 +361,6 @@ class Player():
                             if token in [2,4]:
                                 actions += [(3, card, i)]
                     else:
-
                         if (self.metalTokens[(card.metal//2)*2] in [2,4]): 
                             actions += [(3, card, (card.metal//2)*2)]
                         if (self.metalTokens[((card.metal//2)*2) + 1] in [2,4]): 
@@ -379,6 +389,9 @@ class Player():
             actions += [(10,)]
         if (self.charAbility3 and self.training >= 13) and self.metalBurned[8] > 0:
             actions += [(11,)]
+        if (self.atium > 0) and ((self.metalTokens[:-1].count(1) + self.metalTokens[8]) < self.burns):
+            for i in range(8):
+                actions += [(12, i)]
         return actions
 
     def damage(self, amount):

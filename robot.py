@@ -202,10 +202,56 @@ class HammerBot(Player):
 
     def selectAction(self, actions, game):
         #choose and return one of the actions in the list
-        if len(actions) == 1:
-            return actions[0]
-        else:
-            return random.choice(actions[1:])
+        # if len(actions) == 1:
+        #     return actions[0]
+        # else:
+        #     return random.choice(actions[1:])
+        missions = sorted([action[1] for action in actions if action[0] == 1], key=lambda x: len(x.name))
+        if len(missions) > 0:
+            for mission in missions:
+                if mission.name == "Luthadel Garrison":
+                    return (1, mission)
+            return (1, missions[0])
+        
+        abils = [action for action in actions if (action[0] in [8, 9, 10, 11])]
+        if len(abils) > 0:
+            return abils[0]
+        
+        if len(self.deck.hand) > 0 and set([c.data[0] for c in self.deck.hand]) != set(['Funding']):
+            hand_damage = sorted(self.deck.hand, key=lambda x: self.get_damage(x))
+            for c in hand_damage:
+                if (4, c) in actions:
+                    return (4, c)
+            if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
+                return (5, hand_damage[0].data[2])
+            for i, c in enumerate(hand_damage):
+                for c2 in hand_damage[i+1:]:
+                    if (2, c2, c.data[2]) in actions:
+                        return (2, c2, c.data[2])
+            if (5, 8) in actions and (11,) in actions:
+                return (5, 8)
+            for action in actions:
+                if action[0] == 3:
+                    return action
+            
+        # buys = sorted([action[1] for action in actions if action[0] == 6], key=lambda x: self.get_damage[x])
+        # if len(buys) > 0:
+        #     return (6, buys[0])
+                
+        buys = sorted([action[1] for action in actions if action[0] == 6], key=lambda x: self.get_damage[x])
+        if len(buys) > 0:
+            return (6, buys[0])
+        
+        metal_prio = [(c, c.data[2]) for c in self.allies]
+        for c, m in metal_prio:
+            if (5, m) in actions:
+                return (5, m)
+        if (10,) in actions:
+            metal_prio += 0 #TODO
+
+
+            
+
     
     def senseCheckIn(self, card):
         #return a bool to use the sense ability
