@@ -14,10 +14,12 @@ class Mission():
                 self.game.players[playerNum].missionFuncs[tier[1]](tier[2])
                 if max(self.playerRanks) < tier[0]:
                     self.game.players[playerNum].missionFuncs[tier[3]](tier[4])
+        
         self.playerRanks[playerNum] = new
+        self.game.missionVictoryCheck(playerNum)
     
     def display(self):
         return f"Progress on {self.name} is {self.playerRanks}, tiers are {self.tiers}"
 
     def __repr__(self):
-        return self.name
+        return f"{self.name} and {self.playerRanks}"

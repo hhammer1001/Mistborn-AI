@@ -46,6 +46,7 @@ class Game():
                                 "Luthadel Rooftops":[[6, 'T', 1, 'T', 1],[12, 'T', 1, 'T', 1]]}
         self.metalCodes = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel","atium"]
         self.numPlayers = numPlayers
+        self.turncount = 0
         self.winner = None
         if randChars:
             self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], numPlayers)
@@ -55,21 +56,35 @@ class Game():
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
         if randos:
-            self.players = [RandomBot(self.decks[0], self, 0, names[0], self.characters[0]),
+            self.players = [EliBot(self.decks[0], self, 0, names[0], self.characters[0]),
             EliBot(self.decks[1], self, 1, names[1], self.characters[1])]
         else: 
             self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         for i in range(numPlayers):
             self.decks[i].cleanUp(self.players[i])
 
-
     def play(self):
         currCharacter = 0
         while not self.winner:
             # print(self)
+            self.turncount += 1
+            if self.turncount > 5000:
+                print("long aaaa game")
+                return self.players[1]
             self.players[currCharacter].playTurn(self)
             currCharacter = (currCharacter + 1) % self.numPlayers
         return self.winner
+
+    def missionVictoryCheck(self, playerNum):
+        c = 0
+        for mission in self.missions:
+            # print(mission.playerRanks[playerNum])
+            if(mission.playerRanks[playerNum] == 12):
+                c = c + 1 
+        if c == 3:
+
+            print("mission victory")
+            self.winner = self.players[playerNum]
 
     def attack(self, player):
         opp = self.players[(player.turnOrder + 1)%2]

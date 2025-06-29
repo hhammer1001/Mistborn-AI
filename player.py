@@ -270,11 +270,12 @@ class Player():
 
     def killEnemyAlly(self, amount = 0):
         options, opp = self.game.validTargets(self, ignoreDefender = True)
-        choice = self.killEnemyAllyIn(options)
-        if choice == -1 :
-            return
-        else:
-            opp.killAlly(options[choice])
+        if len(options) > 0:
+            choice = self.killEnemyAllyIn(options)
+            if choice == -1 :
+                return
+            else:
+                opp.killAlly(options[choice])
     
     def killEnemyAllyIn(self, allies):
         for i, ally in enumerate(options):
@@ -651,6 +652,7 @@ class Player():
     
     def special13(self, amount=0):
         #Confrontation2
+        print("confrontation win")
         self.game.winner = self
 
     def special14(self, amount=0):
