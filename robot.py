@@ -218,39 +218,48 @@ class HammerBot(Player):
             return abils[0]
         
         if len(self.deck.hand) > 0 and set([c.data[0] for c in self.deck.hand]) != set(['Funding']):
-            hand_damage = sorted(self.deck.hand, key=lambda x: self.get_damage(x))
+            hand_damage = sorted(self.deck.hand, key=lambda x: -1*self.get_damage(x))
             for c in hand_damage:
                 if (4, c) in actions:
                     return (4, c)
-            if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
-                return (5, hand_damage[0].data[2])
+                if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns and isinstance(c, Action) and (5, c.metal) in actions:
+                    return (5, c.metal)
             for i, c in enumerate(hand_damage):
                 for c2 in hand_damage[i+1:]:
-                    if (2, c2, c.data[2]) in actions:
-                        return (2, c2, c.data[2])
-            if (5, 8) in actions and (11,) in actions:
+                    if (2, c2, c.metal) in actions:
+                        return (2, c2, c.metal)
+            if (5, 8) in actions and (self.charAbility3 and self.training >= 13):
                 return (5, 8)
-            for action in actions:
-                if action[0] == 3:
-                    return action
-            
-        # buys = sorted([action[1] for action in actions if action[0] == 6], key=lambda x: self.get_damage[x])
-        # if len(buys) > 0:
-        #     return (6, buys[0])
                 
-        buys = sorted([action[1] for action in actions if action[0] == 6], key=lambda x: self.get_damage[x])
+        buys = sorted([action[1] for action in actions if action[0] == 6], key=lambda x: -1*self.get_damage(x))
         if len(buys) > 0:
             return (6, buys[0])
         
-        metal_prio = [(c, c.data[2]) for c in self.allies]
+        metal_prio = [(c, c.metal) for c in self.allies if (c.available2 and self.metalBurned[c.metal] > 1)] + [(c, c.metal) for c in self.allies if c.available1]
         for c, m in metal_prio:
             if (5, m) in actions:
                 return (5, m)
-        if (10,) in actions:
-            metal_prio += 0 #TODO
+            for c2 in self.deck.hand:
+                if (2, c2, m) in actions:
+                    return (2, c2, m)
+        selfMetal = int(self.ability1metal)
+        if (self.charAbility1 and self.training >= 5):
+            if (5, selfMetal) in actions:
+                return (5, selfMetal)
+            for c in self.deck.hand:
+                if (2, c, selfMetal) in actions:
+                    return (2, c, selfMetal)
 
-
+        if (self.charAbility3 and self.training >= 13):
+            for c, m in metal_prio:
+                if (12, m) in actions:
+                    return (12, m)
+                
+        for action in actions:
+            if action[0] == 3:
+                return action
             
+        return (0,)
 
     
     def senseCheckIn(self, card):

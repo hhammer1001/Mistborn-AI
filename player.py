@@ -214,9 +214,11 @@ class Player():
                 if self.metalAvailable[action[1].metal] > 0:
                     self.metalAvailable[action[1].metal] -= 1
                     action[1].addMetal(self)
-                else: 
+                elif self.metalAvailable[8]: 
                     self.metalAvailable[8] -= 1
                     self.metalBurned[action[1].metal] += 1
+                else:
+                    print("illegal play")
             case 5:
                 if action[1] == 8:
                     self.metalTokens[8] += 1
@@ -254,7 +256,7 @@ class Player():
                     self.metalTokens[action[1]] = 4
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
-                self.metalBurned[action[8]] += 1
+                self.metalBurned[8] += 1
 
 
     def senseCheck(self):
@@ -342,6 +344,7 @@ class Player():
         #9 -> use second ability of ally
         #10 -> use first character ability
         #11 -> use third character ability
+        #12 -> use atium token to burn metal
         actions = [(0,)]
         if self.curMission > 0:
             for mission in game.missions:
