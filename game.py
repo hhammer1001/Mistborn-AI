@@ -4,7 +4,7 @@ from deck import PlayerDeck, Market
 import card
 from mission import Mission
 from player import Player
-from robot import RandomBot, EliBot, HammerBot
+from robot import RandomBot, EliBot, QualityBot, FocusBot
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
@@ -56,8 +56,8 @@ class Game():
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
         if randos:
-            self.players = [EliBot(self.decks[0], self, 0, names[0], self.characters[0]),
-            EliBot(self.decks[1], self, 1, names[1], self.characters[1])]
+            self.players = [FocusBot(self.decks[0], self, 0, names[0], self.characters[0]),
+            QualityBot(self.decks[1], self, 1, names[1], self.characters[1])]
         else: 
             self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         for i in range(numPlayers):
@@ -83,7 +83,7 @@ class Game():
                 c = c + 1 
         if c == 3:
 
-            print("mission victory")
+
             self.winner = self.players[playerNum]
 
     def attack(self, player):

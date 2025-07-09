@@ -650,7 +650,7 @@ class Player():
     
     def special13(self, amount=0):
         #Confrontation2
-        print("confrontation win")
+        # print("confrontation win")
         self.game.winner = self
 
     def special14(self, amount=0):

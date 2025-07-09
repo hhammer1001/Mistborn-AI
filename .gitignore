@@ -169,3 +169,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+robot1.py
+battle1.py
+.gitignore
+cardData1.json
+cardData.json
