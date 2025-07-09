@@ -68,7 +68,7 @@ class Game():
         while not self.winner:
             # print(self)
             self.turncount += 1
-            if self.turncount > 5000:
+            if self.turncount > 1000:
                 print("long aaaa game")
                 return self.players[1]
             self.players[currCharacter].playTurn(self)

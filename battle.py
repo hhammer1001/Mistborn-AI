@@ -15,7 +15,6 @@ def main():
     learnRate = 0.1
     for i in range(10000):
         g = Game(randos = True)
-
         winner = g.play()
         loser = g.players[(winner.turnOrder + 1)%2]
         goodCards = winner.deck.hand + winner.deck.cards + winner.deck.discard
