@@ -250,13 +250,8 @@ class Player():
                 self.resolve("D.Mi", "3.3")
                 self.charAbility3 = False 
             case 12:
-                if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
-                    self.metalTokens[action[1]] = 1
-                else: 
-                    self.metalTokens[action[1]] = 4
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
-                self.metalBurned[8] += 1
 
 
     def senseCheck(self):
