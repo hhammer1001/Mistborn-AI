@@ -173,4 +173,5 @@ robot1.py
 battle1.py
 .gitignore
 cardData1.json
-cardData.json
+twonkyCardData.json
+twonkyMissionData.json
