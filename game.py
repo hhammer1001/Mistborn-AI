@@ -108,7 +108,7 @@ class Game():
             targets = opp.allies
         else: 
             targets = defenders
-        for target in targets:
+        for target in targets: #TODO yell at Eli
             if player.curDamage < target.health:
                 targets.remove(target)
         return targets, opp

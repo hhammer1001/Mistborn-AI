@@ -674,7 +674,7 @@ class HammerBot(Player):
         #return a bool to decide if card is removed from top of deck
         d = self.get_damage(card)
         if d > 0:
-            0
+            return 0
         else:
             return 1
         
