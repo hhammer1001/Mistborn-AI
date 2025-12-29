@@ -99,6 +99,7 @@ class Game():
         opp = self.players[(player.turnOrder + 1)%2]
         defenders = []
         targets = []
+        finalTargets = []
         if ignoreDefender:
             return opp.allies, opp
         for ally in opp.allies:
@@ -109,9 +110,9 @@ class Game():
         else: 
             targets = defenders
         for target in targets: #TODO yell at Eli
-            if player.curDamage < target.health:
-                targets.remove(target)
-        return targets, opp
+            if player.curDamage >= target.health:
+                finalTargets.append(target)
+        return finalTargets, opp
 
     def senseCheck(self, player):
         opp = self.players[(player.turnOrder + 1)%2]

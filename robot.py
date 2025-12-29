@@ -1,9 +1,10 @@
 import csv
-from card import Funding, Ally, Action
+from card import Card, Funding, Ally, Action
 from player import Player
 import random
 import numpy as np
 import json
+from typing import List
 
 class RandomBot(Player):
     def assignDamageIn(self, targets):
@@ -716,9 +717,12 @@ class HammerBot(Player):
         
 class Twonky(Player):
     def __init__(self, deck, game, turnOrder, name='Twonky', character='Prodigy'):
+        self.cardDataFile = "twonkyCardData.json"
+        self.missionDataFile = "twonkyMissionData.json"
         super().__init__(deck, game, turnOrder, name, character)
-        with open("twonkyCardData.json", 'r') as f:
-            self.twonkyCardData = json.load(f)
+        self.unlearnt = True #TODO
+        with open(self.cardDataFile, 'r') as f:
+            self.cardData = json.load(f)
         # with open("cardData.json", 'r') as f:
         #     self.cardData = json.load(f)
         # self.numCards = 20 
@@ -727,9 +731,10 @@ class Twonky(Player):
         #     self.totalValue += self.cardData[card.name]
         # for card in self.deck.hand:
         #     self.totalValue += self.cardData[card.name] #TODO
-        with open("twonkyMissionData.json", 'r') as f:
+        with open(self.missionDataFile, 'r') as f:
             self.missionPrios = sorted([(item[0], item[1]) for item in json.load(f).items()], key=lambda x: x[1])
-        np.random.shuffle(self.missionPrios) #TODO
+            if self.unlearnt:
+                np.random.shuffle(self.missionPrios) #TODO
     # {
     #     "Canton Of Orthodoxy":0.9,
     #     "Luthadel Garrison":0.1,
@@ -749,23 +754,28 @@ class Twonky(Player):
                 starter_names += [row[2]]
         return starter_names
     
-    def sorting_algo(self, card):
-        #HammerBot sorts by highest damage
-        if isinstance(card, Ally):
-            return 0
-        elif isinstance(card, Funding):
-            return 0
-        elif isinstance(card, Action):
-            abils = [(card.data[3], card.data[4]), (card.data[5], card.data[6]), (card.data[7], card.data[8])]
-            abils = [(i[0].split('.'), i[1].split('.')) for i in abils if i != '']
-            for abil in abils:
-                if 'D' in abil[0]:
-                    return int(abil[1][abil[0].index('D')])
-        return 0
-        
-    def assignDamageIn(self, targets):
+    def card_lookup(self, card: Card) -> int:
+        try:
+            return self.cardData[card.name]
+        except KeyError:
+            print(f"{card.name} not in {self.cardDataFile}") 
+    
+    def sorting_algo(self, card: Card):
+        #Twonky sorts by card rating
+        if self.unlearnt:
+            return np.random.rand()
+        else:
+            return self.card_lookup(card)
+
+    def assignDamageIn(self, targets: List[Card]): #TODO
         #choose the index of the ally to kill by assigning damage to it or return -1 to go to player damage
-        return -1  # HammerBot does not assign damage to allies, always goes to player damage
+        options = sorted([(i, targets[i], self.card_lookup(targets[i])) for i in range(len(targets))], key=lambda x: x[2])
+        for ind, target, score in options:
+            if score > 0.5:
+                return ind
+            else:
+                return -1
+                
 
     def selectAction(self, actions, game):
         #choose and return one of the actions in the list
@@ -773,17 +783,47 @@ class Twonky(Player):
         #     return actions[0]
         # else:
         #     return random.choice(actions[1:])
-        missions = sorted([action[1] for action in actions if action[0] == 1], key=lambda x: len(x.name))
+        """
+            match action[0]:
+        case 0:
+            print(f"{i}: move to damage")
+        case 1:
+            print(f"{i}: advance mission {action[1]}")
+        case 2:
+            print(f"{i}: burn the card {action[1]} for {game.metalCodes[action[2]]}")
+        case 3:
+            print(f"{i}: use {action[1]} to refresh {game.metalCodes[action[2]]}")
+        case 4:
+            print(f"{i}: put metal towards the abilities of {action[1]}") 
+        case 5:
+            if (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns:
+                print(f"{i}: burn {game.metalCodes[action[1]]}") 
+            else:
+                print(f"{i}: flare {game.metalCodes[action[1]]}")
+        case 6:
+            print(f"{i}: buy {action[1]}") 
+        case 7:
+            print(f"{i}: buy {action[1]} and then eliminate it using it's first ability") 
+        case 8:
+            print(f"{i}: use the first ability of your ally {action[1]}") 
+        case 9:
+            print(f"{i}: use the second ability of your ally {action[1]}") 
+        case 10:
+            print(f"{i}: use your first character ability") 
+        case 11:
+            print(f"{i}: use your third character ability") 
+        case 12:
+            print(f"{i}: use an atium token to for {game.metalCodes[action[2]]}")
+        """
+        #Mission Actions (1)
+        missions = sorted([action[1] for action in actions if action[0] == 1], key=lambda x: self.missionPrios[x.name])
         if len(missions) > 0:
-            for mission in missions:
-                if mission.name == "Luthadel Garrison":
-                    return (1, mission)
             return (1, missions[0])
-        
+        #Ally and Player Actions (8-11)
         allyPlayerAbilities = [action for action in actions if (action[0] in [8, 9, 10, 11])]
         if allyPlayerAbilities:
             return allyPlayerAbilities[0]
-        
+        """"""
         if len(self.deck.hand) > 0 and set([c.data[0] for c in self.deck.hand]) != set(['Funding']):
             hand_damage = sorted(self.deck.hand, key=lambda x: -1*self.sorting_algo(x))
             for c in hand_damage:

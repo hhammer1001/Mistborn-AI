@@ -12,7 +12,6 @@ def main():
         carddict = json.load(f)
     dic = {"Kaladin": 0,
     "Jasnah": 0}
-    learnRate = 0.1
     for i in range(10000):
         g = Game(randos = True)
         winner = g.play()
