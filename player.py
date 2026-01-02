@@ -115,7 +115,7 @@ class Player():
         print("-1: deal remaining damage to your opponent")
         while True:
             try:
-                choice = int(input("Enter the number assosciated with your chosen target"))
+                choice = int(input("Enter the number associated with your chosen target"))
                 if choice not in range(-1,len(targets)):
                     raise ValueError("Not a valid choice")
                 break
@@ -159,7 +159,7 @@ class Player():
                     print(f"{i}: use an atium token to for {game.metalCodes[action[2]]}")
         while True:
             try:
-                choice = int(input("Enter the number assosciated with your chosen Action: \n"))
+                choice = int(input("Enter the number associated with your chosen Action: \n"))
                 if choice not in range(0,len(actions)):
                     raise ValueError("Not a valid choice")
                 break
@@ -438,7 +438,7 @@ class Player():
                 return
             else:
                 self.deck.cards = [self.deck.discard[choice]] + self.deck.cards
-                self.deck.discard = self.deck.discard[:choice] + self.deck.discard[choice:]
+                self.deck.discard = self.deck.discard[:choice] + self.deck.discard[choice + 1:]
 
     def pullIn(self):
         for i, card in enumerate(self.deck.discard):
@@ -824,9 +824,9 @@ class Player():
         if len(choices) == 1:
             twice = False
         choice, choice2 = self.seekIn(twice, seeker, choices)
-        if(choice > -1):
+        if choice > -1:
             choices[choice].ability1(self)
-            if twice:
+            if twice and choice2 > -1:
                 choices[choice2].ability1(self)
             elif seeker:
                 choices[choice].sought = True
