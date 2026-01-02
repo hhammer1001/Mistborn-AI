@@ -823,9 +823,9 @@ class Player():
         if len(choices) == 1:
             twice = False
         choice, choice2 = self.seekIn(twice, seeker, choices)
-        if(choice > -1):
+        if choice > -1:
             choices[choice].ability1(self)
-            if twice:
+            if twice and choice2 > -1:
                 choices[choice2].ability1(self)
             elif seeker:
                 choices[choice].sought = True
