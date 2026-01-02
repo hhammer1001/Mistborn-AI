@@ -56,8 +56,8 @@ class Game():
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
         if randos:
-            self.players = [HammerBot(self.decks[0], self, 0, names[0], self.characters[0]),
-            FocusBot(self.decks[1], self, 1, names[1], self.characters[1])]
+            self.players = [FocusBot(self.decks[0], self, 0, names[0], self.characters[0]),
+            HammerBot(self.decks[1], self, 1, names[1], self.characters[1])]
         else: 
             self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         for i in range(numPlayers):

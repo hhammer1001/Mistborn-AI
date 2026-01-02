@@ -229,6 +229,7 @@ class Player():
                         self.metalTokens[action[1]] = 4
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
+                self.atium -= 1
             case 6:
                 self.curMoney -= action[1].cost
                 self.deck.discard += [action[1]]
