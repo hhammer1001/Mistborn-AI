@@ -3,7 +3,8 @@ from card import Funding, Ally, Action
 
 class Player():
 
-    def __init__(self, deck, game, turnOrder, name="B$", character='Kelsier'):
+    def __init__(self, deck, game, turnOrder, name="B$", character='Kelsier', analysisMode=False):
+        self.analysisMode = analysisMode
         self.name = name
         self.allies = []
         self.game = game
@@ -126,6 +127,11 @@ class Player():
 
 
     def selectAction(self, actions, game):
+        if self.analysisMode:
+            print(f"Player is {self.name}")
+            print(f"Market is: {game.market.hand}")
+            print(f"Hand is {self.deck.hand}")
+            print(f"Metals available are {self.metalAvailable}")
         for i, action in enumerate(actions):
             match action[0]:
                 case 0:
@@ -157,6 +163,10 @@ class Player():
                     print(f"{i}: use your third character ability") 
                 case 12:
                     print(f"{i}: use an atium token for {game.metalCodes[action[2]]}")
+                case 13:
+                    print(f"{i}: buy {action[1]} using all money and {action[2]} boxings")
+                case 14:
+                    print(f"{i}: buy {action[1]} using all money and {action[2]} boxings and then eliminate it using it's first ability") 
         while True:
             try:
                 choice = int(input("Enter the number associated with your chosen Action: \n"))
@@ -176,7 +186,12 @@ class Player():
         return val
         
     def performAction(self, action, game):
-        # print(action)
+        if self.analysisMode:
+            print(f"Player is {self.name}")
+            print(f"Market is: {game.market.hand}")
+            print(f"Hand is {self.deck.hand}")
+            print(f"Metals available are {self.metalAvailable}")
+            print(f"Performed {action}")
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2
@@ -256,6 +271,17 @@ class Player():
                 self.metalBurned[action[1]] += 1
                 self.metalBurned[8] += 1
                 self.atium -= 1
+            case 13:
+                self.curMoney = 0
+                self.curBoxings -= action[2]
+                self.desk.discard += [action[1]]
+                game.market.buy(action[1])
+            case 14:
+                self.curMoney = 0
+                self.curBoxings -= action[2]
+                game.market.discard += [action[1]]
+                game.market.buy(action[1])
+                action[1].ability1(self)
 
 
     def senseCheck(self):
@@ -344,6 +370,8 @@ class Player():
         #10 -> use first character ability
         #11 -> use third character ability
         #12 -> use atium token to burn metal
+        #13 -> buy a card using boxings
+        #14 -> buy and elim card using boxings
         actions = [(0,)]
         if self.curMission > 0:
             for mission in game.missions:
@@ -394,6 +422,11 @@ class Player():
         if (self.atium > 0) and ((self.metalTokens[:-1].count(1) + self.metalTokens[8]) < self.burns):
             for i in range(8):
                 actions += [(12, i)]
+        for card in game.market.hand:
+            if card.cost > self.curMoney and card.cost <= self.curMoney + self.curBoxings:
+                actions += [(13, card, card.cost-self.curMoney)]
+                if (self.training >= 8) and self.charAbility2 and isinstance(card, Action):
+                    actions += [(14, card, card.cost-self.curMoney)]
         return actions
 
     def damage(self, amount):
@@ -589,7 +622,7 @@ class Player():
         while True:
             try:
                 choice = int(input("Card number to choose: "))
-                if choice not in range(len(-1, choices)):
+                if choice not in range(-1, len(choices)):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
@@ -612,7 +645,7 @@ class Player():
         while True:
             try:
                 choice = int(input("Card number to buy or -1 to skip: "))
-                if choice not in range(len(-1, choices)):
+                if choice not in range(-1, len(choices)):
                     raise ValueError("Choose a valid number")
                 break
             except ValueError:
@@ -627,6 +660,7 @@ class Player():
         if choice == -1:
             return
         self.deck.discard += [choices[choice]]
+        self.game.market.discard.remove(choices[choice])
 
     def special11(self, amount=0):
         for player in self.game.players:
@@ -666,6 +700,7 @@ class Player():
     def special13(self, amount=0):
         #Confrontation2
         # print("confrontation win")
+        self.game.victoryType = 'C'
         self.game.winner = self
 
     def special14(self, amount=0):
