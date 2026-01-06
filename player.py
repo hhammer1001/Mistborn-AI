@@ -274,7 +274,7 @@ class Player():
             case 13:
                 self.curMoney = 0
                 self.curBoxings -= action[2]
-                self.desk.discard += [action[1]]
+                self.deck.discard += [action[1]]
                 game.market.buy(action[1])
             case 14:
                 self.curMoney = 0
