@@ -175,3 +175,10 @@ battle1.py
 cardData1.json
 twonkyCardData.json
 twonkyMissionData.json
+convertJson.py
+sanityTestingData.json
+sanityTestingData1.json
+sanityTestingData.csv
+*.json
+*.csv
+oldData
