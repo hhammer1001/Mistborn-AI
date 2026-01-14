@@ -286,11 +286,11 @@ class Player():
 
     def senseCheck(self):
         for card in self.deck.hand:
-            if card.data[10] == "sense":
+            if card.data[9] == "sense":
                 if self.senseCheckIn(card):
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
-                    return card.data[11]
+                    return int(card.data[10])
         return 0                   
     
     def senseCheckIn(self, card):
