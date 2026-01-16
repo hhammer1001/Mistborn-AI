@@ -52,7 +52,7 @@ class Game():
         if randChars:
             self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], numPlayers)
         else:
-            self.characters = [chars[0]] + random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], 1)
+            self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], 1) + [chars[0]]
         self.missionNames = [sorted(list(self.missionTiers.keys()))[i] for i in sorted(random.sample(range(8), 3))]
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
@@ -80,7 +80,9 @@ class Game():
     def play(self):
         currCharacter = 0
         while not self.winner:
-            # print(self)
+            # for player in self.players:
+            #     cards = sorted(player.deck.hand + player.deck.cards + player.deck.discard, key=lambda x: x.name)
+            #     print(len(cards), cards)
             self.turncount += 1
             if self.turncount > 1000:
                 print("long aaaa game")
