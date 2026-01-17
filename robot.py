@@ -338,7 +338,7 @@ class FocusBot(Player):
     def selectAction(self, actions, game):
         #choose and return one of the actions in the list
         for action in actions:
-            if action[0] >= 8 or action[0] == 4:
+            if (action[0] >= 8 and action[0] <= 11) or action[0] == 4:
                 return action
         for card in self.deck.hand:
             if isinstance(card, Action) and (not card.burned) and (card.metalUsed < card.capacity):
@@ -1037,7 +1037,7 @@ class Twonky(Player):
             return False
 
 class CharacterTwonky(Player):
-    def __init__(self, deck, game, turnOrder, name='CharacterTwonky', character='Marsh', analysisMode=False):
+    def __init__(self, deck, game, turnOrder, name='CharacterTwonky', character='Marsh', analysisMode=False, specialInput=[]):
         super().__init__(deck, game, turnOrder, name, character, analysisMode)
         # self.synergy=True
         # if self.synergy:
@@ -1047,9 +1047,11 @@ class CharacterTwonky(Player):
         #     self.twonkyCardDict = json.load(f)
         self.seekCount = 0
         self.unlearnt = False
-        charData = {"Kelsier": 0, "Marsh": 0.195, "Shan": -0.18, "Vin": 0.03, "Prodigy": -0.2}
-        if self.character == 'Kelsier':
-            self.buffer = charData[self.character]
+        # charData = {"Kelsier": 0.085, "Marsh": 0.25, "Shan": -0.16, "Vin": 0.1, "Prodigy": -0.13} #trained
+        # charData = {"Kelsier": 0, "Marsh": 0.195, "Shan": -0.18, "Vin": 0.03, "Prodigy": -0.2} #human guessed
+        if self.character in specialInput[0]: #['Kelsier', 'Vin', 'Shan', 'Prodigy', 'Shan']:
+            # self.buffer = charData[self.character]
+            self.buffer = specialInput[1]
             with open(f"{self.character}3.json", 'r') as f:
                 self.cardData = json.load(f)
         else:
@@ -1373,7 +1375,7 @@ class CharacterTwonky(Player):
             return False
         
 class EmployedTwonky(Player):
-    def __init__(self, deck, game, turnOrder, name='EmployedTwonky', character='Marsh', analysisMode=False):
+    def __init__(self, deck, game, turnOrder, name='EmployedTwonky', character='Marsh', analysisMode=False, specialInput=[]):
         self.job = ''
         self.buffer = 0.5
         self.unlearnt = False

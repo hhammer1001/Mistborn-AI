@@ -52,7 +52,7 @@ class Game():
         if randChars:
             self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], numPlayers)
         else:
-            self.characters = random.sample(['Kelsier', 'Shan', 'Vin', 'Marsh', 'Prodigy'], 1) + [chars[0]]
+            self.characters = chars
         self.missionNames = [sorted(list(self.missionTiers.keys()))[i] for i in sorted(random.sample(range(8), 3))]
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
@@ -62,8 +62,8 @@ class Game():
                     self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode),
                     bots[1](self.decks[1], self, 1, bots[1].__name__ + "2", self.characters[1], analysisMode=analysisMode)]
                 else:
-                    self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode),
-                    bots[1](self.decks[1], self, 1, bots[1].__name__, self.characters[1], analysisMode=analysisMode, scoreMult=mults[0], costMult=mults[1])]
+                    self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode, specialInput=mults),
+                    bots[1](self.decks[1], self, 1, bots[1].__name__, self.characters[1], analysisMode=analysisMode, specialInput=mults)]
         else:
             if bots:
                 if bots[0]==bots[1]:
