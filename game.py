@@ -4,7 +4,7 @@ from deck import PlayerDeck, Market
 import card
 from mission import Mission
 from player import Player
-from robot import RandomBot, EliBot, QualityBot, FocusBot, HammerBot, Twonky
+from robot import RandomBot, EliBot, QualityBot, FocusBot, SynergyBot
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
@@ -34,7 +34,7 @@ if ans in ['y', 'Y']:
 
 class Game():
 
-    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], randos = False):
+    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], players = False):
         self.market = Market(self)
         self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[9, 'E', 1, 'E', 1],[12, 'E', 4, 'E', 1]], 
                                 "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[7, 'D', 2, 'K', 1],[10, 'D', 3, 'K', 1],[12, 'Pd', 2, 'D', 1]], 
@@ -55,9 +55,15 @@ class Game():
         self.missionNames = [sorted(list(self.missionTiers.keys()))[i] for i in sorted(random.sample(range(8), 3))]
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
-        if randos:
-            self.players = [Twonky(self.decks[0], self, 0, names[0], self.characters[0]),
-            Twonky(self.decks[1], self, 1, names[1], self.characters[1])]
+        if players:
+            
+            while True:
+                try:
+                    self.players = [players[0](self.decks[0], self, 0, names[0], character = self.characters[0]),
+                    players[1](self.decks[1], self, 1, names[1], character = self.characters[1])]
+                    break
+                except:
+                    continue          
         else: 
             self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         for i in range(numPlayers):
