@@ -1,5 +1,5 @@
 from game import Game
-from robot import RandomBot, FocusBot, HammerBot, Twonky, CharacterTwonky, EmployedTwonky
+from robot import RandomBot, FocusBot, HammerBot, Twonky, CharacterTwonky, EmployedTwonky, TestingTwonky
 import numpy as np
 import random
 
@@ -23,11 +23,11 @@ def main():
     # subsets = {}
     # for mask in range(1, 1 << n):
         # subsets[tuple([characters[i] for i in range(n) if mask & (1 << i)])] = 0
-    subsets = {(('Prodigy',), buffer):0 for buffer in list(np.arange(-0.2, -0.1, 0.01))}
-    # subsets = [0]
+    # subsets = {(('Vin',), buffer):0 for buffer in list(np.arange(0, 0.2, 0.01))}
+    subsets = [0]
     for subset in subsets:
         print(subset)
-        char = {char: [0, 0.01] for char in ALL_CHARACTERS}
+        char = {char: [0, 0.00000001] for char in ALL_CHARACTERS}
         charCards = {char: {} for char in ALL_CHARACTERS}
         b0 = {'M':0, 'D':0, 'C':0, 'T':0}
         b1 = {'M':0, 'D':0, 'C':0, 'T':0}
@@ -38,45 +38,52 @@ def main():
         cTracker = {}
         winDics = [('M', mTracker), ('D', dTracker), ('C', cTracker)]
         dic = {}
+        turnCountsM = []
+        turnCountsD = []
         missionTracker = {}
         jobData = {}
         for games in range(10000):
             # print("______NEW GAME______")
             if games % 2 == 0:
-                boys = [EmployedTwonky, CharacterTwonky]
-                # boys = [FocusBot, CharacterTwonky]
-                g = Game(randChars=False, chars=[ALL_CHARACTERS[games%5]] + ['Prodigy'], bots=boys, mults=subset)
+                boys = [TestingTwonky, TestingTwonky]
+                # boys = [FocusBot, TestingTwonky]
+                # g = Game(randChars=False, chars=[ALL_CHARACTERS[games%5]] + ['Vin'], bots=boys, mults=subset)
             else:
-                # boys = [CharacterTwonky, FocusBot]
-                boys = [CharacterTwonky, EmployedTwonky]
-                g = Game(randChars=False, chars=['Prodigy'] + [ALL_CHARACTERS[games%5]], bots=boys, mults=subset)
+                # boys = [TestingTwonky, FocusBot]
+                boys = [TestingTwonky, TestingTwonky]
+                # g = Game(randChars=False, chars=['Vin'] + [ALL_CHARACTERS[games%5]], bots=boys, mults=subset)
+            g = Game(randChars=False, chars=[ALL_CHARACTERS[games%5], ALL_CHARACTERS[(games//5)%5]], bots=boys, mults=subset)
+
             winner = g.play()
             loser = g.players[(winner.turnOrder + 1)%2]
             goodCards = winner.deck.hand + winner.deck.cards + winner.deck.discard
             badCards = loser.deck.hand + loser.deck.cards + loser.deck.discard
-            if winner.name == 'CharacterTwonky':
+            if winner.name in ['TestingTwonky', 'TestingTwonky2']:
                 char[winner.character] = [char[winner.character][0] + 1, char[winner.character][1] + 1]
             else:
                 char[loser.character] = [char[loser.character][0], char[loser.character][1] + 1]
+            if g.victoryType == 'M':
+                turnCountsM += [g.turncount]
+            else:
+                turnCountsD += [g.turncount]
+            
+            if winner.name in ['TestingTwonky', 'TestingTwonky2']:
+                outcome = f'Won {g.victoryType}'
+                job = winner.job
+                outcomeStr = f'Pred {job}, {outcome}'
+                if outcomeStr in jobData:
+                    jobData[outcomeStr] += 1
+                else:
+                    jobData[outcomeStr] = 1
+            elif loser.name in ['TestingTwonky', 'TestingTwonky2']:
+                outcome = 'Lost'
+                job = loser.job
+                outcomeStr = f'Pred {job}, {outcome}'
+                if outcomeStr in jobData:
+                    jobData[outcomeStr] += 1
+                else:
+                    jobData[outcomeStr] = 1
 
-            
-            # if winner.name == 'EmployedTwonky':
-            #     outcome = f'Won {g.victoryType}'
-            #     job = winner.job
-            #     outcomeStr = f'Pred {job}, {outcome}'
-            #     if outcomeStr in jobData:
-            #         jobData[outcomeStr] += 1
-            #     else:
-            #         jobData[outcomeStr] = 1
-            # elif loser.name == 'EmployedTwonky':
-            #     outcome = 'Lost'
-            #     job = loser.job
-            #     outcomeStr = f'Pred {job}, {outcome}'
-            #     if outcomeStr in jobData:
-            #         jobData[outcomeStr] += 1
-            #     else:
-            #         jobData[outcomeStr] = 1
-            
             #card ratings
             for card in goodCards:
                 if card.name in cardTracker:
@@ -165,7 +172,9 @@ def main():
         for character in char:
             char[character] = char[character][0]/char[character][1]
         print(char)
-        
+        print(f'Mission turn Count average, high, low was: {[sum(turnCountsM)/len(turnCountsM), max(turnCountsM), min(turnCountsM)]}')
+        print(f'Damage turn Count average, high, low was: {[sum(turnCountsD)/len(turnCountsD), max(turnCountsD), min(turnCountsD)]}')
+
         for card in cardTracker:
             cardTracker[card] += [cardTracker[card][0]/cardTracker[card][1]]
         for card in synergyTracker:
@@ -178,10 +187,11 @@ def main():
             for card in d:
                 d[card] += [d[card][0]/d[card][1]]
             winDic[name] = d
-        subsets[tuple(subset)] = [dic['CharacterTwonky'], char[subset[0][0]]]
+        # subsets[tuple(subset)] = [dic['CharacterTwonky'], char[subset[0][0]]]
 
-    print(subsets)
-    print(max(subsets.items(), key=lambda x:x[1][1]))
+    # print(subsets)
+    # print(max(subsets.items(), key=lambda x:x[1][1]))
+
     # with open("wins2.json", "w") as f:
     #     json.dump(cardTracker, f, indent=4)
     # with open("categor2.json", "w") as f:
@@ -194,8 +204,8 @@ def main():
     #     with open(f"{charName}3.json", 'w') as f:
     #         json.dump(charCards[charName], f, indent=4)
     
-    # with open("jobs2.json", 'w') as f:
-    #     json.dump(jobData, f, indent=4)
+    with open("jobs2.json", 'w') as f:
+        json.dump(jobData, f, indent=4)
 if __name__ == '__main__':
     main()
 
