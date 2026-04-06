@@ -719,7 +719,7 @@ class HammerBot(Player):
         #return a bool to decide if the card should be discarded to cloudp
         return 0
         
-class Twonky(Player):
+class Twonky1(Player):
     def __init__(self, deck, game, turnOrder, name='Twonky', character='Marsh', analysisMode=False):
         super().__init__(deck, game, turnOrder, name, character, analysisMode)
         self.buffer = 0
@@ -1764,8 +1764,8 @@ class EmployedTwonky(Player):
         else:
             return False
         
-class TestingTwonky(Player):
-    def __init__(self, deck, game, turnOrder, name='TestingTwonky', character='Marsh', analysisMode=False, specialInput=[]):
+class Twonky(Player):
+    def __init__(self, deck, game, turnOrder, name='Twonky', character='Marsh', analysisMode=False, specialInput=[]):
         super().__init__(deck, game, turnOrder, name, character, analysisMode)
         self.job = ''
         # self.synergy=True
