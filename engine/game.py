@@ -142,6 +142,25 @@ class Game():
         opp = self.players[(player.turnOrder + 1)%2]
         return opp.senseCheck()
 
+    def to_dict(self, perspective=None):
+        """Serialize full game state. perspective is a turnOrder int — that player sees their hand, opponent's is hidden."""
+        return {
+            "turnCount": self.turncount,
+            "winner": self.winner.name if self.winner else None,
+            "victoryType": self.victoryType or None,
+            "metalCodes": self.metalCodes,
+            "market": {
+                "hand": [c.to_dict() for c in self.market.hand],
+                "deckSize": len(self.market.cards),
+                "discardSize": len(self.market.discard),
+            },
+            "missions": [m.to_dict() for m in self.missions],
+            "players": [
+                p.to_dict(reveal_hand=(perspective is None or p.turnOrder == perspective))
+                for p in self.players
+            ],
+        }
+
     def __repr__(self):
         ret = f"{str(self.market)}"
         for player in self.players:

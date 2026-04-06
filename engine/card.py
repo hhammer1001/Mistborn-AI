@@ -1,7 +1,14 @@
+METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"]
+
+_next_card_id = 0
+
 class Card():
 
     def __init__(self, data, deck):
+        global _next_card_id
         #data = [name, Cost,metal code,ability 1,abil 1 amt,ability 2,abil 2 amt,ability 3,abil 3 amt,activ abil,activ amt,burn abil,burn amt]
+        self.id = _next_card_id
+        _next_card_id += 1
         self.data = data
         self.name = self.data[0]
         self.deck = deck
@@ -11,6 +18,17 @@ class Card():
 
     def __repr__(self):
         return self.name
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": "card",
+            "cost": self.cost,
+            "metal": self.metal,
+            "metalName": METAL_NAMES[self.metal] if self.metal < len(METAL_NAMES) else "unknown",
+            "sought": self.sought,
+        }
 
 class Action(Card):
     def __init__(self, data, deck):
@@ -28,6 +46,19 @@ class Action(Card):
         self.burned = False
 
     
+    def to_dict(self):
+        d = super().to_dict()
+        d["type"] = "action"
+        d["capacity"] = self.capacity
+        d["metalUsed"] = self.metalUsed
+        d["burned"] = self.burned
+        d["abilities"] = []
+        for i in range(self.capacity):
+            idx = 3 + i * 2
+            if self.data[idx] != '':
+                d["abilities"].append({"effect": self.data[idx], "amount": self.data[idx + 1]})
+        return d
+
     def burn(self, player):
         self.burned = True
         if (self.data[12] != ''):
@@ -68,6 +99,20 @@ class Ally(Card):
             if self.data[5] != '':
                 self.available2 = True
     
+    def to_dict(self):
+        d = super().to_dict()
+        d["type"] = "ally"
+        d["health"] = self.health
+        d["defender"] = self.defender
+        d["available1"] = self.available1
+        d["available2"] = self.available2
+        d["abilities"] = []
+        if self.data[3] != '':
+            d["abilities"].append({"effect": self.data[3], "amount": self.data[4]})
+        if self.data[5] != '':
+            d["abilities"].append({"effect": self.data[5], "amount": self.data[6]})
+        return d
+
     def ability1(self, player):
         player.resolve(self.data[3], self.data[4])
         self.available1 = False
@@ -89,6 +134,12 @@ class Ally(Card):
 class Funding(Card):
     def __init__(self, data, deck):
         super().__init__(data, deck)
+
+    def to_dict(self):
+        d = super().to_dict()
+        d["type"] = "funding"
+        return d
+
     def play(self, owner):
         owner.money(1)
     def reset(self):

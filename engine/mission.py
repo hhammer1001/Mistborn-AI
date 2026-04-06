@@ -18,6 +18,15 @@ class Mission():
         self.playerRanks[playerNum] = new
         self.game.missionVictoryCheck(playerNum)
     
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "playerRanks": self.playerRanks,
+            "tiers": [{"threshold": t[0], "reward": t[1], "rewardAmount": t[2],
+                        "firstReward": t[3], "firstRewardAmount": t[4]} for t in self.tiers],
+            "maxRank": self.tiers[-1][0] if self.tiers else 12,
+        }
+
     def display(self):
         return f"Progress on {self.name} is {self.playerRanks}, tiers are {self.tiers}"
 

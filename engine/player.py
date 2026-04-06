@@ -430,6 +430,69 @@ class Player():
                     actions += [(14, card, card.cost-self.curMoney)]
         return actions
 
+    def serialize_action(self, action, game):
+        """Convert an action tuple into a JSON-friendly dict."""
+        metal_names = game.metalCodes
+        code = action[0]
+        is_burn = (self.metalTokens[:-1].count(1) + self.metalTokens[-1]) < self.burns
+
+        base = {"code": code, "index": None}
+
+        match code:
+            case 0:
+                return {**base, "description": "End actions (move to damage phase)"}
+            case 1:
+                return {**base, "description": f"Advance mission {action[1].name}",
+                        "missionName": action[1].name}
+            case 2:
+                return {**base, "description": f"Burn {action[1].name} for {metal_names[action[2]]}",
+                        "cardId": action[1].id, "metalIndex": action[2]}
+            case 3:
+                return {**base, "description": f"Use {action[1].name} to refresh {metal_names[action[2]]}",
+                        "cardId": action[1].id, "metalIndex": action[2]}
+            case 4:
+                return {**base, "description": f"Put metal towards abilities of {action[1].name}",
+                        "cardId": action[1].id}
+            case 5:
+                verb = "Burn" if is_burn else "Flare"
+                return {**base, "description": f"{verb} {metal_names[action[1]]}",
+                        "metalIndex": action[1]}
+            case 6:
+                return {**base, "description": f"Buy {action[1].name}",
+                        "cardId": action[1].id}
+            case 7:
+                return {**base, "description": f"Buy {action[1].name} and eliminate (use first ability)",
+                        "cardId": action[1].id}
+            case 8:
+                return {**base, "description": f"Use first ability of ally {action[1].name}",
+                        "cardId": action[1].id}
+            case 9:
+                return {**base, "description": f"Use second ability of ally {action[1].name}",
+                        "cardId": action[1].id}
+            case 10:
+                return {**base, "description": "Use first character ability"}
+            case 11:
+                return {**base, "description": "Use third character ability"}
+            case 12:
+                return {**base, "description": f"Use atium token for {metal_names[action[1]]}",
+                        "metalIndex": action[1]}
+            case 13:
+                return {**base, "description": f"Buy {action[1].name} using all money and {action[2]} boxings",
+                        "cardId": action[1].id, "boxingsCost": action[2]}
+            case 14:
+                return {**base, "description": f"Buy {action[1].name} using all money and {action[2]} boxings and eliminate",
+                        "cardId": action[1].id, "boxingsCost": action[2]}
+
+    def serialize_actions(self, game):
+        """Return all available actions as a list of dicts with an index for selection."""
+        actions = self.availableActions(game)
+        result = []
+        for i, action in enumerate(actions):
+            d = self.serialize_action(action, game)
+            d["index"] = i
+            result.append(d)
+        return result, actions
+
     def damage(self, amount):
         self.curDamage += amount
 
@@ -918,5 +981,40 @@ class Player():
                 pass
         return (ans in ['y', 'Y'])
                 
+    def to_dict(self, reveal_hand=True):
+        metal_names = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"]
+        return {
+            "name": self.name,
+            "character": self.character,
+            "turnOrder": self.turnOrder,
+            "alive": self.alive,
+            "health": self.curHealth,
+            "damage": self.curDamage,
+            "money": self.curMoney,
+            "mission": self.curMission,
+            "boxings": self.curBoxings,
+            "hand": [c.to_dict() for c in self.deck.hand] if reveal_hand else [],
+            "handSize": len(self.deck.hand),
+            "deckSize": len(self.deck.cards),
+            "discardSize": len(self.deck.discard),
+            "allies": [a.to_dict() for a in self.allies],
+            "metalTokens": self.metalTokens,
+            "metalAvailable": self.metalAvailable,
+            "metalBurned": self.metalBurned,
+            "metalNames": metal_names,
+            "burns": self.burns,
+            "atium": self.atium,
+            "training": self.training,
+            "maxHandSize": self.handSize,
+            "pDamage": self.pDamage,
+            "pMoney": self.pMoney,
+            "charAbility1": self.charAbility1,
+            "charAbility2": self.charAbility2,
+            "charAbility3": self.charAbility3,
+            "ability1metal": self.ability1metal,
+            "ability1effect": self.ability1effect,
+            "ability1amount": self.ability1amount,
+        }
+
     def __repr__(self):
         return f"{self.name}: {self.curHealth}"
