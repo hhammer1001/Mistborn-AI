@@ -4,7 +4,7 @@ from deck import PlayerDeck, Market
 import card
 from mission import Mission
 from player import Player
-from robot import RandomBot, EliBot, QualityBot, FocusBot, SynergyBot
+from robot import RandomBot, EliBot, QualityBot, FocusBot, SynergyBot, HammerBot, Twonky, EmployedTwonky
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
@@ -34,7 +34,8 @@ if ans in ['y', 'Y']:
 
 class Game():
 
-    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], players = False):
+    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], players=False, randos=False, analysisMode=False, bots=[], mults=[]):
+        self.victoryType = ''
         self.market = Market(self)
         self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[9, 'E', 1, 'E', 1],[12, 'E', 4, 'E', 1]], 
                                 "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[7, 'D', 2, 'K', 1],[10, 'D', 3, 'K', 1],[12, 'Pd', 2, 'D', 1]], 
@@ -56,15 +57,29 @@ class Game():
         self.missions = [Mission(self.missionNames[i], self, self.missionTiers[self.missionNames[i]]) for i in range(3)]
         self.decks = [PlayerDeck(self, self.characters[i]) for i in range(numPlayers)]
         if players:
-            
             while True:
                 try:
                     self.players = [players[0](self.decks[0], self, 0, names[0], character = self.characters[0]),
                     players[1](self.decks[1], self, 1, names[1], character = self.characters[1])]
                     break
                 except:
-                    continue          
-        else: 
+                    continue
+        elif mults:
+            if bots:
+                if bots[0]==bots[1]:
+                    self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode),
+                    bots[1](self.decks[1], self, 1, bots[1].__name__ + "2", self.characters[1], analysisMode=analysisMode)]
+                else:
+                    self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode, specialInput=mults),
+                    bots[1](self.decks[1], self, 1, bots[1].__name__, self.characters[1], analysisMode=analysisMode, specialInput=mults)]
+        elif bots:
+            if bots[0]==bots[1]:
+                self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode),
+                bots[1](self.decks[1], self, 1, bots[1].__name__ + "2", self.characters[1], analysisMode=analysisMode)]
+            else:
+                self.players = [bots[0](self.decks[0], self, 0, bots[0].__name__, self.characters[0], analysisMode=analysisMode),
+                bots[1](self.decks[1], self, 1, bots[1].__name__, self.characters[1], analysisMode=analysisMode)]
+        else:
             self.players = [Player(self.decks[i], self, i, names[i], self.characters[i]) for i in range(numPlayers)]
         for i in range(numPlayers):
             self.decks[i].cleanUp(self.players[i])
@@ -72,10 +87,13 @@ class Game():
     def play(self):
         currCharacter = 0
         while not self.winner:
-            # print(self)
+            # for player in self.players:
+            #     cards = sorted(player.deck.hand + player.deck.cards + player.deck.discard, key=lambda x: x.name)
+            #     print(len(cards), cards)
             self.turncount += 1
             if self.turncount > 1000:
                 print("long aaaa game")
+                self.victoryType = 'T'
                 return self.players[1]
             self.players[currCharacter].playTurn(self)
             currCharacter = (currCharacter + 1) % self.numPlayers
@@ -88,8 +106,7 @@ class Game():
             if(mission.playerRanks[playerNum] == 12):
                 c = c + 1 
         if c == 3:
-
-
+            self.victoryType = 'M'
             self.winner = self.players[playerNum]
 
     def attack(self, player):
@@ -99,6 +116,7 @@ class Game():
                 return
         opp.takeDamage(player.curDamage)
         if not opp.alive:
+            self.victoryType = 'D'
             self.winner = player
 
     def validTargets(self, player, ignoreDefender = False):

@@ -1,11 +1,9 @@
 from game import Game
-from robot import FocusBot, RandomBot, SynergyBot, SynergyBotPrime, Twonky
+from robot import RandomBot, FocusBot, SynergyBot, SynergyBotPrime, Twonky
 from matplotlib import pyplot as plt
 
 
 import json
-
-
 
 
 def main():
@@ -37,7 +35,7 @@ def main():
 
     dic = {"Twonky": 0,
         "SynergyBot": 0}
-    
+
     for z in range(1000000):
         p = [Twonky,
                     SynergyBot]
@@ -51,7 +49,7 @@ def main():
 
         goodCards = winner.deck.hand + winner.deck.cards + winner.deck.discard
         xs.append(len(goodCards))
-        
+
         badCards = loser.deck.hand + loser.deck.cards + loser.deck.discard
         ys.append(len(badCards))
 
@@ -80,7 +78,7 @@ def main():
                         synDict[badKey][(badCards[i].name, badCards[j].name)] = 1.0
                 else:
                     try:
-                        synDict[badKey][(badCards[j].name, badCards[i].name)] = synDict[badKey][(badCards[j].name, badCards[i].name)] * (1 - learnRate) 
+                        synDict[badKey][(badCards[j].name, badCards[i].name)] = synDict[badKey][(badCards[j].name, badCards[i].name)] * (1 - learnRate)
                     except:
                         synDict[badKey][(badCards[j].name, badCards[i].name)] = 1.0
 
@@ -105,13 +103,13 @@ def main():
                         break
                     except:
                         continue
-        
-        
 
 
 
 
-                
+
+
+
     plt.hist(xs)
     plt.savefig("hubbins.png")
     plt.clf()
