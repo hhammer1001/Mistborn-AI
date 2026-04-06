@@ -1,5 +1,6 @@
 import csv
-from card import Funding, Ally, Action
+from engine.card import Funding, Ally, Action
+from engine import DATA_DIR
 
 class Player():
 
@@ -40,7 +41,7 @@ class Player():
             self.curHealth = 40
             self.curBoxings = 1
         
-        with open('characters.csv', newline='') as csvfile:
+        with open(DATA_DIR / 'characters.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in lines:
                 if row[0] == self.character:

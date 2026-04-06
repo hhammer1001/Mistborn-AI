@@ -1,5 +1,6 @@
-from game import Game
-from robot import RandomBot, FocusBot, HammerBot, Twonky, EmployedTwonky
+from engine.game import Game
+from engine.robot import RandomBot, FocusBot, HammerBot, Twonky, EmployedTwonky
+from engine import DATA_DIR
 
 
 import json
@@ -113,11 +114,11 @@ def main():
             d[card] += [d[card][0]/d[card][1]]
         winDic[name] = d
 
-    with open("wins1.json", "w") as f:
+    with open(DATA_DIR / "wins1.json", "w") as f:
         json.dump(cardTracker, f, indent=4)
-    with open("categor1.json", "w") as f:
+    with open(DATA_DIR / "categor1.json", "w") as f:
         json.dump(winDic, f, indent=4)
-    with open("syns1.json", 'w') as f:
+    with open(DATA_DIR / "syns1.json", 'w') as f:
         json.dump(synergyTracker, f, indent=4)
 
 if __name__ == '__main__':

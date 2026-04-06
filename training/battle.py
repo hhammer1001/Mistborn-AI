@@ -1,5 +1,6 @@
-from game import Game
-from robot import RandomBot, FocusBot, SynergyBot, SynergyBotPrime, Twonky
+from engine.game import Game
+from engine.robot import RandomBot, FocusBot, Twonky
+from engine import DATA_DIR
 from matplotlib import pyplot as plt
 
 
@@ -20,14 +21,14 @@ def main():
     cardDict = {}
     for key in keys:
         try:
-            with open(f"synergyData1/{key}.json", 'r') as f:
+            with open(DATA_DIR / f"synergyData1/{key}.json", 'r') as f:
                 tempdata = json.load(f)
         except:
             print(key)
         synDict[key] = {tuple(old_key.split('|')): value for old_key, value in tempdata.items()}
 
 
-    with open(f"cardData.json", 'r') as f:
+    with open(DATA_DIR / "cardData.json", 'r') as f:
         cardDict = json.load(f)
     xs = []
     ys = []
@@ -98,7 +99,7 @@ def main():
 
                 while(True):
                     try:
-                        with open(f"synergyData1/{key}.json", "w") as f:
+                        with open(DATA_DIR / f"synergyData1/{key}.json", "w") as f:
                             json.dump(tempdata, f, indent=4) # indent for pretty-printing
                         break
                     except:

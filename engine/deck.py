@@ -1,6 +1,7 @@
 import random
 import csv
-from card import Funding, Action, Ally
+from engine.card import Funding, Action, Ally
+from engine import DATA_DIR
 
 class Deck():
 
@@ -42,7 +43,7 @@ class PlayerDeck(Deck):
     def __init__(self, game, code):
         super().__init__(game)
         deckInfo = {0:[], 1:[]}
-        with open('starterdecks.csv', newline='') as csvfile:
+        with open(DATA_DIR / 'starterdecks.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             fixedLines = []
             for row in lines:
@@ -122,7 +123,7 @@ class PlayerDeck(Deck):
 class Market(Deck):
     def __init__(self, game):
         super().__init__(game)
-        with open('marketdeck.csv', newline='') as csvfile:
+        with open(DATA_DIR / 'marketdeck.csv', newline='') as csvfile:
             lines = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in lines:
                 self.cards += [self.dataToCard(row)]

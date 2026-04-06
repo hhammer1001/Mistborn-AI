@@ -1,6 +1,7 @@
 import csv
-from card import Card, Funding, Ally, Action
-from player import Player
+from engine.card import Card, Funding, Ally, Action
+from engine.player import Player
+from engine import DATA_DIR
 import random
 import numpy as np
 import json
@@ -14,7 +15,7 @@ class Twonky(Player):
         # if self.synergy:
         #     with open("syns2.json", 'r') as f:
         #         self.twonkySynDict = json.load(f)
-        # with open("wins2.json", 'r') as f:
+        # with open(DATA_DIR / "wins2.json", 'r') as f:
         #     self.twonkyCardDict = json.load(f)
         # with open("categor2.json", 'r') as f:
         #     self.categoryData = json.load(f)
@@ -23,18 +24,18 @@ class Twonky(Player):
         charData = {"Kelsier": 0.04, "Marsh": 0.25, "Shan": -0.16, "Vin": 0.09, "Prodigy": -0.16} #extra trained
         if self.character in ['Kelsier', 'Vin', 'Shan', 'Prodigy', 'Marsh']:
             self.buffer = charData[self.character]
-            with open(f"{self.character}3.json", 'r') as f:
+            with open(DATA_DIR / f"{self.character}3.json", 'r') as f:
                 self.cardData = json.load(f)
         else:
             self.buffer = 0
-            with open("wins2.json", 'r') as f:
+            with open(DATA_DIR / "wins2.json", 'r') as f:
                 self.cardData = json.load(f)
         for card in self.cardData:
             if self.unlearnt:
                 self.cardData[card] = 0.5 + (random.random()/100)
             else:
                 self.cardData[card] = self.cardData[card][2]
-        self.missionDataFile = "twonkyMissionData.json"
+        self.missionDataFile = DATA_DIR / "twonkyMissionData.json"
         with open(self.missionDataFile, 'r') as f:
             self.missionLookup = json.load(f)
         # charCards = {}

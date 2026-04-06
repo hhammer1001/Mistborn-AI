@@ -1,18 +1,19 @@
 import json
 import csv
+from engine import DATA_DIR
 
 
 def convert(name, category=False):
-    with open(f"{name}.json") as f:
+    with open(DATA_DIR / f"{name}.json") as f:
         data = json.load(f)
     if not category:
-        with open(f"{name}.csv", "w", newline="") as f:
+        with open(DATA_DIR / f"{name}.csv", "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["Name", "Net Score", "Uses", "Winrate"])
             for card, values in data.items():
                 writer.writerow([card, *values])
     else: 
-        with open(f"{name}.csv", "w", newline="") as f:
+        with open(DATA_DIR / f"{name}.csv", "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["Name", "Net Score", "Uses", "Winrate"]*3)
             for i in range(len(data[list(data.keys())[0]].keys())):
@@ -27,7 +28,7 @@ def unconvert(name, category=False):
     if not category:
         data = {}
 
-        with open(f"{name}.csv", newline="") as f:
+        with open(DATA_DIR / f"{name}.csv", newline="") as f:
             reader = csv.reader(f)
             next(reader)  # skip header
 
@@ -40,12 +41,12 @@ def unconvert(name, category=False):
                 ]
                 data[card] = values
 
-        with open(f"{name}.json", "w") as f:
+        with open(DATA_DIR / f"{name}.json", "w") as f:
             json.dump(data, f, indent=2)
 
 
     else:
-        with open(f"{name}.csv", newline="") as f:
+        with open(DATA_DIR / f"{name}.csv", newline="") as f:
             reader = csv.reader(f)
             header = next(reader)
 
@@ -68,7 +69,7 @@ def unconvert(name, category=False):
         for i, cat in enumerate(categories):
             data[f"mission_{i}"] = cat
 
-        with open(f"{name}.json", "w") as f:
+        with open(DATA_DIR / f"{name}.json", "w") as f:
             json.dump(data, f, indent=2)
 
 # convert('wins2')

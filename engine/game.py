@@ -1,10 +1,10 @@
 import random
 import csv
-from deck import PlayerDeck, Market
-import card
-from mission import Mission
-from player import Player
-from robot import RandomBot, EliBot, QualityBot, FocusBot, SynergyBot, HammerBot, Twonky, EmployedTwonky
+from engine.deck import PlayerDeck, Market
+import engine.card as card
+from engine.mission import Mission
+from engine.player import Player
+from engine.robot import RandomBot, EliBot, QualityBot, FocusBot, HammerBot, Twonky, EmployedTwonky
 
 """ Mission tier format [dist from last reward/start, reward func, amt, first player reward func, first player reward amt]"""
 
