@@ -104,6 +104,11 @@ CARDS = [
     ("Funding",         TRAIN_SHEET, 4, 0, False),
 ]
 
+# Windows reserved device names must be mapped to safe filenames.
+FILENAME_OVERRIDES = {
+    "Con": "Con_card",
+}
+
 # Cache opened sheet images
 _sheet_cache: dict[str, Image.Image] = {}
 
@@ -129,7 +134,8 @@ for name, (filename, cols, rows, w, h), col, row, rotated in CARDS:
     if rotated:
         card_img = card_img.rotate(90, expand=True)
 
-    out_path = OUT / f"{name}.png"
+    out_name = FILENAME_OVERRIDES.get(name, name)
+    out_path = OUT / f"{out_name}.png"
     card_img.save(out_path)
     print(f"  {name} -> {out_path}")
 
