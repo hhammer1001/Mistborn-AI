@@ -57,6 +57,10 @@ class Action(Card):
             idx = 3 + i * 2
             if self.data[idx] != '':
                 d["abilities"].append({"effect": self.data[idx], "amount": self.data[idx + 1]})
+        if self.data[9] != '':
+            d["activeAbility"] = {"effect": self.data[9], "amount": self.data[10]}
+        if self.data[11] != '':
+            d["burnAbility"] = {"effect": self.data[11], "amount": self.data[12]}
         return d
 
     def burn(self, player):

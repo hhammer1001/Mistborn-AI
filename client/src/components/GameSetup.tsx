@@ -10,9 +10,10 @@ interface Props {
     opponentType: string,
     opponentCharacter: string
   ) => void;
+  onViewCards: () => void;
 }
 
-export function GameSetup({ onStart }: Props) {
+export function GameSetup({ onStart, onViewCards }: Props) {
   const [playerName, setPlayerName] = useState("Player");
   const [character, setCharacter] = useState("Kelsier");
   const [opponentType, setOpponentType] = useState("twonky");
@@ -74,6 +75,9 @@ export function GameSetup({ onStart }: Props) {
           }
         >
           Start Game
+        </button>
+        <button className="view-cards-btn" onClick={onViewCards}>
+          View All Cards
         </button>
       </div>
     </div>

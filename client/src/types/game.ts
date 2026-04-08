@@ -11,6 +11,8 @@ export interface CardData {
   metalUsed?: number;
   burned?: boolean;
   abilities?: { effect: string; amount: string }[];
+  activeAbility?: { effect: string; amount: string };
+  burnAbility?: { effect: string; amount: string };
   // Ally-specific
   health?: number;
   defender?: boolean;
@@ -82,6 +84,22 @@ export interface GameAction {
   boxingsCost?: number;
 }
 
+export interface BotLogEntry {
+  turn: number;
+  text: string;
+}
+
+export interface PromptOption {
+  index: number;
+  [key: string]: unknown;
+}
+
+export interface GamePrompt {
+  type: string;
+  options: PromptOption[];
+  context: string;
+}
+
 export interface GameState {
   sessionId: string;
   phase: "actions" | "game_over";
@@ -93,4 +111,6 @@ export interface GameState {
   missions: MissionData[];
   players: PlayerData[];
   availableActions: GameAction[];
+  botLog?: BotLogEntry[];
+  prompt?: GamePrompt;
 }

@@ -283,6 +283,12 @@ class Player():
                 game.market.discard += [action[1]]
                 game.market.buy(action[1])
                 action[1].ability1(self)
+            case 15:
+                self.curMoney -= 2
+                self.curBoxings += 1
+            case 16:
+                self.curBoxings -= 1
+                self.curMoney += 1
 
 
     def senseCheck(self):
@@ -373,7 +379,13 @@ class Player():
         #12 -> use atium token to burn metal
         #13 -> buy a card using boxings
         #14 -> buy and elim card using boxings
+        #15 -> buy a boxing (2 money -> 1 boxing)
+        #16 -> use a boxing (1 boxing -> 2 money)
         actions = [(0,)]
+        if self.curMoney >= 2:
+            actions += [(15,)]
+        if self.curBoxings > 0:
+            actions += [(16,)]
         if self.curMission > 0:
             for mission in game.missions:
                 if mission.playerRanks[self.turnOrder]< 12:
@@ -482,6 +494,10 @@ class Player():
             case 14:
                 return {**base, "description": f"Buy {action[1].name} using all money and {action[2]} boxings and eliminate",
                         "cardId": action[1].id, "boxingsCost": action[2]}
+            case 15:
+                return {**base, "description": "Buy a boxing (2 money → 1 boxing)"}
+            case 16:
+                return {**base, "description": "Use a boxing (1 boxing → 1 money)"}
 
     def serialize_actions(self, game):
         """Return all available actions as a list of dicts with an index for selection."""

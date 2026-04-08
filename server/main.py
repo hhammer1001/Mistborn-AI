@@ -27,6 +27,11 @@ class ActionRequest(BaseModel):
     actionIndex: int
 
 
+class PromptResponse(BaseModel):
+    promptType: str
+    value: int
+
+
 @app.get("/api/info")
 def get_info():
     return {
@@ -60,6 +65,14 @@ def play_action(session_id: str, req: ActionRequest):
     if not session:
         return {"error": "Session not found"}
     return session.play_action(req.actionIndex)
+
+
+@app.post("/api/games/{session_id}/prompt")
+def respond_to_prompt(session_id: str, req: PromptResponse):
+    session = manager.get(session_id)
+    if not session:
+        return {"error": "Session not found"}
+    return session.respond_to_prompt(req.promptType, req.value)
 
 
 @app.delete("/api/games/{session_id}")
