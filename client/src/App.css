@@ -269,7 +269,7 @@ h3 {
 }
 
 .player-info-with-training {
-  width: 280px;
+  width: 300px;
   flex-shrink: 0;
   display: flex;
   background: var(--bg-panel);
@@ -699,6 +699,7 @@ h3 {
   flex-direction: column;
   gap: 0.25rem;
   position: relative;
+  align-self: flex-start;
 }
 
 .card-actions {
