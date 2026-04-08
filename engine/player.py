@@ -800,10 +800,18 @@ class Player():
     def special15(self, amount=0):
         #Keeper
         if len(self.deck.hand) > 0:
+            from engine.card import Funding
             choices = self.deck.hand
+            # Filter out Funding if player can't afford to undo the money
+            choices = [c for c in choices if not isinstance(c, Funding) or self.curMoney >= 1]
+            if not choices:
+                return
             choice = self.keeperIn(choices)
-            self.deck.setAside += [choices[choice]]
-            self.deck.hand.remove(choices[choice])
+            card = choices[choice]
+            if isinstance(card, Funding):
+                self.curMoney -= 1
+            self.deck.setAside += [card]
+            self.deck.hand.remove(card)
             
         # else:
         #     print("Your hand is empty")
