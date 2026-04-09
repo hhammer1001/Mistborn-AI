@@ -16,7 +16,7 @@ const ICON_MAP: Record<string, { src: string; label: string }> = {
   A:  { src: "atium",     label: "Atium" },
   R:  { src: "refresh_2", label: "Refresh" },
   B:  { src: "burn",    label: "Burn" },
-  K:  { src: "swords",    label: "Kill" },
+  K:  { src: "__kill__",   label: "Kill Ally" },
   T:  { src: "cloak_1",   label: "Train" },
   Pc: { src: "draw_1",    label: "+Draw" },
   Pd: { src: "swords",    label: "+Damage" },
@@ -72,12 +72,27 @@ export function RewardIcon({ code, amount, size = 24, className }: Props) {
     );
   }
 
+  // Special rendering for Kill Ally — red "K" circle
+  if (code === "K") {
+    return (
+      <span
+        className={`reward-icon reward-icon-kill ${className ?? ""}`}
+        style={{ width: size, height: size, fontSize: size * 0.55 }}
+        title="Kill Ally — Destroy an opponent's Ally"
+      >
+        K
+      </span>
+    );
+  }
+
   const variants = NUMBERED_VARIANTS[entry.src];
   const hasVariant = variants && amount && variants.includes(amount);
   const src = iconPath(entry.src, amount);
 
   // Show numeric overlay when there's an amount but no pre-baked variant
-  const showOverlay = amount !== undefined && amount > 0 && !hasVariant;
+  // Burn icon already has "+1" baked in
+  const showOverlay = amount !== undefined && amount > 0 && !hasVariant
+    && !(code === "B" && amount === 1);
   const isPermanent = code.startsWith("P") && code.length === 2;
   const overlayText = showOverlay
     ? isPermanent ? `${amount}P` : `${amount}`
@@ -98,7 +113,7 @@ export function RewardIcon({ code, amount, size = 24, className }: Props) {
         draggable={false}
       />
       {overlayText && (
-        <span className="reward-icon-number" style={{ fontSize: size * 0.45 }}>
+        <span className="reward-icon-number" style={{ fontSize: size * 0.65 }}>
           {overlayText}
         </span>
       )}

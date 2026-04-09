@@ -22,12 +22,13 @@ function MissionColumn({ mission, action, onAction }: {
     <div className="mission-col">
       <div className="mission-col-name">{mission.name}</div>
 
-      {/* Bars with tier markers */}
+      {/* All children share the same 200px coordinate space */}
       <div className="mission-bar-area">
         {/* Tier cutoff lines with rewards */}
         {mission.tiers.map((tier, i) => {
-          const pct = Math.min((tier.threshold / max) * 100, 96);
+          const pct = (tier.threshold / max) * 100;
           const isFinal = i === mission.tiers.length - 1;
+          const iconSize = 24;
           return (
             <div
               key={tier.threshold}
@@ -35,11 +36,13 @@ function MissionColumn({ mission, action, onAction }: {
               style={{ bottom: `${pct}%` }}
             >
               <span className="mission-cutoff-rewards left">
-                <RewardIcon code={tier.reward} amount={tier.rewardAmount} size={20} />
+                <RewardIcon code={tier.reward} amount={tier.rewardAmount} size={iconSize} />
               </span>
-              <span className="mission-cutoff-line" />
+              <span className="mission-cutoff-line">
+                <span className="mission-cutoff-rank">{tier.threshold}</span>
+              </span>
               <span className="mission-cutoff-rewards right">
-                <RewardIcon code={tier.firstReward} amount={tier.firstRewardAmount} size={20} />
+                <RewardIcon code={tier.firstReward} amount={tier.firstRewardAmount} size={iconSize} />
               </span>
             </div>
           );
@@ -51,19 +54,19 @@ function MissionColumn({ mission, action, onAction }: {
           return <div key={i} className="mission-bar-tick" style={{ bottom: `${pct}%` }} />;
         })}
 
-        {/* Double bars */}
-        <div className="mission-bar-col">
-          <div className="mission-bar-bg">
-            <div className="mission-bar-fill you" style={{ height: `${youPct}%` }} />
-          </div>
-          <span className="mission-bar-val you">{you}</span>
+        {/* Two bar fills — absolutely positioned to fill the area */}
+        <div className="mission-bar-abs you">
+          <div className="mission-bar-fill you" style={{ height: `${youPct}%` }} />
         </div>
-        <div className="mission-bar-col">
-          <div className="mission-bar-bg">
-            <div className="mission-bar-fill opp" style={{ height: `${oppPct}%` }} />
-          </div>
-          <span className="mission-bar-val opp">{opp}</span>
+        <div className="mission-bar-abs opp">
+          <div className="mission-bar-fill opp" style={{ height: `${oppPct}%` }} />
         </div>
+      </div>
+
+      {/* Rank numbers below the bar area */}
+      <div className="mission-bar-values">
+        <span className="mission-bar-val you">{you}</span>
+        <span className="mission-bar-val opp">{opp}</span>
       </div>
       <div className="mission-col-labels">
         <span className="mission-col-label-reach">Reach</span>

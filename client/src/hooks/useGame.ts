@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import type { GameState } from "../types/game";
+import type { GameState, GameAction } from "../types/game";
 
 const API_BASE = "";
 
@@ -127,6 +127,36 @@ export function useGame() {
     [gameState]
   );
 
+  const playTwoActions = useCallback(
+    async (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
+      const first = await playAction(firstIndex);
+      if (!first) return null;
+      const secondIndex = findSecond(first.availableActions);
+      if (secondIndex === undefined) return first;
+      // Fire the second action directly against the API with the fresh session
+      setLoading(true);
+      try {
+        const resp = await fetch(
+          `${API_BASE}/api/games/${first.sessionId}/action`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actionIndex: secondIndex }),
+          }
+        );
+        const data: GameState = await resp.json();
+        setGameState(data);
+        return data;
+      } catch (e) {
+        setError(String(e));
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [playAction]
+  );
+
   const respondToPrompt = useCallback(
     async (promptType: string, value: number) => {
       if (!gameState) return null;
@@ -176,6 +206,61 @@ export function useGame() {
     [gameState]
   );
 
+  const assignDamage = useCallback(
+    async (targetIndex: number) => {
+      if (!gameState) return null;
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await fetch(
+          `${API_BASE}/api/games/${gameState.sessionId}/damage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ targetIndex }),
+          }
+        );
+        const data: GameState = await resp.json();
+        setGameState(data);
+
+        const newEntries: LogEntry[] = [];
+        const bName = botName.current;
+        const pName = playerName.current;
+
+        if (targetIndex === -1) {
+          newEntries.push({ turn: gameState.turnCount, text: `${pName} — Deal remaining damage to opponent` });
+        } else {
+          const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
+          newEntries.push({ turn: gameState.turnCount, text: `${pName} — Kill ${target?.name ?? "ally"}` });
+        }
+
+        if (data.botLog && data.botLog.length > 0) {
+          const botTurn = data.botLog[0]?.turn ?? gameState.turnCount + 1;
+          newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
+          for (const entry of data.botLog) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          }
+        }
+
+        if (data.turnCount > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        }
+
+        if (newEntries.length > 0) {
+          setLog((prev) => consolidateLog([...prev, ...newEntries]));
+        }
+
+        return data;
+      } catch (e) {
+        setError(String(e));
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [gameState]
+  );
+
   const refreshState = useCallback(async () => {
     if (!gameState) return;
     try {
@@ -196,6 +281,8 @@ export function useGame() {
     log,
     createGame,
     playAction,
+    playTwoActions,
+    assignDamage,
     respondToPrompt,
     refreshState,
   };

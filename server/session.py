@@ -84,6 +84,14 @@ class GameSession:
             self._real_bot = self.game.players[1]
             self.bot = LoggingBot(self._real_bot, self)
 
+    def _get_damage_targets(self):
+        """Return serialized list of opponent allies the human can kill with current damage."""
+        targets, opp = self.game.validTargets(self.human)
+        return [
+            {"index": i, "name": t.name, "health": t.health, "cardId": t.id}
+            for i, t in enumerate(targets)
+        ]
+
     def get_state(self):
         state = self.game.to_dict(perspective=0)
         state["sessionId"] = self.id
@@ -95,6 +103,9 @@ class GameSession:
             state["availableActions"] = serialized
         else:
             state["availableActions"] = []
+
+        if self.phase == "damage":
+            state["damageTargets"] = self._get_damage_targets()
 
         if self._pending_prompt:
             state["prompt"] = self._pending_prompt.to_dict()
@@ -140,7 +151,9 @@ class GameSession:
         self._save_state = None
 
         if action[0] == 0:
-            self._end_human_turn()
+            # Enter damage phase so player can assign damage to allies/opponent
+            self.phase = "damage"
+            self._cached_raw = None
         else:
             self._cached_raw = None
 
@@ -185,17 +198,45 @@ class GameSession:
         self._accumulated_responses = []
 
         if action[0] == 0:
-            self._end_human_turn()
+            self.phase = "damage"
+            self._cached_raw = None
         else:
             self._cached_raw = None
 
         return self.get_state()
 
-    def _end_human_turn(self):
-        self.human.assignDamage(self.game)
-        self.game.attack(self.human)
-        self.human.curDamage = self.human.pDamage
+    def assign_damage(self, target_index):
+        """Human picks a target ally to kill, or -1 to deal remaining damage to opponent."""
+        if self.phase != "damage":
+            return {"error": f"Cannot assign damage in phase: {self.phase}"}
 
+        if target_index == -1:
+            # Done assigning to allies — deal remaining damage to opponent
+            self.game.attack(self.human)
+            self.human.curDamage = self.human.pDamage
+            self._finish_human_turn()
+            return self.get_state()
+
+        targets, opp = self.game.validTargets(self.human)
+        if target_index < 0 or target_index >= len(targets):
+            return {"error": f"Invalid target index: {target_index}"}
+
+        target = targets[target_index]
+        self.human.curDamage -= target.health
+        opp.killAlly(target)
+
+        # Check if more targets available
+        new_targets, _ = self.game.validTargets(self.human)
+        if not new_targets:
+            # No more killable allies — deal remaining damage to opponent
+            self.game.attack(self.human)
+            self.human.curDamage = self.human.pDamage
+            self._finish_human_turn()
+
+        return self.get_state()
+
+    def _finish_human_turn(self):
+        """Complete the human turn after damage, then run bot turn."""
         if self.game.winner:
             self.phase = "game_over"
             return

@@ -32,6 +32,10 @@ class PromptResponse(BaseModel):
     value: int
 
 
+class DamageRequest(BaseModel):
+    targetIndex: int
+
+
 @app.get("/api/info")
 def get_info():
     return {
@@ -65,6 +69,14 @@ def play_action(session_id: str, req: ActionRequest):
     if not session:
         return {"error": "Session not found"}
     return session.play_action(req.actionIndex)
+
+
+@app.post("/api/games/{session_id}/damage")
+def assign_damage(session_id: str, req: DamageRequest):
+    session = manager.get(session_id)
+    if not session:
+        return {"error": "Session not found"}
+    return session.assign_damage(req.targetIndex)
 
 
 @app.post("/api/games/{session_id}/prompt")

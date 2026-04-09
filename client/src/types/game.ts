@@ -100,9 +100,16 @@ export interface GamePrompt {
   context: string;
 }
 
+export interface DamageTarget {
+  index: number;
+  name: string;
+  health: number;
+  cardId: number;
+}
+
 export interface GameState {
   sessionId: string;
-  phase: "actions" | "game_over";
+  phase: "actions" | "damage" | "awaiting_prompt" | "game_over";
   turnCount: number;
   winner: string | null;
   victoryType: string | null;
@@ -111,6 +118,7 @@ export interface GameState {
   missions: MissionData[];
   players: PlayerData[];
   availableActions: GameAction[];
+  damageTargets?: DamageTarget[];
   botLog?: BotLogEntry[];
   prompt?: GamePrompt;
 }

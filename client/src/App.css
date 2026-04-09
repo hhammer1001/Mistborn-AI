@@ -434,6 +434,58 @@ h3 {
   flex-shrink: 0;
 }
 
+/* ─── Damage Phase ────────────────────────────────────────────────── */
+.damage-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.damage-phase h3 {
+  margin: 0;
+  color: var(--red-bright);
+  font-size: 0.8rem;
+}
+
+.damage-phase-total {
+  margin: 0;
+  font-size: 0.7rem;
+}
+
+.damage-phase-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.damage-phase-targets p {
+  margin: 0;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.damage-target-btn {
+  border-color: var(--red-bright);
+  font-size: 0.6rem;
+}
+
+.damage-target-btn:hover {
+  background: var(--red-bright);
+  color: #fff;
+}
+
+.damage-done-btn {
+  border-color: var(--gold);
+  font-size: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.damage-done-btn:hover {
+  background: var(--gold);
+  color: #000;
+}
+
 .main-menu-btn {
   position: fixed;
   bottom: 0.5rem;
@@ -744,6 +796,30 @@ h3 {
 .hand-action-btn:hover {
   background: var(--bg-panel);
   border-color: var(--gold);
+}
+
+.hand-action-btn.composite {
+  border-color: var(--blue-bright);
+  border-style: dashed;
+}
+
+.hand-action-btn.composite:hover {
+  border-color: var(--blue-bright);
+  background: rgba(100, 180, 255, 0.1);
+}
+
+.hand-action-btn.composite.flare {
+  border-color: var(--red-bright);
+}
+
+.hand-action-btn.composite.flare:hover {
+  border-color: var(--red-bright);
+  background: rgba(255, 100, 100, 0.1);
+}
+
+.flare-text {
+  color: var(--red-bright);
+  font-weight: 700;
 }
 
 .hand-action-metal-icon {
@@ -1275,35 +1351,33 @@ h3 {
   line-height: 1.15;
   text-align: center;
   margin-bottom: 0.1rem;
+  /* Reserve space for two lines so bars align across columns */
+  min-height: 1.4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 
-/* Bar area — fixed height with cutoff overlays */
+/* Bar area — fixed height, everything absolutely positioned inside */
 .mission-bar-area {
   height: 200px;
   position: relative;
-  display: flex;
-  justify-content: center;
-  gap: 4px;
 }
 
-.mission-bar-col {
+/* Absolutely-positioned bar containers — share the full 200px */
+.mission-bar-abs {
+  position: absolute;
+  top: 0;
+  bottom: 0;
   width: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-}
-
-.mission-bar-bg {
-  width: 100%;
-  flex: 1;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
-  position: relative;
-  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
 }
+.mission-bar-abs.you { left: calc(50% - 26px); }
+.mission-bar-abs.opp { left: calc(50% + 2px); }
 
 .mission-bar-fill {
   position: absolute;
@@ -1317,14 +1391,27 @@ h3 {
 .mission-bar-fill.you { background: var(--blue-bright); }
 .mission-bar-fill.opp { background: var(--red-bright); }
 
+/* Tick lines — same coordinate space as bars */
 .mission-bar-tick {
   position: absolute;
   left: 0;
   right: 0;
   height: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 1;
   pointer-events: none;
+  z-index: 1;
+}
+
+/* Rank numbers below the bar area */
+.mission-bar-values {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.mission-bar-values .mission-bar-val {
+  width: 24px;
+  text-align: center;
 }
 
 /* Tier cutoff lines overlaid on bar area */
@@ -1336,12 +1423,31 @@ h3 {
   align-items: center;
   z-index: 2;
   pointer-events: none;
+  /* bottom: X% positions our bottom edge, but the dashed line is
+     vertically centered — shift down so the line sits on the tick */
+  transform: translateY(50%);
 }
 
 .mission-cutoff-line {
   flex: 1;
   height: 0;
   border-top: 1px dashed rgba(255, 255, 255, 0.35);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mission-cutoff-rank {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  padding: 0 0.15rem;
+  line-height: 1;
+  pointer-events: auto;
 }
 
 .mission-cutoff.final .mission-cutoff-line {
@@ -1435,6 +1541,19 @@ h3 {
   font-family: var(--font-display);
   font-weight: 700;
   color: var(--text-dim);
+}
+
+.reward-icon-kill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a0e0e;
+  border: 2px solid #c62828;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: #ef5350;
+  cursor: default;
 }
 
 .mission-bar-val {

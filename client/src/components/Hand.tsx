@@ -1,15 +1,29 @@
 import { useState, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import type { CardData, GameAction } from "../types/game";
+import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
 import { METAL_ICONS } from "../data/metalIcons";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 
+/** A composite action that fires two sequential API actions */
+export interface CompositeAction {
+  textBefore: string;
+  textAfter: string;
+  metalIcon?: string;
+  title: string;
+  isFlare?: boolean;
+  firstActionIndex: number;
+  /** Finds the follow-up action in the new action list after the first resolves */
+  findSecond: (actions: GameAction[]) => number | undefined;
+}
+
 interface Props {
   cards: CardData[];
   actions: GameAction[];
+  player: PlayerData;
   onAction: (index: number) => void;
+  onCompositeAction: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
   deckSize?: number;
   discardSize?: number;
 }
@@ -56,9 +70,11 @@ function actionLabel(a: GameAction): { text: string; metalIcon?: string } {
   }
 }
 
-function CardActionMenu({ actions, onAction, onClose, anchorRef }: {
+function CardActionMenu({ actions, composites, onAction, onCompositeAction, onClose, anchorRef }: {
   actions: GameAction[];
+  composites: CompositeAction[];
   onAction: (index: number) => void;
+  onCompositeAction: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -130,13 +146,92 @@ function CardActionMenu({ actions, onAction, onClose, anchorRef }: {
           </button>
         );
       })}
+      {composites.map((c, i) => (
+        <button
+          key={`composite-${i}`}
+          className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
+          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.findSecond); onClose(); }}
+          title={c.title}
+        >
+          <span className={c.isFlare ? "flare-text" : ""}>{c.textBefore}</span>
+          {c.metalIcon && (
+            <img className="hand-action-metal-icon" src={c.metalIcon} alt="" draggable={false} />
+          )}
+          <span>{c.textAfter}</span>
+        </button>
+      ))}
     </div>
   );
 
   return createPortal(menu, document.body);
 }
 
-export function Hand({ cards, actions, onAction, deckSize, discardSize }: Props) {
+function getCompositeActions(
+  card: CardData,
+  allIds: number[],
+  actions: GameAction[],
+  player: PlayerData,
+): CompositeAction[] {
+  const composites: CompositeAction[] = [];
+  if (card.type !== "action" || card.burned) return composites;
+  const capacity = card.capacity ?? 0;
+  const metalUsed = card.metalUsed ?? 0;
+  if (metalUsed >= capacity) return composites;
+
+  // Card already has metal available — no composite needed (code 4 already exists)
+  if (player.metalAvailable[card.metal] > 0) return composites;
+
+  const cardMetal = card.metal;
+
+  // 1) "Burn/Flare [metal token] + add to card" — if the token is unburned (code 5 exists)
+  const burnTokenAction = actions.find((a) => a.code === 5 && a.metalIndex === cardMetal);
+  if (burnTokenAction) {
+    const burnCount = player.metalTokens.slice(0, 8).filter((t) => t === 1).length + player.metalTokens[8];
+    const isFlare = burnCount >= player.burns;
+    const verb = isFlare ? "Flare" : "Burn";
+    const metalName = METAL_NAMES[cardMetal];
+    const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
+    composites.push({
+      textBefore: verb,
+      textAfter: "+ add",
+      metalIcon: icon,
+      isFlare,
+      title: `${verb} ${metalName} token and add to ${card.name}`,
+      firstActionIndex: burnTokenAction.index,
+      findSecond: (newActions) => {
+        // After burning the token, find the "use metal on card" action (code 4) for any of our card IDs
+        const match = newActions.find((a) => a.code === 4 && a.cardId !== undefined && allIds.includes(a.cardId));
+        return match?.index;
+      },
+    });
+  }
+
+  // 2) "Burn [other card] + add to this card" — if another card can be burned for this metal
+  const burnCardActions = actions.filter(
+    (a) => a.code === 2 && a.metalIndex === cardMetal && a.cardId !== undefined && !allIds.includes(a.cardId)
+  );
+  for (const burnAction of burnCardActions) {
+    // Find the source card name
+    const sourceCard = player.hand.find((c) => c.id === burnAction.cardId);
+    const metalName = METAL_NAMES[cardMetal];
+    const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
+    composites.push({
+      textBefore: `Burn ${sourceCard?.name ?? "card"}`,
+      textAfter: "+ add",
+      metalIcon: icon,
+      title: `Burn ${sourceCard?.name ?? "card"} for ${metalName} and add to ${card.name}`,
+      firstActionIndex: burnAction.index,
+      findSecond: (newActions) => {
+        const match = newActions.find((a) => a.code === 4 && a.cardId !== undefined && allIds.includes(a.cardId));
+        return match?.index;
+      },
+    });
+  }
+
+  return composites;
+}
+
+export function Hand({ cards, actions, player, onAction, onCompositeAction, deckSize, discardSize }: Props) {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -159,7 +254,8 @@ export function Hand({ cards, actions, onAction, deckSize, discardSize }: Props)
       <div className="card-row">
         {groups.map((group) => {
           const groupActions = getGroupActions(group.allIds);
-          const hasActions = groupActions.length > 0;
+          const composites = getCompositeActions(group.card, group.allIds, actions, player);
+          const hasActions = groupActions.length > 0 || composites.length > 0;
           const isSelected = selectedGroup === group.card.id;
           return (
             <div
@@ -176,7 +272,9 @@ export function Hand({ cards, actions, onAction, deckSize, discardSize }: Props)
               {isSelected && hasActions && (
                 <CardActionMenu
                   actions={groupActions}
+                  composites={composites}
                   onAction={onAction}
+                  onCompositeAction={onCompositeAction}
                   onClose={handleClose}
                   anchorRef={{ current: cardRefs.current.get(group.card.id) ?? null }}
                 />

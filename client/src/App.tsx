@@ -13,9 +13,10 @@ import { ActionList } from "./components/ActionList";
 import { TrainingTrack } from "./components/TrainingTrack";
 import { ActivityLog } from "./components/ActivityLog";
 import { PromptDialog } from "./components/PromptDialog";
+import { DamagePhase } from "./components/DamagePhase";
 
 function App() {
-  const { gameState, loading, log, createGame, playAction, respondToPrompt } = useGame();
+  const { gameState, loading, log, createGame, playAction, playTwoActions, assignDamage, respondToPrompt } = useGame();
   const [showGallery, setShowGallery] = useState(false);
 
   const handleAction = (index: number) => {
@@ -69,7 +70,15 @@ function App() {
             <Market market={gameState.market} actions={actions} onAction={handleAction} />
           </div>
           <AllyZone allies={you.allies} actions={actions} onAction={handleAction} label="Your Allies" />
-          <Hand cards={you.hand} actions={actions} onAction={handleAction} deckSize={you.deckSize} discardSize={you.discardSize} />
+          <Hand
+            cards={you.hand}
+            actions={actions}
+            player={you}
+            onAction={handleAction}
+            onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }}
+            deckSize={you.deckSize}
+            discardSize={you.discardSize}
+          />
         </div>
       </div>
       <div className="board-right">
@@ -78,7 +87,15 @@ function App() {
         <MissionTrack missions={gameState.missions} actions={actions} onAction={handleAction} />
         <ActivityLog log={log} />
         <div className="right-footer">
-          <ActionList actions={actions} onAction={handleAction} />
+          {gameState.phase === "damage" ? (
+            <DamagePhase
+              damage={you.damage}
+              targets={gameState.damageTargets ?? []}
+              onAssign={(idx) => { if (!loading) assignDamage(idx); }}
+            />
+          ) : (
+            <ActionList actions={actions} onAction={handleAction} />
+          )}
           <div className="turn-info">
             <span>Turn {gameState.turnCount}</span>
             {loading && <span className="loading">...</span>}
