@@ -20,6 +20,7 @@ class WebPlayer(Player):
         super().__init__(*args, **kwargs)
         self._prompt_responses = {}   # prompt_type -> value (single-use)
         self._prompt_queues = {}      # prompt_type -> [values] (multi-use, for loops)
+        self._sense_flag = False      # set per-turn by sense_defense phase
 
     def set_prompt_response(self, prompt_type: str, value):
         """Set a response for a pending prompt."""
@@ -54,7 +55,7 @@ class WebPlayer(Player):
         return best
 
     def senseCheckIn(self, card):
-        return True
+        return self._sense_flag
 
     def killEnemyAllyIn(self, allies):
         if not allies:
@@ -226,4 +227,4 @@ class WebPlayer(Player):
         return choice1, choice2
 
     def cloudP(self, card):
-        return False
+        return False  # handled by cloud_defense phase after bot turn

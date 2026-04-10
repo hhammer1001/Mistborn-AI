@@ -107,9 +107,21 @@ export interface DamageTarget {
   cardId: number;
 }
 
+export interface SenseCard {
+  cardId: number;
+  name: string;
+  amount: number;
+}
+
+export interface CloudCard {
+  cardId: number;
+  name: string;
+  reduction: number;
+}
+
 export interface GameState {
   sessionId: string;
-  phase: "actions" | "damage" | "awaiting_prompt" | "game_over";
+  phase: "actions" | "damage" | "sense_defense" | "cloud_defense" | "awaiting_prompt" | "game_over";
   turnCount: number;
   winner: string | null;
   victoryType: string | null;
@@ -119,6 +131,8 @@ export interface GameState {
   players: PlayerData[];
   availableActions: GameAction[];
   damageTargets?: DamageTarget[];
+  senseCards?: SenseCard[];
+  cloudCards?: CloudCard[];
   botLog?: BotLogEntry[];
   prompt?: GamePrompt;
 }

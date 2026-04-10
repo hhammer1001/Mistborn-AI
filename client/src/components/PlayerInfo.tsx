@@ -1,4 +1,80 @@
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { PlayerData, GameAction } from "../types/game";
+import { METAL_ICONS } from "../data/metalIcons";
+
+const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
+const CHARACTER_METAL: Record<string, number> = {
+  Kelsier: 7, Vin: 0, Marsh: 2, Shan: 4, Prodigy: 5,
+};
+
+const P = "/cards/httpssteamusercontentaakamaihdnetugc";
+const CHARACTER_IMAGES: Record<string, string> = {
+  Kelsier: `${P}96933575893836348543557D24AEEE1F012C3CAD29954EF6814E760FC9D.jpg`,
+  Vin:     `${P}1345520488082639487110C19C4ACDC3BB4A6DED9A5BF2E459BE380AC1E6.jpg`,
+  Marsh:   `${P}109539518916106846249A7A17D9C6BE1C03FF4CA5B6C5F9A8955B0722D3.jpg`,
+  Shan:    `${P}175380882799496743833A2ED5F67A4F055DBA77817F4E1E3182320AC66E.jpg`,
+  Prodigy: "/cards/Vin%20Prodigy%20copy.png",
+};
+
+function CharacterCard({ character }: { character: string }) {
+  const [zoomed, setZoomed] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const src = CHARACTER_IMAGES[character];
+
+  useLayoutEffect(() => {
+    if (!zoomed) { setPos(null); return; }
+    const el = imgRef.current;
+    const popup = popupRef.current;
+    if (!el || !popup) return;
+    const rect = el.getBoundingClientRect();
+    const pw = popup.offsetWidth;
+    const ph = popup.offsetHeight;
+    let left = rect.right + 8;
+    let top = rect.top + rect.height / 2 - ph / 2;
+    const m = 8;
+    if (left + pw > window.innerWidth - m) left = rect.left - pw - 8;
+    if (top + ph > window.innerHeight - m) top = window.innerHeight - m - ph;
+    if (top < m) top = m;
+    setPos({ left, top });
+  }, [zoomed]);
+
+  useEffect(() => {
+    if (!zoomed) return;
+    const close = (e: MouseEvent) => { e.preventDefault(); setZoomed(false); };
+    const t = setTimeout(() => {
+      window.addEventListener("click", close, true);
+      window.addEventListener("contextmenu", close, true);
+    }, 0);
+    return () => { clearTimeout(t); window.removeEventListener("click", close, true); window.removeEventListener("contextmenu", close, true); };
+  }, [zoomed]);
+
+  if (!src) return null;
+
+  return (
+    <>
+      <div
+        ref={imgRef}
+        className="character-card-thumb"
+        onContextMenu={(e) => { e.preventDefault(); setZoomed(v => !v); }}
+      >
+        <img src={src} alt={character} draggable={false} />
+      </div>
+      {zoomed && createPortal(
+        <div
+          ref={popupRef}
+          className="character-card-zoom"
+          style={{ position: "fixed", left: pos?.left ?? -9999, top: pos?.top ?? -9999, opacity: pos ? 1 : 0 }}
+        >
+          <img src={src} alt={character} draggable={false} />
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 interface Props {
   player: PlayerData;
@@ -59,10 +135,16 @@ export function PlayerInfo({ player, isOpponent, actions, onAction }: Props) {
 
   return (
     <div className="player-info you">
+      <CharacterCard character={player.character} />
       <div className="player-header">
         <strong>{player.name}</strong>
+        {(() => {
+          const metalIdx = CHARACTER_METAL[player.character];
+          const metalName = metalIdx !== undefined ? METAL_NAMES[metalIdx] : undefined;
+          const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
+          return icon ? <img className="player-header-metal" src={icon} alt={metalName} title={metalName} draggable={false} /> : null;
+        })()}
       </div>
-      <div className="player-character">{player.character}</div>
       <div className="player-stats-grid">
         <div className="stat-block health">
           <span className="stat-value">{player.health}</span>

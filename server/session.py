@@ -1,9 +1,16 @@
 import uuid
 import pickle
 from engine.game import Game
+from engine.card import Action
 from engine.robot import Twonky, RandomBot, FocusBot, HammerBot
 from server.web_player import WebPlayer
 from server.prompts import PromptNeeded
+
+EFFECT_NAMES = {
+    "D": "damage", "M": "money", "H": "heal", "C": "draw", "E": "eliminate",
+    "Mi": "mission", "T": "train", "K": "kill ally", "R": "refresh",
+    "B": "burn", "A": "atium",
+}
 
 
 BOT_TYPES = {
@@ -107,6 +114,18 @@ class GameSession:
         if self.phase == "damage":
             state["damageTargets"] = self._get_damage_targets()
 
+        if self.phase == "sense_defense":
+            sense_cards = [{"cardId": c.id, "name": c.name, "amount": int(c.data[10])}
+                           for c in self.human.deck.hand
+                           if isinstance(c, Action) and c.data[9] == "sense"]
+            state["senseCards"] = sense_cards
+
+        if self.phase == "cloud_defense":
+            cloud_cards = [{"cardId": c.id, "name": c.name, "reduction": int(c.data[10])}
+                           for c in self.human.deck.hand
+                           if isinstance(c, Action) and c.data[9] == "cloudP"]
+            state["cloudCards"] = cloud_cards
+
         if self._pending_prompt:
             state["prompt"] = self._pending_prompt.to_dict()
 
@@ -134,6 +153,38 @@ class GameSession:
         action = self._cached_raw[action_index]
         self.human.clear_prompt_responses()
 
+        # For action 0 (end actions), do pre-damage cleanup but defer
+        # hand redraw until after the damage phase so the player can
+        # still see their cards while assigning damage.
+        if action[0] == 0:
+            h = self.human
+            h.curBoxings += h.curMoney // 2
+            h.curMoney = h.pMoney
+            h.curMission = 0
+            h.metalTokens = list(map(h.resetToken, h.metalTokens))
+            h.metalTokens[8] = 0
+            h.metalAvailable = [0] * 9
+            h.metalBurned = [0] * 9
+            h.charAbility1 = True
+            h.charAbility2 = True
+            h.charAbility3 = True
+            # deck.cleanUp and ally.reset are deferred to after damage phase
+            if h.curDamage > 0:
+                self.phase = "damage"
+            else:
+                self.game.attack(h)
+                h.curDamage = h.pDamage
+                self._cleanup_and_finish()
+            self._cached_raw = None
+            self._pending_prompt = None
+            self._save_state = None
+            return self.get_state()
+
+        # Track mission state before action to detect sense checks
+        mission_before = None
+        if action[0] == 1:
+            mission_before = self.human.curMission
+
         try:
             self.human.performAction(action, self.game)
         except PromptNeeded as p:
@@ -150,13 +201,29 @@ class GameSession:
         self._pending_prompt = None
         self._save_state = None
 
-        if action[0] == 0:
-            # Enter damage phase so player can assign damage to allies/opponent
-            self.phase = "damage"
-            self._cached_raw = None
-        else:
-            self._cached_raw = None
+        # Log burn on-effect (e.g. "Strike: burn → +1 heal")
+        if action[0] == 2:
+            card = action[1]
+            if card.data[11] != '':
+                eff = card.data[11]
+                amt = card.data[12]
+                eff_name = EFFECT_NAMES.get(eff, eff)
+                self._bot_log.append({
+                    "turn": self.game.turncount,
+                    "text": f"{card.name} burn effect: +{amt} {eff_name}",
+                })
 
+        # Log sense check if mission advance was blocked
+        # Normal advance costs 1 mission; sense costs more and skips progress
+        if action[0] == 1 and mission_before is not None:
+            mission_spent = mission_before - self.human.curMission
+            if mission_spent != 1:
+                self._bot_log.append({
+                    "turn": self.game.turncount,
+                    "text": f"Opponent used Sense to block mission advance! (−{mission_spent} mission)",
+                })
+
+        self._cached_raw = None
         return self.get_state()
 
     def respond_to_prompt(self, prompt_type: str, value):
@@ -196,12 +263,7 @@ class GameSession:
         self._pending_prompt = None
         self._save_state = None
         self._accumulated_responses = []
-
-        if action[0] == 0:
-            self.phase = "damage"
-            self._cached_raw = None
-        else:
-            self._cached_raw = None
+        self._cached_raw = None
 
         return self.get_state()
 
@@ -214,7 +276,7 @@ class GameSession:
             # Done assigning to allies — deal remaining damage to opponent
             self.game.attack(self.human)
             self.human.curDamage = self.human.pDamage
-            self._finish_human_turn()
+            self._cleanup_and_finish()
             return self.get_state()
 
         targets, opp = self.game.validTargets(self.human)
@@ -231,12 +293,19 @@ class GameSession:
             # No more killable allies — deal remaining damage to opponent
             self.game.attack(self.human)
             self.human.curDamage = self.human.pDamage
-            self._finish_human_turn()
+            self._cleanup_and_finish()
 
         return self.get_state()
 
+    def _cleanup_and_finish(self):
+        """Draw new hand (deferred from end-of-actions) then finish turn."""
+        self.human.deck.cleanUp(self.human)
+        for ally in self.human.allies:
+            ally.reset()
+        self._finish_human_turn()
+
     def _finish_human_turn(self):
-        """Complete the human turn after damage, then run bot turn."""
+        """Complete the human turn — check sense, run bot, check cloud."""
         if self.game.winner:
             self.phase = "game_over"
             return
@@ -248,12 +317,119 @@ class GameSession:
             self.phase = "game_over"
             return
 
+        # Check for sense defense before bot turn
+        sense_cards = [c for c in self.human.deck.hand
+                       if isinstance(c, Action) and c.data[9] == "sense"]
+        if sense_cards:
+            self.phase = "sense_defense"
+            return
+
+        self.human._sense_flag = False
+        self._run_bot_turn()
+
+    def resolve_sense(self, use):
+        """Player decides whether to use sense card to block bot mission advances."""
+        if self.phase != "sense_defense":
+            return {"error": f"Cannot resolve sense in phase: {self.phase}"}
+        self.human._sense_flag = use
+        self._run_bot_turn()
+        return self.get_state()
+
+    def _run_bot_turn(self):
+        """Execute the bot's turn, then check for cloud defense."""
+        human_hp_before = self.human.curHealth
+        human_allies_before = [a.name for a in self.human.allies]
+        human_hand_before = set(c.id for c in self.human.deck.hand)
+
         self.bot.playTurn(self.game)
+
+        bot_turn = self.game.turncount
+
+        # Log ally kills
+        killed = [n for n in human_allies_before
+                  if n not in [a.name for a in self.human.allies]]
+        for name in killed:
+            self._bot_log.append({"turn": bot_turn, "text": f"Killed your {name}"})
+
+        # Log sense card usage
+        human_hand_after = set(c.id for c in self.human.deck.hand)
+        used_ids = human_hand_before - human_hand_after
+        for card in self.human.deck.discard:
+            if card.id in used_ids and card.data[9] == "sense":
+                self._bot_log.append({"turn": bot_turn,
+                                      "text": f"Your {card.name} blocked a mission advance"})
+
+        hp_lost = human_hp_before - self.human.curHealth
+
+        # Check for cloud defense opportunity
+        cloud_cards = [c for c in self.human.deck.hand
+                       if isinstance(c, Action) and c.data[9] == "cloudP"]
+        if hp_lost > 0 and cloud_cards:
+            self._bot_log.append({"turn": bot_turn,
+                                  "text": f"Incoming: {hp_lost} damage"})
+            self.phase = "cloud_defense"
+            return
+
+        if hp_lost > 0:
+            self._bot_log.append({"turn": bot_turn,
+                                  "text": f"Dealt {hp_lost} damage to you"})
 
         if self.game.winner:
             self.phase = "game_over"
             return
 
+        self._start_next_human_turn()
+
+    def resolve_cloud(self, card_id):
+        """Player picks a cloud card to block damage, or -1 to skip."""
+        if self.phase != "cloud_defense":
+            return {"error": f"Cannot resolve cloud in phase: {self.phase}"}
+
+        if card_id == -1:
+            if self.game.winner:
+                self.phase = "game_over"
+            else:
+                self._start_next_human_turn()
+            return self.get_state()
+
+        # Find and use the cloud card
+        card = None
+        for c in self.human.deck.hand:
+            if c.id == card_id and c.data[9] == "cloudP":
+                card = c
+                break
+        if not card:
+            return {"error": "Cloud card not found in hand"}
+
+        reduction = int(card.data[10])
+        self.human.curHealth = min(self.human.curHealth + reduction, 40)
+        self.human.deck.hand.remove(card)
+        self.human.deck.discard.append(card)
+
+        self._bot_log.append({
+            "turn": self.game.turncount,
+            "text": f"Your {card.name} blocked {reduction} damage",
+        })
+
+        # Un-die if cloud saved us
+        if self.human.curHealth > 0:
+            self.human.alive = True
+            if self.game.victoryType == 'D' and self.game.winner != self.human:
+                self.game.winner = None
+                self.game.victoryType = None
+
+        # Check for more cloud cards
+        remaining = [c for c in self.human.deck.hand
+                     if isinstance(c, Action) and c.data[9] == "cloudP"]
+        if not remaining:
+            if self.game.winner:
+                self.phase = "game_over"
+            else:
+                self._start_next_human_turn()
+
+        return self.get_state()
+
+    def _start_next_human_turn(self):
         self.game.turncount += 1
         self.human.resolve("T", "1")
         self.phase = "actions"

@@ -1,7 +1,12 @@
 import { useState } from "react";
 
 const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+const CHARACTER_OPTIONS = ["Random", ...CHARACTERS];
 const BOT_TYPES = ["twonky", "random", "focus", "hammer"];
+
+function pickRandom(arr: string[]): string {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
 interface Props {
   onStart: (
@@ -15,9 +20,19 @@ interface Props {
 
 export function GameSetup({ onStart, onViewCards }: Props) {
   const [playerName, setPlayerName] = useState("Player");
-  const [character, setCharacter] = useState("Kelsier");
+  const [character, setCharacter] = useState("Random");
   const [opponentType, setOpponentType] = useState("twonky");
-  const [opponentCharacter, setOpponentCharacter] = useState("Shan");
+  const [opponentCharacter, setOpponentCharacter] = useState("Random");
+
+  const handleStart = () => {
+    const playerChar = character === "Random" ? pickRandom(CHARACTERS) : character;
+    let oppChar = opponentCharacter === "Random" ? pickRandom(CHARACTERS) : opponentCharacter;
+    // Avoid same character for both players
+    while (oppChar === playerChar) {
+      oppChar = pickRandom(CHARACTERS);
+    }
+    onStart(playerName, playerChar, opponentType, oppChar);
+  };
 
   return (
     <div className="game-setup">
@@ -36,7 +51,7 @@ export function GameSetup({ onStart, onViewCards }: Props) {
             value={character}
             onChange={(e) => setCharacter(e.target.value)}
           >
-            {CHARACTERS.map((c) => (
+            {CHARACTER_OPTIONS.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -62,7 +77,7 @@ export function GameSetup({ onStart, onViewCards }: Props) {
             value={opponentCharacter}
             onChange={(e) => setOpponentCharacter(e.target.value)}
           >
-            {CHARACTERS.map((c) => (
+            {CHARACTER_OPTIONS.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -70,9 +85,7 @@ export function GameSetup({ onStart, onViewCards }: Props) {
           </select>
         </label>
         <button
-          onClick={() =>
-            onStart(playerName, character, opponentType, opponentCharacter)
-          }
+          onClick={handleStart}
         >
           Start Game
         </button>

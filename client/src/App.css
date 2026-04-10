@@ -287,7 +287,7 @@ h3 {
 }
 
 .player-info-with-training .training-track-zone {
-  width: 75px;
+  width: 90px;
   border: none;
   border-left: 1px solid var(--border);
   border-radius: 0;
@@ -364,6 +364,54 @@ h3 {
 }
 
 /* Prompt dialog */
+/* ─── Generic modal overlay/dialog ──────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-dialog {
+  background: var(--bg-panel);
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  padding: 1.2rem 1.5rem;
+  min-width: 280px;
+  max-width: 400px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+}
+
+.modal-dialog h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 0.6rem;
+}
+
+.modal-dialog p {
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem;
+  line-height: 1.4;
+}
+
+.modal-note {
+  font-size: 0.7rem !important;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
 .prompt-overlay {
   position: fixed;
   inset: 0;
@@ -432,6 +480,8 @@ h3 {
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
+  /* Space for the fixed main-menu button */
+  padding-bottom: 2.5rem;
 }
 
 /* ─── Damage Phase ────────────────────────────────────────────────── */
@@ -479,6 +529,7 @@ h3 {
   border-color: var(--gold);
   font-size: 0.6rem;
   margin-top: 0.2rem;
+  align-self: flex-start;
 }
 
 .damage-done-btn:hover {
@@ -879,6 +930,16 @@ h3 {
   background: var(--red-bright);
 }
 
+.end-turn-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.end-turn-btn.disabled:hover {
+  background: transparent;
+}
+
 .mission-btn {
   border-color: var(--green);
 }
@@ -963,17 +1024,45 @@ h3 {
   border-left: 3px solid var(--blue);
 }
 
-.player-header {
-  margin-bottom: 0.1rem;
+.character-card-thumb {
+  width: 100%;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
 }
 
-.player-character {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--gold);
-  letter-spacing: 0.04em;
-  margin-bottom: 0.4rem;
+.character-card-thumb img {
+  width: 100%;
+  display: block;
+  border-radius: 4px;
+}
+
+.character-card-zoom {
+  z-index: 500;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
+}
+
+.character-card-zoom img {
+  display: block;
+  width: 480px;
+  border-radius: 8px;
+}
+
+.player-header {
+  margin-bottom: 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.player-header-metal {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .player-info.you .player-header strong {

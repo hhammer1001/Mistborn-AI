@@ -9,13 +9,17 @@ export interface LogEntry {
   isBot?: boolean;
 }
 
+/** Strip trailing " (×N)" to get the base text for comparison */
+function baseText(text: string): string {
+  return text.replace(/\s*\(×\d+\)$/, "");
+}
+
 /** Merge consecutive identical entries into "X (×N)" */
 function consolidateLog(entries: LogEntry[]): LogEntry[] {
   const result: LogEntry[] = [];
   for (const entry of entries) {
     const last = result[result.length - 1];
-    if (last && last.text === entry.text && last.turn === entry.turn && last.isBot === entry.isBot) {
-      // Extract existing count or start at 1
+    if (last && baseText(last.text) === baseText(entry.text) && last.turn === entry.turn && last.isBot === entry.isBot) {
       const match = last.text.match(/^(.*?)(?:\s*\(×(\d+)\))?$/);
       if (match) {
         const base = match[1];
@@ -94,8 +98,12 @@ export function useGame() {
             body: JSON.stringify({ actionIndex }),
           }
         );
-        const data: GameState = await resp.json();
-        setGameState(data);
+        const data = await resp.json();
+        if (data.error) {
+          setError(data.error);
+          return null;
+        }
+        setGameState(data as GameState);
 
         const newEntries: LogEntry[] = [
           { turn: prevTurn, text: `${pName} — ${desc}` },
@@ -144,8 +152,9 @@ export function useGame() {
             body: JSON.stringify({ actionIndex: secondIndex }),
           }
         );
-        const data: GameState = await resp.json();
-        setGameState(data);
+        const data = await resp.json();
+        if (data.error) { setError(data.error); return null; }
+        setGameState(data as GameState);
         return data;
       } catch (e) {
         setError(String(e));
@@ -171,8 +180,9 @@ export function useGame() {
             body: JSON.stringify({ promptType, value }),
           }
         );
-        const data: GameState = await resp.json();
-        setGameState(data);
+        const data = await resp.json();
+        if (data.error) { setError(data.error); return null; }
+        setGameState(data as GameState);
 
         // Log bot actions if turn advanced
         const newEntries: LogEntry[] = [];
@@ -220,18 +230,22 @@ export function useGame() {
             body: JSON.stringify({ targetIndex }),
           }
         );
-        const data: GameState = await resp.json();
-        setGameState(data);
+        const data = await resp.json();
+        if (data.error) { setError(data.error); return null; }
+        setGameState(data as GameState);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
 
         if (targetIndex === -1) {
-          newEntries.push({ turn: gameState.turnCount, text: `${pName} — Deal remaining damage to opponent` });
+          const dmg = gameState.players[0].damage;
+          if (dmg > 0) {
+            newEntries.push({ turn: gameState.turnCount, text: `${pName} dealt ${dmg} damage to ${bName}` });
+          }
         } else {
           const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
-          newEntries.push({ turn: gameState.turnCount, text: `${pName} — Kill ${target?.name ?? "ally"}` });
+          newEntries.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
         }
 
         if (data.botLog && data.botLog.length > 0) {
@@ -261,14 +275,89 @@ export function useGame() {
     [gameState]
   );
 
+  const resolveSense = useCallback(
+    async (use: boolean) => {
+      if (!gameState) return null;
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await fetch(
+          `${API_BASE}/api/games/${gameState.sessionId}/sense`,
+          { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ use }) }
+        );
+        const data = await resp.json();
+        if (data.error) { setError(data.error); return null; }
+        setGameState(data as GameState);
+
+        const newEntries: LogEntry[] = [];
+        const bName = botName.current;
+        const pName = playerName.current;
+
+        if (use) {
+          newEntries.push({ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` });
+        }
+
+        if (data.botLog && data.botLog.length > 0) {
+          const botTurn = data.botLog[0]?.turn ?? gameState.turnCount;
+          newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
+          for (const entry of data.botLog) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          }
+        }
+        if (data.turnCount > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        }
+        if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
+        return data;
+      } catch (e) { setError(String(e)); return null; }
+      finally { setLoading(false); }
+    }, [gameState]
+  );
+
+  const resolveCloud = useCallback(
+    async (cardId: number) => {
+      if (!gameState) return null;
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await fetch(
+          `${API_BASE}/api/games/${gameState.sessionId}/cloud`,
+          { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cardId }) }
+        );
+        const data = await resp.json();
+        if (data.error) { setError(data.error); return null; }
+        setGameState(data as GameState);
+
+        const newEntries: LogEntry[] = [];
+        const bName = botName.current;
+        const pName = playerName.current;
+
+        if (data.botLog && data.botLog.length > 0) {
+          for (const entry of data.botLog) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          }
+        }
+        if (data.turnCount > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        }
+        if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
+        return data;
+      } catch (e) { setError(String(e)); return null; }
+      finally { setLoading(false); }
+    }, [gameState]
+  );
+
   const refreshState = useCallback(async () => {
     if (!gameState) return;
     try {
       const resp = await fetch(
         `${API_BASE}/api/games/${gameState.sessionId}`
       );
-      const data: GameState = await resp.json();
-      setGameState(data);
+      const data = await resp.json();
+      if (data.error) { setError(data.error); return; }
+      setGameState(data as GameState);
     } catch (e) {
       setError(String(e));
     }
@@ -283,6 +372,8 @@ export function useGame() {
     playAction,
     playTwoActions,
     assignDamage,
+    resolveSense,
+    resolveCloud,
     respondToPrompt,
     refreshState,
   };

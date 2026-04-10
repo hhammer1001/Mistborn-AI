@@ -16,7 +16,7 @@ import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 
 function App() {
-  const { gameState, loading, log, createGame, playAction, playTwoActions, assignDamage, respondToPrompt } = useGame();
+  const { gameState, loading, log, createGame, playAction, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt } = useGame();
   const [showGallery, setShowGallery] = useState(false);
 
   const handleAction = (index: number) => {
@@ -94,7 +94,7 @@ function App() {
               onAssign={(idx) => { if (!loading) assignDamage(idx); }}
             />
           ) : (
-            <ActionList actions={actions} onAction={handleAction} />
+            <ActionList actions={actions} onAction={handleAction} missionRemaining={you.mission} />
           )}
           <div className="turn-info">
             <span>Turn {gameState.turnCount}</span>
@@ -110,6 +110,45 @@ function App() {
           prompt={gameState.prompt}
           onRespond={(type, value) => respondToPrompt(type, value)}
         />
+      )}
+      {gameState.phase === "sense_defense" && gameState.senseCards && (
+        <div className="modal-overlay">
+          <div className="modal-dialog">
+            <h3>Sense Defense</h3>
+            <p>You have a Sense card ({gameState.senseCards.map(c => c.name).join(", ")}). Use it to block opponent mission advances this turn?</p>
+            <p className="modal-note">If the opponent advances a mission, your card will be discarded to block it.</p>
+            <div className="modal-actions">
+              <button className="action-btn" style={{borderColor: "var(--blue-bright)"}}
+                onClick={() => { if (!loading) resolveSense(true); }}>
+                Use Sense
+              </button>
+              <button className="action-btn" style={{borderColor: "var(--text-dim)", opacity: 0.7}}
+                onClick={() => { if (!loading) resolveSense(false); }}>
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {gameState.phase === "cloud_defense" && gameState.cloudCards && (
+        <div className="modal-overlay">
+          <div className="modal-dialog">
+            <h3>Cloud Defense</h3>
+            <p>Incoming damage! Discard a cloud card to block?</p>
+            <div className="modal-actions">
+              {gameState.cloudCards.map(c => (
+                <button key={c.cardId} className="action-btn" style={{borderColor: "var(--green)"}}
+                  onClick={() => { if (!loading) resolveCloud(c.cardId); }}>
+                  Use {c.name} (block {c.reduction})
+                </button>
+              ))}
+              <button className="action-btn" style={{borderColor: "var(--text-dim)", opacity: 0.7}}
+                onClick={() => { if (!loading) resolveCloud(-1); }}>
+                Take the damage
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

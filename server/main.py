@@ -1,8 +1,13 @@
+import logging
+import traceback
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from server.session import SessionManager, CHARACTERS, BOT_TYPES
 import json
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("mistborn")
 
 app = FastAPI(title="Mistborn Card Game API")
 
@@ -34,6 +39,14 @@ class PromptResponse(BaseModel):
 
 class DamageRequest(BaseModel):
     targetIndex: int
+
+
+class SenseRequest(BaseModel):
+    use: bool
+
+
+class CloudRequest(BaseModel):
+    cardId: int
 
 
 @app.get("/api/info")
@@ -68,7 +81,14 @@ def play_action(session_id: str, req: ActionRequest):
     session = manager.get(session_id)
     if not session:
         return {"error": "Session not found"}
-    return session.play_action(req.actionIndex)
+    log.info(f"ACTION session={session_id[:8]} index={req.actionIndex} phase={session.phase}")
+    try:
+        result = session.play_action(req.actionIndex)
+        log.info(f"  -> phase={session.phase} winner={session.game.winner}")
+        return result
+    except Exception as e:
+        log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
 
 
 @app.post("/api/games/{session_id}/damage")
@@ -76,7 +96,44 @@ def assign_damage(session_id: str, req: DamageRequest):
     session = manager.get(session_id)
     if not session:
         return {"error": "Session not found"}
-    return session.assign_damage(req.targetIndex)
+    log.info(f"DAMAGE session={session_id[:8]} target={req.targetIndex}")
+    try:
+        result = session.assign_damage(req.targetIndex)
+        log.info(f"  -> phase={session.phase}")
+        return result
+    except Exception as e:
+        log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
+
+
+@app.post("/api/games/{session_id}/sense")
+def resolve_sense(session_id: str, req: SenseRequest):
+    session = manager.get(session_id)
+    if not session:
+        return {"error": "Session not found"}
+    log.info(f"SENSE session={session_id[:8]} use={req.use}")
+    try:
+        result = session.resolve_sense(req.use)
+        log.info(f"  -> phase={session.phase}")
+        return result
+    except Exception as e:
+        log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
+
+
+@app.post("/api/games/{session_id}/cloud")
+def resolve_cloud(session_id: str, req: CloudRequest):
+    session = manager.get(session_id)
+    if not session:
+        return {"error": "Session not found"}
+    log.info(f"CLOUD session={session_id[:8]} cardId={req.cardId}")
+    try:
+        result = session.resolve_cloud(req.cardId)
+        log.info(f"  -> phase={session.phase}")
+        return result
+    except Exception as e:
+        log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
 
 
 @app.post("/api/games/{session_id}/prompt")
@@ -84,7 +141,14 @@ def respond_to_prompt(session_id: str, req: PromptResponse):
     session = manager.get(session_id)
     if not session:
         return {"error": "Session not found"}
-    return session.respond_to_prompt(req.promptType, req.value)
+    log.info(f"PROMPT session={session_id[:8]} type={req.promptType} value={req.value}")
+    try:
+        result = session.respond_to_prompt(req.promptType, req.value)
+        log.info(f"  -> phase={session.phase}")
+        return result
+    except Exception as e:
+        log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
 
 
 @app.delete("/api/games/{session_id}")

@@ -212,9 +212,9 @@ class Player():
             case 1:
                 sense = game.senseCheck(self)
                 if sense > 0:
-                    self.curMission -= sense
+                    self.curMission = max(self.curMission - sense, 0)
                 else:
-                    self.curMission += -1
+                    self.curMission -= 1
                     action[1].progress(self.turnOrder, 1)
             case 2:
                 action[1].burn(self)
@@ -980,11 +980,10 @@ class Player():
         
 
     def takeDamage(self, amount):
-        for card in self.deck.hand:
-            if card.data[10] == "cloudP":
-                
+        for card in list(self.deck.hand):
+            if card.data[9] == "cloudP":
                 if self.cloudP(card):
-                    amount = max(amount - card.active[1], 0)
+                    amount = max(amount - int(card.data[10]), 0)
                     self.deck.hand.remove(card)
                     self.deck.discard += [card]
         self.curHealth -= amount
