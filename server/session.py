@@ -1,7 +1,7 @@
 import uuid
 import pickle
 from engine.game import Game
-from engine.card import Action
+from engine.card import Action, Ally
 from engine.robot import Twonky, RandomBot, FocusBot, HammerBot
 from server.web_player import WebPlayer
 from server.prompts import PromptNeeded
@@ -9,8 +9,60 @@ from server.prompts import PromptNeeded
 EFFECT_NAMES = {
     "D": "damage", "M": "money", "H": "heal", "C": "draw", "E": "eliminate",
     "Mi": "mission", "T": "train", "K": "kill ally", "R": "refresh",
-    "B": "burn", "A": "atium",
+    "B": "burn", "A": "atium", "Pc": "+hand size", "Pd": "+perm damage",
+    "Pm": "+perm money",
 }
+
+
+def _snapshot(player):
+    """Capture player state for diff-based logging."""
+    return {
+        "damage": player.curDamage,
+        "money": player.curMoney,
+        "health": player.curHealth,
+        "mission": player.curMission,
+        "training": player.training,
+        "atium": player.atium,
+        "burns": player.burns,
+        "handSize": player.handSize,
+        "pDamage": player.pDamage,
+        "pMoney": player.pMoney,
+        "hand_count": len(player.deck.hand),
+        "allies": [a.name for a in player.allies],
+    }
+
+
+def _diff_to_text(before, after):
+    """Produce a list of human-readable effect strings from two snapshots."""
+    parts = []
+    diffs = [
+        ("damage", "damage"),
+        ("money", "money"),
+        ("health", "heal"),
+        ("mission", "mission"),
+        ("training", "training"),
+        ("atium", "atium"),
+        ("burns", "burns"),
+        ("handSize", "+hand size"),
+        ("pDamage", "+perm damage"),
+        ("pMoney", "+perm money"),
+    ]
+    for key, label in diffs:
+        delta = after[key] - before[key]
+        if delta > 0:
+            parts.append(f"+{delta} {label}")
+        elif delta < 0:
+            parts.append(f"{delta} {label}")
+
+    draw_delta = after["hand_count"] - before["hand_count"]
+    if draw_delta > 0:
+        parts.append(f"drew {draw_delta}")
+
+    new_allies = [n for n in after["allies"] if n not in before["allies"]]
+    for n in new_allies:
+        parts.append(f"played {n}")
+
+    return parts
 
 
 BOT_TYPES = {
@@ -60,6 +112,7 @@ class GameSession:
         self.opponent_type = opponent_type
         self.opponent_character = opponent_character
         self._bot_log = []
+        self._player_log = []
         self._pending_prompt = None
         self._pending_action_index = None
         self._accumulated_responses = []
@@ -79,7 +132,7 @@ class GameSession:
 
         # Start human's first turn
         self.game.turncount += 1
-        self.human.resolve("T", "1")
+        self._resolve_training()
 
     def _save_game_state(self):
         self._save_state = pickle.dumps(self.game)
@@ -98,6 +151,36 @@ class GameSession:
             {"index": i, "name": t.name, "health": t.health, "cardId": t.id}
             for i, t in enumerate(targets)
         ]
+
+    def _action_source_name(self, action):
+        """Return a human-readable source name for an action tuple."""
+        code = action[0]
+        if code == 2:  # burn card
+            return f"{action[1].name} (burn)"
+        if code == 4:  # use metal on card
+            return action[1].name
+        if code == 5:  # burn/flare metal token
+            names = self.game.metalCodes
+            return f"Burn {names[action[1]]}" if action[1] < len(names) else "Burn metal"
+        if code == 8:  # ally ability 1
+            return f"{action[1].name} ability 1"
+        if code == 9:  # ally ability 2
+            return f"{action[1].name} ability 2"
+        if code == 10:  # character ability 1
+            return f"{self.human.character} ability I"
+        if code == 11:  # character ability 3
+            return f"{self.human.character} ability III"
+        if code == 6:  # buy
+            return f"Bought {action[1].name} for {action[1].cost}"
+        if code == 7:  # buy and eliminate
+            return f"Buy+eliminate {action[1].name}"
+        if code == 13:  # buy with boxings
+            return f"Bought {action[1].name} for {action[1].cost} ({action[2]} boxings)"
+        if code == 14:  # buy+eliminate with boxings
+            return f"Buy+eliminate {action[1].name} ({action[2]} boxings)"
+        if code == 1:  # advance mission
+            return f"Mission {action[1].name}"
+        return None
 
     def get_state(self):
         state = self.game.to_dict(perspective=0)
@@ -131,6 +214,8 @@ class GameSession:
 
         state["botLog"] = self._bot_log
         self._bot_log = []
+        state["playerLog"] = self._player_log
+        self._player_log = []
 
         return state
 
@@ -180,42 +265,64 @@ class GameSession:
             self._save_state = None
             return self.get_state()
 
-        # Track mission state before action to detect sense checks
-        mission_before = None
-        if action[0] == 1:
-            mission_before = self.human.curMission
+        # Snapshot before action for effect logging
+        snap_before = _snapshot(self.human)
+        mission_before = self.human.curMission
 
         try:
             self.human.performAction(action, self.game)
         except PromptNeeded as p:
             self._pending_prompt = p
             self.phase = "awaiting_prompt"
-            # Restore to pre-action state
             self._restore_game_state()
-            # Re-cache raw actions from restored state
             _, raw = self.human.serialize_actions(self.game)
             self._cached_raw = raw
             return self.get_state()
 
-        # Action succeeded with no prompts — discard saved state
         self._pending_prompt = None
         self._save_state = None
 
-        # Log burn on-effect (e.g. "Strike: burn → +1 heal")
-        if action[0] == 2:
-            card = action[1]
-            if card.data[11] != '':
-                eff = card.data[11]
-                amt = card.data[12]
-                eff_name = EFFECT_NAMES.get(eff, eff)
-                self._bot_log.append({
+        # Log effects from this action
+        snap_after = _snapshot(self.human)
+        effects = _diff_to_text(snap_before, snap_after)
+
+        source = self._action_source_name(action)
+        if source:
+            # For plain buys (6, 13), cost is in the source name — just log source
+            if action[0] in (6, 13):
+                self._player_log.append({
                     "turn": self.game.turncount,
-                    "text": f"{card.name} burn effect: +{amt} {eff_name}",
+                    "text": source,
+                })
+            # For buy+eliminate (7, 14), show the ability effects (filter out money)
+            elif action[0] in (7, 14):
+                effects = [e for e in effects if "money" not in e]
+                if effects:
+                    self._player_log.append({
+                        "turn": self.game.turncount,
+                        "text": f"{source}: {', '.join(effects)}",
+                    })
+                else:
+                    self._player_log.append({
+                        "turn": self.game.turncount,
+                        "text": source,
+                    })
+            # For mission advance (1), filter out the -1 mission spend — only log tier rewards
+            elif action[0] == 1:
+                effects = [e for e in effects if e != "-1 mission"]
+                if effects:
+                    self._player_log.append({
+                        "turn": self.game.turncount,
+                        "text": f"{source}: {', '.join(effects)}",
+                    })
+            elif effects:
+                self._player_log.append({
+                    "turn": self.game.turncount,
+                    "text": f"{source}: {', '.join(effects)}",
                 })
 
         # Log sense check if mission advance was blocked
-        # Normal advance costs 1 mission; sense costs more and skips progress
-        if action[0] == 1 and mission_before is not None:
+        if action[0] == 1:
             mission_spent = mission_before - self.human.curMission
             if mission_spent != 1:
                 self._bot_log.append({
@@ -431,9 +538,22 @@ class GameSession:
 
     def _start_next_human_turn(self):
         self.game.turncount += 1
-        self.human.resolve("T", "1")
+        self._resolve_training()
         self.phase = "actions"
         self._cached_raw = None
+
+    def _resolve_training(self):
+        """Advance training by 1 and log any rewards gained."""
+        snap = _snapshot(self.human)
+        self.human.resolve("T", "1")
+        effects = _diff_to_text(snap, _snapshot(self.human))
+        # Filter out the training +1 itself — that's implied
+        effects = [e for e in effects if e != "+1 training"]
+        if effects:
+            self._player_log.append({
+                "turn": self.game.turncount,
+                "text": f"Training reward (level {self.human.training}): {', '.join(effects)}",
+            })
 
 
 class SessionManager:

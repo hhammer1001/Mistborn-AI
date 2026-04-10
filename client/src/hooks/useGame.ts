@@ -109,6 +109,13 @@ export function useGame() {
           { turn: prevTurn, text: `${pName} — ${desc}` },
         ];
 
+        // Player effect logs (abilities, buys, etc.)
+        if (data.playerLog && data.playerLog.length > 0) {
+          for (const entry of data.playerLog) {
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+          }
+        }
+
         // If bot log entries came back, add them
         if (data.botLog && data.botLog.length > 0) {
           const botTurn = data.botLog[0]?.turn ?? prevTurn + 1;
@@ -189,6 +196,12 @@ export function useGame() {
         const bName = botName.current;
         const pName = playerName.current;
 
+        if (data.playerLog && data.playerLog.length > 0) {
+          for (const entry of data.playerLog) {
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+          }
+        }
+
         if (data.botLog && data.botLog.length > 0) {
           const botTurn = data.botLog[0]?.turn ?? gameState.turnCount + 1;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
@@ -248,6 +261,12 @@ export function useGame() {
           newEntries.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
         }
 
+        if (data.playerLog && data.playerLog.length > 0) {
+          for (const entry of data.playerLog) {
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+          }
+        }
+
         if (data.botLog && data.botLog.length > 0) {
           const botTurn = data.botLog[0]?.turn ?? gameState.turnCount + 1;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
@@ -298,6 +317,11 @@ export function useGame() {
           newEntries.push({ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` });
         }
 
+        if (data.playerLog && data.playerLog.length > 0) {
+          for (const entry of data.playerLog) {
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+          }
+        }
         if (data.botLog && data.botLog.length > 0) {
           const botTurn = data.botLog[0]?.turn ?? gameState.turnCount;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
@@ -334,6 +358,11 @@ export function useGame() {
         const bName = botName.current;
         const pName = playerName.current;
 
+        if (data.playerLog && data.playerLog.length > 0) {
+          for (const entry of data.playerLog) {
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+          }
+        }
         if (data.botLog && data.botLog.length > 0) {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });

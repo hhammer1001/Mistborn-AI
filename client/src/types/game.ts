@@ -134,5 +134,6 @@ export interface GameState {
   senseCards?: SenseCard[];
   cloudCards?: CloudCard[];
   botLog?: BotLogEntry[];
+  playerLog?: BotLogEntry[];
   prompt?: GamePrompt;
 }

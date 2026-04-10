@@ -419,7 +419,7 @@ class Player():
         for card in game.market.hand:
             if card.cost <= self.curMoney:
                 actions += [(6, card)]
-                if (self.training >= 8) and self.charAbility2 and isinstance(card, Action):
+                if (self.training >= 8) and self.charAbility2 and (isinstance(card, Action) or (isinstance(card, Ally) and card.data[3] != '')):
                     actions += [(7, card)]
         for ally in self.allies:
             if ally.available1:
@@ -438,7 +438,7 @@ class Player():
         for card in game.market.hand:
             if card.cost > self.curMoney and card.cost <= self.curMoney + self.curBoxings:
                 actions += [(13, card, card.cost-self.curMoney)]
-                if (self.training >= 8) and self.charAbility2 and isinstance(card, Action):
+                if (self.training >= 8) and self.charAbility2 and (isinstance(card, Action) or (isinstance(card, Ally) and card.data[3] != '')):
                     actions += [(14, card, card.cost-self.curMoney)]
         return actions
 

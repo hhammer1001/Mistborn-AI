@@ -1,5 +1,6 @@
 import type { MissionData, GameAction } from "../types/game";
 import { RewardIcon } from "./RewardIcon";
+import { useUIScale } from "../hooks/useUIScale";
 
 interface Props {
   missions: MissionData[];
@@ -7,10 +8,11 @@ interface Props {
   onAction: (index: number) => void;
 }
 
-function MissionColumn({ mission, action, onAction }: {
+function MissionColumn({ mission, action, onAction, scale }: {
   mission: MissionData;
   action?: GameAction;
   onAction: (index: number) => void;
+  scale: number;
 }) {
   const you = mission.playerRanks[0];
   const opp = mission.playerRanks[1];
@@ -22,13 +24,13 @@ function MissionColumn({ mission, action, onAction }: {
     <div className="mission-col">
       <div className="mission-col-name">{mission.name}</div>
 
-      {/* All children share the same 200px coordinate space */}
+      {/* All children share the same coordinate space */}
       <div className="mission-bar-area">
         {/* Tier cutoff lines with rewards */}
         {mission.tiers.map((tier, i) => {
           const pct = (tier.threshold / max) * 100;
           const isFinal = i === mission.tiers.length - 1;
-          const iconSize = 24;
+          const iconSize = Math.round(24 * scale);
           return (
             <div
               key={tier.threshold}
@@ -86,6 +88,7 @@ function MissionColumn({ mission, action, onAction }: {
 
 export function MissionTrack({ missions, actions, onAction }: Props) {
   const missionActions = actions.filter((a) => a.code === 1);
+  const scale = useUIScale();
 
   return (
     <div className="mission-zone">
@@ -99,6 +102,7 @@ export function MissionTrack({ missions, actions, onAction }: Props) {
               mission={m}
               action={action}
               onAction={onAction}
+              scale={scale}
             />
           );
         })}

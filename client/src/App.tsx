@@ -69,7 +69,14 @@ function App() {
             </div>
             <Market market={gameState.market} actions={actions} onAction={handleAction} />
           </div>
-          <AllyZone allies={you.allies} actions={actions} onAction={handleAction} label="Your Allies" />
+          <AllyZone
+            allies={you.allies}
+            actions={actions}
+            player={you}
+            onAction={handleAction}
+            onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }}
+            label="Your Allies"
+          />
           <Hand
             cards={you.hand}
             actions={actions}
