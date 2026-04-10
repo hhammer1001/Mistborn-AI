@@ -4,6 +4,7 @@ import type { CardData } from "../types/game";
 import { getCardSprite } from "../data/cardSprites";
 import type { CardSprite } from "../data/cardSprites";
 import { describeCard } from "../data/abilityText";
+import { useUIScale } from "../hooks/useUIScale";
 
 interface Props {
   card: CardData;
@@ -95,13 +96,17 @@ function CardTooltip({ card }: { card: CardData }) {
   );
 }
 
-function CardDetailPopup({ card, sprite, cardRef }: {
+function CardDetailPopup({ card, sprite, cardRef, scale }: {
   card: CardData;
   sprite: CardSprite | undefined;
   cardRef: React.RefObject<HTMLDivElement | null>;
+  scale: number;
 }) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const popupCardWidth = 320 * scale;
+  const fallbackWidth = 240 * scale;
+  const fallbackMinH = 160 * scale;
 
   useLayoutEffect(() => {
     const cardEl = cardRef.current;
@@ -145,10 +150,10 @@ function CardDetailPopup({ card, sprite, cardRef }: {
       <div className="card-detail-preview">
         {sprite ? (
           sprite.rotated
-            ? <RotatedSprite sprite={sprite} width={320} />
-            : <UprightSprite sprite={sprite} width={320} />
+            ? <RotatedSprite sprite={sprite} width={popupCardWidth} />
+            : <UprightSprite sprite={sprite} width={popupCardWidth} />
         ) : (
-          <div className="card-fallback" style={{ width: 240, minHeight: 160 }}>
+          <div className="card-fallback" style={{ width: fallbackWidth, minHeight: fallbackMinH }}>
             <div className="card-fallback-name">{card.name}</div>
           </div>
         )}
@@ -164,7 +169,8 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
   const [showTooltip, setShowTooltip] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const sprite = getCardSprite(card.name);
-  const cardWidth = small ? 100 : 160;
+  const scale = useUIScale();
+  const cardWidth = (small ? 100 : 160) * scale;
   const spent = card.burned
     || (card.type === "action" && card.capacity !== undefined && card.metalUsed === card.capacity);
   const typeClass = noTypeBorder ? "" : ` card-${card.type}`;
@@ -223,7 +229,7 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
         )}
         {stackCount && <div className="card-stack-count">{stackCount}</div>}
       </div>
-      {showTooltip && <CardDetailPopup card={card} sprite={sprite} cardRef={cardRef} />}
+      {showTooltip && <CardDetailPopup card={card} sprite={sprite} cardRef={cardRef} scale={scale} />}
     </div>
   );
 }

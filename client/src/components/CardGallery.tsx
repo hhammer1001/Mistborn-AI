@@ -1,3 +1,5 @@
+import { useUIScale } from "../hooks/useUIScale";
+
 const P = "/cards/httpssteamusercontentaakamaihdnetugc";
 
 // ── Sprite sheet definitions ───────────────────────────────────────────────
@@ -326,6 +328,7 @@ function ImageCard({ card, width }: { card: Single; width: number }) {
 // ── Main gallery component ─────────────────────────────────────────────────
 
 export function CardGallery({ onBack }: { onBack: () => void }) {
+  const scale = useUIScale();
   return (
     <div className="card-gallery">
       <div className="gallery-header">
@@ -338,7 +341,7 @@ export function CardGallery({ onBack }: { onBack: () => void }) {
         <h2>Heroes</h2>
         <div className="gallery-grid">
           {HEROES.map((h) => (
-            <ImageCard key={h.name} card={h} width={280} />
+            <ImageCard key={h.name} card={h} width={280 * scale} />
           ))}
         </div>
       </section>
@@ -348,7 +351,7 @@ export function CardGallery({ onBack }: { onBack: () => void }) {
         <h2>Missions</h2>
         <div className="gallery-grid">
           {MISSIONS.map((m) => (
-            <SpriteCard key={m.name} card={m} displayWidth={160} />
+            <SpriteCard key={m.name} card={m} displayWidth={160 * scale} />
           ))}
         </div>
       </section>
@@ -368,7 +371,7 @@ export function CardGallery({ onBack }: { onBack: () => void }) {
               <h3>Allies</h3>
               <div className="gallery-grid">
                 {ms.allies.map((a) => (
-                  <RotatedSpriteCard key={a.name} card={a} displayWidth={190} />
+                  <RotatedSpriteCard key={a.name} card={a} displayWidth={190 * scale} />
                 ))}
               </div>
             </>
@@ -379,7 +382,7 @@ export function CardGallery({ onBack }: { onBack: () => void }) {
               <h3>Actions</h3>
               <div className="gallery-grid">
                 {ms.actions.map((a) => (
-                  <SpriteCard key={a.name} card={a} displayWidth={140} />
+                  <SpriteCard key={a.name} card={a} displayWidth={140 * scale} />
                 ))}
               </div>
             </>
@@ -394,9 +397,9 @@ export function CardGallery({ onBack }: { onBack: () => void }) {
           <div key={sd.label} className="gallery-starter">
             <h3>{sd.label}</h3>
             <div className="gallery-grid">
-              <SpriteCard card={{ ...FUNDING, name: "Funding ×6" }} displayWidth={110} />
+              <SpriteCard card={{ ...FUNDING, name: "Funding ×6" }} displayWidth={110 * scale} />
               {sd.training.map((t) => (
-                <SpriteCard key={t} card={TRAINING[t]} displayWidth={110} />
+                <SpriteCard key={t} card={TRAINING[t]} displayWidth={110 * scale} />
               ))}
             </div>
           </div>
