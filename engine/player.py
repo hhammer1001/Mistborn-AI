@@ -16,6 +16,7 @@ class Player():
         self.pDamage = 0
         self.pMoney = 0
         self.handSize = 5
+        self._active_card = None  # card currently being played (can't eliminate itself)
         
         self.deck = deck
         self.atium = 0
@@ -193,6 +194,11 @@ class Player():
             print(f"Hand is {self.deck.hand}")
             print(f"Metals available are {self.metalAvailable}")
             print(f"Performed {action}")
+        # Track the card being played so it can't eliminate itself
+        if action[0] in (2, 4) and len(action) > 1:
+            self._active_card = action[1]
+        else:
+            self._active_card = None
         match action[0]:
             case 0:
                 self.curBoxings += self.curMoney // 2
@@ -593,84 +599,59 @@ class Player():
     def permDamage(self, amount):
         self.pDamage += amount
 
+    def _is_lowest(self, mission):
+        """Check if we are lowest on a mission (must be > 0, and all opponents higher)."""
+        ranks = mission.playerRanks
+        ours = ranks[self.turnOrder]
+        if ours <= 0:
+            return False
+        for i, r in enumerate(ranks):
+            if i == self.turnOrder:
+                continue
+            if r <= ours and r > 0:
+                return False
+        return True
+
+    def _is_highest(self, mission):
+        """Check if we are highest on a mission (must be > 0, and no opponent higher)."""
+        ranks = mission.playerRanks
+        ours = ranks[self.turnOrder]
+        if ours <= 0:
+            return False
+        for i, r in enumerate(ranks):
+            if i == self.turnOrder:
+                continue
+            if r >= ours and r > 0:
+                return False
+        return True
+
     def special1(self, amount=0):
-        #investigate
-        count = 0
-        for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                lowest = [1,0]
-                for i in range(len(ranks)):
-                    if i > 0 and i < ours:
-                        lowest[0] = 0
-                    elif i > ours:
-                        lowest[1] = 1
-                if lowest == [1,1]:
-                    count += 1
+        #investigate — gain 1 money per mission you're lowest on
+        count = sum(1 for m in self.game.missions if self._is_lowest(m))
         self.money(count)
 
     def special2(self, amount=0):
-        #Eavesdrop1
+        #Eavesdrop — advance 1 on every mission you're lowest on
         for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                lowest = [1,0]
-                for i in range(len(ranks)):
-                    if i > 0 and i < ours:
-                        lowest[0] = 0
-                    elif i > ours:
-                        lowest[1] = 1
-                if lowest == [1,1]:
-                    m.progress(self.turnOrder, 1)
-    
+            if self._is_lowest(m):
+                m.progress(self.turnOrder, 1)
+
     def special3(self, amount=0):
-        #Lookout
-        count = 0
-        for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                highest = True
-                for i in range(len(ranks)):
-                    if i > ours:
-                        highest = False
-                if highest:
-                    count += 1
+        #Lookout — draw a card for each mission you're highest on
+        count = sum(1 for m in self.game.missions if self._is_highest(m))
         self.draw(count)
 
-
     def special4(self, amount=0):
-        #Hyperaware
-        count = 0
-        for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                highest = True
-                for i in range(len(ranks)):
-                    if i > ours:
-                        highest = False
-                if highest:
-                    count += 1
+        #Hyperaware — gain damage for each mission you're highest on
+        count = sum(1 for m in self.game.missions if self._is_highest(m))
         self.damage(count*3)
 
     def special5(self, amount=0):
-        #Coppercloud
-        count = 0
+        #Coppercloud — draw a card if you are the lowest on any mission
         for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                highest = True
-                for i in range(len(ranks)):
-                    if i > ours:
-                        highest = False
-                if highest:
-                    count += 1
-        if count > 0:
-            self.draw(1)
+            if self._is_lowest(m):
+                self.draw(1)
+                return
 
 
     def special6(self, amount=0):
@@ -801,9 +782,15 @@ class Player():
         #Keeper
         if len(self.deck.hand) > 0:
             from engine.card import Funding
-            choices = self.deck.hand
-            # Filter out Funding if player can't afford to undo the money
-            choices = [c for c in choices if not isinstance(c, Funding) or self.curMoney >= 1]
+            choices = []
+            for c in self.deck.hand:
+                # Exclude Funding if player can't afford to undo the money
+                if isinstance(c, Funding) and self.curMoney < 1:
+                    continue
+                # Exclude cards that have been "played" (burned, abilities used, or used to refresh)
+                if isinstance(c, Action) and (c.burned or c.metalUsed > 0):
+                    continue
+                choices.append(c)
             if not choices:
                 return
             choice = self.keeperIn(choices)
@@ -1020,6 +1007,7 @@ class Player():
             "handSize": len(self.deck.hand),
             "deckSize": len(self.deck.cards),
             "discardSize": len(self.deck.discard),
+            "discard": [c.to_dict() for c in self.deck.discard] if reveal_hand else [],
             "allies": [a.to_dict() for a in self.allies],
             "metalTokens": self.metalTokens,
             "metalAvailable": self.metalAvailable,
