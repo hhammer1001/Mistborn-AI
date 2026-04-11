@@ -514,20 +514,23 @@ class Player():
         self.pDamage += amount
 
     def _is_lowest(self, mission):
-        """Check if we are lowest on a mission (must be > 0, and all opponents higher)."""
+        """Check if we are lowest on a mission (must be > 0, and at least one opponent strictly higher)."""
         ranks = mission.playerRanks
         ours = ranks[self.turnOrder]
         if ours <= 0:
             return False
+        someone_higher = False
         for i, r in enumerate(ranks):
             if i == self.turnOrder:
                 continue
-            if r <= ours and r > 0:
-                return False
-        return True
+            if r > 0 and r <= ours:
+                return False  # opponent is on the mission and at or below us
+            if r > ours:
+                someone_higher = True
+        return someone_higher
 
     def _is_highest(self, mission):
-        """Check if we are highest on a mission (must be > 0, and no opponent higher)."""
+        """Check if we are highest on a mission (must be > 0, no opponent at or above us)."""
         ranks = mission.playerRanks
         ours = ranks[self.turnOrder]
         if ours <= 0:
