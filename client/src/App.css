@@ -269,7 +269,7 @@ h3 {
 }
 
 .player-info-with-training {
-  width: calc(300px * var(--ui-scale, 1));
+  width: calc(315px * var(--ui-scale, 1));
   flex-shrink: 0;
   display: flex;
   background: var(--bg-panel);
@@ -296,7 +296,7 @@ h3 {
 }
 
 .player-info-with-training .metal-col-zone {
-  width: calc(75px * var(--ui-scale, 1));
+  width: calc(180px * var(--ui-scale, 1));
   border-radius: 0;
 }
 
@@ -938,6 +938,18 @@ h3 {
 
 .end-turn-btn.disabled:hover {
   background: transparent;
+}
+
+.end-turn-reminders {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.end-turn-reminder {
+  font-size: 0.6rem;
+  color: var(--gold);
+  font-style: italic;
 }
 
 .mission-btn {

@@ -101,7 +101,7 @@ function App() {
               onAssign={(idx) => { if (!loading) assignDamage(idx); }}
             />
           ) : (
-            <ActionList actions={actions} onAction={handleAction} missionRemaining={you.mission} />
+            <ActionList actions={actions} onAction={handleAction} missionRemaining={you.mission} player={you} />
           )}
           <div className="turn-info">
             <span>Turn {gameState.turnCount}</span>
