@@ -109,10 +109,15 @@ export function useGame() {
           { turn: prevTurn, text: `${pName} — ${desc}` },
         ];
 
-        // Player effect logs (abilities, buys, etc.)
+        // Player effect logs for THIS turn (abilities, buys, etc.)
+        const newTurnPlayerLogs: LogEntry[] = [];
         if (data.playerLog && data.playerLog.length > 0) {
           for (const entry of data.playerLog) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            if (entry.turn > prevTurn) {
+              newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            } else {
+              newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            }
           }
         }
 
@@ -128,6 +133,8 @@ export function useGame() {
         if (data.turnCount > prevTurn) {
           newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
         }
+        // Append new-turn player logs after the turn header
+        newEntries.push(...newTurnPlayerLogs);
 
         setLog((prev) => consolidateLog([...prev, ...newEntries]));
 

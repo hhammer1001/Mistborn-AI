@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
 import { METAL_ICONS } from "../data/metalIcons";
+import { MetalChoicePopup } from "./MetalChoicePopup";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 
@@ -80,6 +81,7 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [showAtiumBurnPopup, setShowAtiumBurnPopup] = useState(false);
 
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
@@ -130,22 +132,54 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      {actions.map((a) => {
-        const label = actionLabel(a);
+      {(() => {
+        // Group atium card burns (code 2, 9 metals) into single button
+        const atiumBurns = actions.filter((a) => a.code === 2 && actions.filter((b) => b.code === 2).length > 2);
+        const normalActions = atiumBurns.length > 2
+          ? actions.filter((a) => !(a.code === 2 && atiumBurns.includes(a)))
+          : actions;
+
         return (
-          <button
-            key={a.index}
-            className="hand-action-btn"
-            onClick={(e) => { e.stopPropagation(); onAction(a.index); onClose(); }}
-            title={a.description}
-          >
-            <span>{label.text}</span>
-            {label.metalIcon && (
-              <img className="hand-action-metal-icon" src={label.metalIcon} alt="" draggable={false} />
+          <>
+            {atiumBurns.length > 2 && (
+              <button
+                className="hand-action-btn"
+                onClick={(e) => { e.stopPropagation(); setShowAtiumBurnPopup(true); }}
+                title="Burn this card — choose which metal"
+              >
+                <span>Burn (choose metal)</span>
+              </button>
             )}
-          </button>
+            {normalActions.map((a) => {
+              const label = actionLabel(a);
+              return (
+                <button
+                  key={a.index}
+                  className="hand-action-btn"
+                  onClick={(e) => { e.stopPropagation(); onAction(a.index); onClose(); }}
+                  title={a.description}
+                >
+                  <span>{label.text}</span>
+                  {label.metalIcon && (
+                    <img className="hand-action-metal-icon" src={label.metalIcon} alt="" draggable={false} />
+                  )}
+                </button>
+              );
+            })}
+            {showAtiumBurnPopup && (
+              <MetalChoicePopup
+                title="Burn card as..."
+                onChoose={(metalIndex) => {
+                  const burnAction = atiumBurns.find((a) => a.metalIndex === metalIndex);
+                  if (burnAction) onAction(burnAction.index);
+                  onClose();
+                }}
+                onClose={() => setShowAtiumBurnPopup(false)}
+              />
+            )}
+          </>
         );
-      })}
+      })()}
       {composites.map((c, i) => (
         <button
           key={`composite-${i}`}

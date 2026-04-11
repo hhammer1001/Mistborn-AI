@@ -75,9 +75,14 @@ class WebPlayer(Player):
             return -1
         options = []
         for i, c in enumerate(self.deck.hand):
+            # Can't eliminate the card that's currently being played
+            if self._active_card and c.id == self._active_card.id:
+                continue
             options.append({"index": i, "name": c.name, "source": "hand"})
         for i, c in enumerate(self.deck.discard):
             options.append({"index": i + h, "name": c.name, "source": "discard"})
+        if not options:
+            return -1
         options.append({"index": -1, "name": "Skip", "source": "skip"})
         raise PromptNeeded("eliminate", options, "Choose a card to eliminate")
 

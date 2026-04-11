@@ -268,8 +268,17 @@ h3 {
   min-height: 0;
 }
 
+.market-and-allies {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 .player-info-with-training {
-  width: calc(315px * var(--ui-scale, 1));
+  width: calc(380px * var(--ui-scale, 1));
   flex-shrink: 0;
   display: flex;
   background: var(--bg-panel);
@@ -281,13 +290,15 @@ h3 {
 
 .player-info-with-training .player-info {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   border: none;
   border-radius: 0;
   box-shadow: none;
 }
 
 .player-info-with-training .training-track-zone {
-  width: calc(90px * var(--ui-scale, 1));
+  flex: 0 0 calc(90px * var(--ui-scale, 1));
   border: none;
   border-left: 1px solid var(--border);
   border-radius: 0;
@@ -296,7 +307,7 @@ h3 {
 }
 
 .player-info-with-training .metal-col-zone {
-  width: calc(180px * var(--ui-scale, 1));
+  flex: 0 0 calc(90px * var(--ui-scale, 1));
   border-radius: 0;
 }
 
@@ -410,6 +421,60 @@ h3 {
   flex-direction: column;
   gap: 0.4rem;
   margin-top: 0.5rem;
+}
+
+/* ─── Metal choice popup ────────────────────────────────────────────────── */
+.metal-choice-popup {
+  min-width: 280px;
+  background: var(--bg-panel);
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
+}
+
+.metal-choice-popup h3 {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.metal-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+
+.metal-choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0.2rem;
+  font-size: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  background: var(--bg-deep);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-transform: capitalize;
+}
+
+.metal-choice-btn:hover {
+  background: var(--bg-panel);
+  border-color: var(--gold);
+}
+
+.metal-choice-btn img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
 }
 
 .prompt-overlay {
@@ -683,7 +748,7 @@ h3 {
 }
 
 .card-detail-popup {
-  z-index: 100;
+  z-index: 500;
   display: flex;
   gap: 0;
   pointer-events: auto;
@@ -899,6 +964,13 @@ h3 {
 .action-btn:hover {
   background: var(--blue);
   color: #fff;
+}
+
+.action-btn.disabled,
+.action-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
 }
 
 .action-btn:active {
@@ -1295,9 +1367,89 @@ h3 {
   cursor: default;
 }
 
+.pile-btns {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.pile-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 0.55rem;
+  padding: 0.15rem 0.25rem;
+  border-color: var(--border-light);
+}
+
+.pile-btn:not(.disabled):hover {
+  border-color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pile-btn.disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* ─── Card pile overlay (discard / trash viewer) ────────────────────────── */
+.card-pile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-pile-content {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card-pile-content h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: var(--gold);
+}
+
+.card-pile-empty {
+  color: var(--text-dim);
+  font-style: italic;
+  margin: 0;
+}
+
+.card-pile-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.card-pile-hint {
+  font-size: 0.5rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 .char-abilities {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.2rem;
+}
+
+.char-abilities .action-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 0.6rem;
+  padding: 0.2rem 0.3rem;
 }
 
 /* ─── Metal Tokens (vertical column) ────────────────────────────────────── */

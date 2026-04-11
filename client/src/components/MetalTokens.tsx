@@ -1,5 +1,7 @@
+import { useState, useRef } from "react";
 import type { PlayerData, GameAction } from "../types/game";
 import { METAL_ICONS } from "../data/metalIcons";
+import { MetalChoicePopup } from "./MetalChoicePopup";
 
 const ATIUM_ICON = "/cards/atium%20token.png";
 
@@ -10,10 +12,24 @@ interface Props {
 }
 
 export function MetalTokens({ player, actions, onAction }: Props) {
+  const [showAtiumPopup, setShowAtiumPopup] = useState(false);
+  const atiumRef = useRef<HTMLDivElement>(null);
   const burnActions = actions.filter((a) => a.code === 5);
   const atiumActions = actions.filter((a) => a.code === 12);
-  const atiumBurned = player.metalTokens[8] === 1;
-  const atiumDim = player.atium === 0 || atiumBurned;
+  const hasAtiumBurn = atiumActions.length > 0 || burnActions.some((a) => a.metalIndex === 8);
+  const atiumDim = player.atium === 0 || !hasAtiumBurn;
+
+  const handleAtiumChoice = (metalIndex: number) => {
+    // metal 0-7: use code 12 (atium as that metal)
+    // metal 8: use code 5 with metal=8 (atium as atium)
+    if (metalIndex < 8) {
+      const act = atiumActions.find((a) => a.metalIndex === metalIndex);
+      if (act) onAction(act.index);
+    } else {
+      const act = burnActions.find((a) => a.metalIndex === 8);
+      if (act) onAction(act.index);
+    }
+  };
 
   return (
     <div className="metal-col-zone">
@@ -67,10 +83,12 @@ export function MetalTokens({ player, actions, onAction }: Props) {
           );
         })}
 
-        {/* Atium token */}
+        {/* Atium token — click opens metal choice popup */}
         <div
-          className={`metal-icon-row atium-token${atiumDim ? " burned" : ""}`}
+          ref={atiumRef}
+          className={`metal-icon-row atium-token${atiumDim ? " burned" : ""}${hasAtiumBurn ? " clickable" : ""}`}
           title={`Atium: ${player.atium} tokens, ${player.metalBurned[8]} used this turn`}
+          onClick={hasAtiumBurn ? () => setShowAtiumPopup(true) : undefined}
         >
           <div className="atium-icon-wrap">
             <img
@@ -86,6 +104,15 @@ export function MetalTokens({ player, actions, onAction }: Props) {
           </span>
         </div>
       </div>
+
+      {showAtiumPopup && (
+        <MetalChoicePopup
+          title="Use atium token as..."
+          anchorRef={atiumRef}
+          onChoose={handleAtiumChoice}
+          onClose={() => setShowAtiumPopup(false)}
+        />
+      )}
     </div>
   );
 }

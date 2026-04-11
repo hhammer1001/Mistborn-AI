@@ -63,20 +63,22 @@ function App() {
         <div className="left-main">
           <div className="left-top-row">
             <div className="player-info-with-training">
-              <PlayerInfo player={you} actions={actions} onAction={handleAction} />
+              <PlayerInfo player={you} actions={actions} onAction={handleAction} onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }} discard={you.discard} marketDiscard={gameState.market.discard} />
               <TrainingTrack training={you.training} character={you.character} />
               <MetalTokens player={you} actions={actions} onAction={handleAction} />
             </div>
-            <Market market={gameState.market} actions={actions} onAction={handleAction} />
+            <div className="market-and-allies">
+              <Market market={gameState.market} actions={actions} onAction={handleAction} />
+              <AllyZone
+                allies={you.allies}
+                actions={actions}
+                player={you}
+                onAction={handleAction}
+                onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }}
+                label="Your Allies"
+              />
+            </div>
           </div>
-          <AllyZone
-            allies={you.allies}
-            actions={actions}
-            player={you}
-            onAction={handleAction}
-            onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }}
-            label="Your Allies"
-          />
           <Hand
             cards={you.hand}
             actions={actions}
@@ -141,7 +143,7 @@ function App() {
         <div className="modal-overlay">
           <div className="modal-dialog">
             <h3>Cloud Defense</h3>
-            <p>Incoming damage! Discard a cloud card to block?</p>
+            <p>Incoming: <strong>{gameState.incomingDamage ?? "?"}</strong> damage! Discard a cloud card to block?</p>
             <div className="modal-actions">
               {gameState.cloudCards.map(c => (
                 <button key={c.cardId} className="action-btn" style={{borderColor: "var(--green)"}}

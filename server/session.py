@@ -208,6 +208,7 @@ class GameSession:
                            for c in self.human.deck.hand
                            if isinstance(c, Action) and c.data[9] == "cloudP"]
             state["cloudCards"] = cloud_cards
+            state["incomingDamage"] = getattr(self, '_cloud_damage', 0)
 
         if self._pending_prompt:
             state["prompt"] = self._pending_prompt.to_dict()
@@ -330,6 +331,10 @@ class GameSession:
                     "text": f"Opponent used Sense to block mission advance! (−{mission_spent} mission)",
                 })
 
+        # Check for instant victory (e.g. mission victory)
+        if self.game.winner:
+            self.phase = "game_over"
+
         self._cached_raw = None
         return self.get_state()
 
@@ -371,6 +376,9 @@ class GameSession:
         self._save_state = None
         self._accumulated_responses = []
         self._cached_raw = None
+
+        if self.game.winner:
+            self.phase = "game_over"
 
         return self.get_state()
 
@@ -472,6 +480,7 @@ class GameSession:
         cloud_cards = [c for c in self.human.deck.hand
                        if isinstance(c, Action) and c.data[9] == "cloudP"]
         if hp_lost > 0 and cloud_cards:
+            self._cloud_damage = hp_lost
             self._bot_log.append({"turn": bot_turn,
                                   "text": f"Incoming: {hp_lost} damage"})
             self.phase = "cloud_defense"

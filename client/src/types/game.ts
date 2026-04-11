@@ -49,6 +49,7 @@ export interface PlayerData {
   handSize: number;
   deckSize: number;
   discardSize: number;
+  discard: CardData[];
   allies: CardData[];
   metalTokens: number[];
   metalAvailable: number[];
@@ -72,6 +73,7 @@ export interface MarketData {
   hand: CardData[];
   deckSize: number;
   discardSize: number;
+  discard: CardData[];
 }
 
 export interface GameAction {
@@ -133,6 +135,7 @@ export interface GameState {
   damageTargets?: DamageTarget[];
   senseCards?: SenseCard[];
   cloudCards?: CloudCard[];
+  incomingDamage?: number;
   botLog?: BotLogEntry[];
   playerLog?: BotLogEntry[];
   prompt?: GamePrompt;

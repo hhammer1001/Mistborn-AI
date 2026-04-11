@@ -226,6 +226,9 @@ class Player():
                 action[1].burn(self)
                 self.metalAvailable[action[2]] += 1
                 self.metalBurned[action[2]] += 1
+                # Atium cards burned as another metal still count as atium burned
+                if action[1].metal == 8 and action[2] != 8:
+                    self.metalBurned[8] += 1
             case 3:
                 action[1].burned = True
                 if self.metalTokens[action[2]] == 4:
@@ -276,7 +279,8 @@ class Player():
             case 12:
                 self.metalAvailable[action[1]] += 1
                 self.metalBurned[action[1]] += 1
-                self.metalBurned[8] += 1
+                if action[1] != 8:
+                    self.metalBurned[8] += 1
                 self.atium -= 1
             case 13:
                 self.curMoney = 0
@@ -402,7 +406,8 @@ class Player():
             if not card.burned:
                 if card.metalUsed == 0:
                     if card.metal == 8:
-                        actions += [(2, card, 8)]
+                        for m in range(9):
+                            actions += [(2, card, m)]
                     else:
                         actions += [(2, card, (card.metal//2)*2), (2, card, (card.metal//2)*2 + 1)]
                     if (card.metal == 8):
@@ -439,7 +444,7 @@ class Player():
         if (self.charAbility3 and self.training >= 13) and self.metalBurned[8] > 0:
             actions += [(11,)]
         if (self.atium > 0) and ((self.metalTokens[:-1].count(1) + self.metalTokens[8]) < self.burns):
-            for i in range(8):
+            for i in range(9):
                 actions += [(12, i)]
         for card in game.market.hand:
             if card.cost > self.curMoney and card.cost <= self.curMoney + self.curBoxings:

@@ -13,6 +13,8 @@ interface Props {
   highlightColor?: "gold" | "green";
   noTypeBorder?: boolean;
   small?: boolean;
+  cropped?: boolean;
+  baseWidth?: number;
   stackCount?: number;
 }
 
@@ -32,6 +34,29 @@ function UprightSprite({ sprite, width }: { sprite: CardSprite; width: number })
         backgroundSize: `${sheet.w * scale}px ${sheet.h * scale}px`,
         backgroundPosition: `-${col * cw * scale}px -${row * ch * scale}px`,
         backgroundRepeat: "no-repeat",
+      }}
+    />
+  );
+}
+
+function CroppedSprite({ sprite, width }: { sprite: CardSprite; width: number }) {
+  const { sheet, col, row } = sprite;
+  const cw = sheet.w / sheet.cols;
+  const ch = sheet.h / sheet.rows;
+  const scale = width / cw;
+  const fullHeight = ch * scale;
+  const cropHeight = fullHeight * 0.5;
+  return (
+    <div
+      className="card-sprite card-sprite-cropped"
+      style={{
+        width,
+        height: cropHeight,
+        backgroundImage: `url(${sheet.src})`,
+        backgroundSize: `${sheet.w * scale}px ${sheet.h * scale}px`,
+        backgroundPosition: `-${col * cw * scale}px -${row * ch * scale}px`,
+        backgroundRepeat: "no-repeat",
+        borderRadius: "4px",
       }}
     />
   );
@@ -165,12 +190,12 @@ function CardDetailPopup({ card, sprite, cardRef, scale }: {
   return createPortal(popup, document.body);
 }
 
-export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder, small, stackCount }: Props) {
+export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder, small, cropped, baseWidth, stackCount }: Props) {
   const [showTooltip, setShowTooltip] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const sprite = getCardSprite(card.name);
   const scale = useUIScale();
-  const cardWidth = (small ? 100 : 160) * scale;
+  const cardWidth = (baseWidth ?? (small ? 80 : 130)) * scale;
   const spent = card.burned
     || (card.type === "action" && card.capacity !== undefined && card.metalUsed === card.capacity);
   const typeClass = noTypeBorder ? "" : ` card-${card.type}`;
@@ -211,9 +236,11 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
     <div className="card-wrapper" onContextMenu={handleContext} onClick={handleClick}>
       <div ref={cardRef} className={borderClass} title={card.name}>
         {sprite ? (
-          sprite.rotated
-            ? <RotatedSprite sprite={sprite} width={cardWidth} />
-            : <UprightSprite sprite={sprite} width={cardWidth} />
+          cropped && !sprite.rotated
+            ? <CroppedSprite sprite={sprite} width={cardWidth} />
+            : sprite.rotated
+              ? <RotatedSprite sprite={sprite} width={cardWidth} />
+              : <UprightSprite sprite={sprite} width={cardWidth} />
         ) : (
           <div className="card-fallback" style={{ width: cardWidth }}>
             <div className="card-fallback-name">{card.name}</div>

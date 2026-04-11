@@ -1,7 +1,8 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { createPortal } from "react-dom";
-import type { PlayerData, GameAction } from "../types/game";
+import type { PlayerData, GameAction, CardData } from "../types/game";
 import { METAL_ICONS } from "../data/metalIcons";
+import { CardPileOverlay } from "./CardPileOverlay";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 const CHARACTER_METAL: Record<string, number> = {
@@ -81,10 +82,15 @@ interface Props {
   isOpponent?: boolean;
   actions?: GameAction[];
   onAction?: (index: number) => void;
+  onCompositeAction?: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  discard?: CardData[];
+  marketDiscard?: CardData[];
 }
 
 
-export function PlayerInfo({ player, isOpponent, actions, onAction }: Props) {
+export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeAction, discard, marketDiscard }: Props) {
+  const [showDiscard, setShowDiscard] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
   const charAbilityAction = actions?.find((a) => a.code === 10);
   const thirdAbilityAction = actions?.find((a) => a.code === 11);
 
@@ -197,27 +203,98 @@ export function PlayerInfo({ player, isOpponent, actions, onAction }: Props) {
               </div>
             );
           })()}
-          {(charAbilityAction || thirdAbilityAction) && (
-            <div className="char-abilities">
-              {charAbilityAction && (
-                <button
-                  className="action-btn"
-                  onClick={() => onAction(charAbilityAction.index)}
-                >
-                  Char. Ability I
-                </button>
-              )}
-              {thirdAbilityAction && (
-                <button
-                  className="action-btn"
-                  onClick={() => onAction(thirdAbilityAction.index)}
-                >
-                  Char. Ability III
-                </button>
-              )}
+          {discard && marketDiscard && (
+            <div className="pile-btns">
+              <button
+                className={`action-btn pile-btn${discard.length === 0 ? " disabled" : ""}`}
+                onClick={discard.length > 0 ? () => setShowDiscard(true) : undefined}
+                disabled={discard.length === 0}
+              >
+                Discard ({discard.length})
+              </button>
+              <button
+                className={`action-btn pile-btn${marketDiscard.length === 0 ? " disabled" : ""}`}
+                onClick={marketDiscard.length > 0 ? () => setShowTrash(true) : undefined}
+                disabled={marketDiscard.length === 0}
+              >
+                Trash ({marketDiscard.length})
+              </button>
             </div>
           )}
+          {(() => {
+            const metal1 = parseInt(player.ability1metal);
+            const burnCount = player.metalTokens.slice(0, 8).filter((t: number) => t === 1).length + player.metalTokens[8];
+            const hasBurns = burnCount < player.burns;
+            const showAbility1 = player.training >= 5;
+            const showAbility3 = player.training >= 13;
+            if (!showAbility1 && !showAbility3) return null;
+
+            return (
+              <div className="char-abilities">
+                {showAbility1 && (() => {
+                  const ready = charAbilityAction; // code 10 exists = metal already burned & ability unused
+                  const used = !player.charAbility1;
+                  const burnAction = actions?.find((a) => a.code === 5 && a.metalIndex === metal1);
+                  const canBurn = !!burnAction;
+                  const isFlare = canBurn && !hasBurns;
+
+                  if (used) {
+                    return <button className="action-btn disabled" disabled>Ability I (used)</button>;
+                  }
+                  if (ready) {
+                    return <button className="action-btn" onClick={() => onAction!(ready.index)}>Use Ability I</button>;
+                  }
+                  if (canBurn && onCompositeAction) {
+                    const verb = isFlare ? "Flare" : "Burn";
+                    return (
+                      <button
+                        className={`action-btn${isFlare ? " flare-btn" : ""}`}
+                        onClick={() => onCompositeAction(burnAction!.index, (newActions) =>
+                          newActions.find((a) => a.code === 10)?.index
+                        )}
+                      >
+                        {verb} + Ability I
+                      </button>
+                    );
+                  }
+                  return <button className="action-btn disabled" disabled>Ability I (no metal)</button>;
+                })()}
+                {showAbility3 && (() => {
+                  const ready = thirdAbilityAction; // code 11 exists
+                  const used = !player.charAbility3;
+                  const burnAction = actions?.find((a) => a.code === 5 && a.metalIndex === 8);
+                  const canBurn = !!burnAction;
+
+                  if (used) {
+                    return <button className="action-btn disabled" disabled>Ability III (used)</button>;
+                  }
+                  if (ready) {
+                    return <button className="action-btn" onClick={() => onAction!(ready.index)}>Use Ability III</button>;
+                  }
+                  if (canBurn && onCompositeAction) {
+                    return (
+                      <button
+                        className="action-btn"
+                        onClick={() => onCompositeAction(burnAction!.index, (newActions) =>
+                          newActions.find((a) => a.code === 11)?.index
+                        )}
+                      >
+                        Burn + Ability III
+                      </button>
+                    );
+                  }
+                  return <button className="action-btn disabled" disabled>Ability III (no atium)</button>;
+                })()}
+              </div>
+            );
+          })()}
         </div>
+      )}
+      {showDiscard && discard && (
+        <CardPileOverlay title="Your Discard" cards={discard} onClose={() => setShowDiscard(false)} />
+      )}
+      {showTrash && marketDiscard && (
+        <CardPileOverlay title="Eliminated Cards" cards={marketDiscard} onClose={() => setShowTrash(false)} />
       )}
     </div>
   );

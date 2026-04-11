@@ -153,6 +153,7 @@ class Game():
                 "hand": [c.to_dict() for c in self.market.hand],
                 "deckSize": len(self.market.cards),
                 "discardSize": len(self.market.discard),
+                "discard": [c.to_dict() for c in self.market.discard],
             },
             "missions": [m.to_dict() for m in self.missions],
             "players": [

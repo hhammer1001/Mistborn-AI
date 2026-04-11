@@ -133,6 +133,8 @@ export function Market({ market, actions, onAction }: Props) {
                 highlighted={hasBuy}
                 highlightColor={color}
                 noTypeBorder
+                cropped={card.type !== "ally"}
+                baseWidth={160}
                 onClick={hasBuy ? () => handleCardClick(card.id) : undefined}
               />
               {isSelected && hasBuy && (
