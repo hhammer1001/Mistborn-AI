@@ -577,84 +577,59 @@ class Player():
     def permDamage(self, amount):
         self.pDamage += amount
 
+    def _is_lowest(self, mission):
+        """Check if we are lowest on a mission (must be > 0, and all opponents higher)."""
+        ranks = mission.playerRanks
+        ours = ranks[self.turnOrder]
+        if ours <= 0:
+            return False
+        for i, r in enumerate(ranks):
+            if i == self.turnOrder:
+                continue
+            if r <= ours and r > 0:
+                return False
+        return True
+
+    def _is_highest(self, mission):
+        """Check if we are highest on a mission (must be > 0, and no opponent higher)."""
+        ranks = mission.playerRanks
+        ours = ranks[self.turnOrder]
+        if ours <= 0:
+            return False
+        for i, r in enumerate(ranks):
+            if i == self.turnOrder:
+                continue
+            if r >= ours and r > 0:
+                return False
+        return True
+
     def special1(self, amount=0):
-        #investigate
-        count = 0
-        for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                lowest = [1,0]
-                for i in range(len(ranks)):
-                    if i > 0 and i < ours:
-                        lowest[0] = 0
-                    elif i > ours:
-                        lowest[1] = 1
-                if lowest == [1,1]:
-                    count += 1
+        #investigate — gain 1 money per mission you're lowest on
+        count = sum(1 for m in self.game.missions if self._is_lowest(m))
         self.money(count)
 
     def special2(self, amount=0):
-        #Eavesdrop1
+        #Eavesdrop — advance 1 on every mission you're lowest on
         for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                lowest = [1,0]
-                for i in range(len(ranks)):
-                    if i > 0 and i < ours:
-                        lowest[0] = 0
-                    elif i > ours:
-                        lowest[1] = 1
-                if lowest == [1,1]:
-                    m.progress(self.turnOrder, 1)
-    
+            if self._is_lowest(m):
+                m.progress(self.turnOrder, 1)
+
     def special3(self, amount=0):
-        #Lookout
-        count = 0
-        for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                highest = True
-                for i in range(len(ranks)):
-                    if i > ours:
-                        highest = False
-                if highest:
-                    count += 1
+        #Lookout — draw a card for each mission you're highest on
+        count = sum(1 for m in self.game.missions if self._is_highest(m))
         self.draw(count)
 
-
     def special4(self, amount=0):
-        #Hyperaware
-        count = 0
-        for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                highest = True
-                for i in range(len(ranks)):
-                    if i > ours:
-                        highest = False
-                if highest:
-                    count += 1
+        #Hyperaware — gain damage for each mission you're highest on
+        count = sum(1 for m in self.game.missions if self._is_highest(m))
         self.damage(count*3)
 
     def special5(self, amount=0):
-        #Coppercloud
-        count = 0
+        #Coppercloud — draw a card if you are the lowest on any mission
         for m in self.game.missions:
-            ranks = m.playerRanks
-            ours = ranks[self.turnOrder]
-            if ours > 0:
-                highest = True
-                for i in range(len(ranks)):
-                    if i > ours:
-                        highest = False
-                if highest:
-                    count += 1
-        if count > 0:
-            self.draw(1)
+            if self._is_lowest(m):
+                self.draw(1)
+                return
 
 
     def special6(self, amount=0):
