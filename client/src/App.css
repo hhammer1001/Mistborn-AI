@@ -614,6 +614,28 @@ h3 {
   color: #000;
 }
 
+.forfeit-btn {
+  position: fixed;
+  bottom: 2.75rem;
+  right: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--red);
+  color: var(--text);
+  border: 1px solid var(--red-bright);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 100;
+}
+
+.forfeit-btn:hover {
+  background: var(--red-bright);
+}
+
 .main-menu-btn {
   position: fixed;
   bottom: 0.5rem;
@@ -2051,4 +2073,166 @@ h3 {
   margin-bottom: 0.75rem;
   font-size: 0.95rem;
   color: var(--gold);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTH SCREEN
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+  background:
+    radial-gradient(ellipse at 50% 30%, #1a152808 0%, transparent 50%),
+    var(--bg-deep);
+}
+
+.auth-screen h1 {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+
+.auth-subtitle {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: var(--bg-panel);
+  padding: 2rem 2.25rem;
+  border-radius: 10px;
+  min-width: 320px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.auth-form input {
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-zone);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.auth-info {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.auth-error {
+  color: var(--red-bright);
+  font-size: 0.85rem;
+}
+
+.auth-back {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOBBY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.room-code-display {
+  text-align: center;
+  padding: 1rem;
+}
+
+.room-code-display p {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.room-code {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: 0.3em;
+  text-shadow: 0 2px 16px rgba(201, 164, 74, 0.3);
+}
+
+.waiting-text {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+  font-style: italic;
+}
+
+.lobby-error {
+  color: var(--red-bright);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.lobby-opponent {
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 0.5rem;
+  background: var(--bg-zone);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAITING OVERLAY (opponent's turn)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.waiting-overlay {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.waiting-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.waiting-content p {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-style: italic;
+  margin: 0;
+}
+
+.waiting-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

@@ -19,17 +19,17 @@ export interface CardSprite {
 
 export const CREW_SHEET: Sheet = {
   src: `${P}10307375962418354840C29207AC69F8AA63CF05D2C21F6DD4C08D8207E9.jpg`,
-  cols: 10, rows: 3, w: 7680, h: 3212,
+  cols: 10, rows: 3, w: 3840, h: 1606,
 };
 
 export const DECK_SHEET: Sheet = {
   src: `${P}13135413059729423061344DC892AC987C52EB68024EB7CB51612AAEA7C8.jpg`,
-  cols: 10, rows: 5, w: 7680, h: 5365,
+  cols: 10, rows: 5, w: 3840, h: 2682,
 };
 
 export const TRAIN_SHEET: Sheet = {
   src: `${P}115369065496175734263557006D91E26EC106890A39303332327D47F4DB.jpg`,
-  cols: 5, rows: 4, w: 6517, h: 7244,
+  cols: 5, rows: 4, w: 3258, h: 3622,
 };
 
 // ── Card name → sprite position ────────────────────────────────────────────

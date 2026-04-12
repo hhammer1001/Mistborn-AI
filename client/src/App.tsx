@@ -1,8 +1,14 @@
 import { useState } from "react";
 import "./App.css";
 import { useGame } from "./hooks/useGame";
+import { useAuth } from "./hooks/useAuth";
+import { useLobby } from "./hooks/useLobby";
+import { useMultiplayerGame } from "./hooks/useMultiplayerGame";
 import { GameSetup } from "./components/GameSetup";
 import { CardGallery } from "./components/CardGallery";
+import { AuthScreen } from "./components/AuthScreen";
+import { Lobby } from "./components/Lobby";
+import { WaitingOverlay } from "./components/WaitingOverlay";
 import { Hand } from "./components/Hand";
 import { Market } from "./components/Market";
 import { MissionTrack } from "./components/MissionTrack";
@@ -14,49 +20,324 @@ import { TrainingTrack } from "./components/TrainingTrack";
 import { ActivityLog } from "./components/ActivityLog";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
+import type { GameState } from "./types/game";
+
+type AppMode = "menu" | "gallery" | "bot_game" | "auth" | "lobby" | "mp_game";
 
 function App() {
-  const { gameState, loading, log, createGame, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt } = useGame();
-  const [showGallery, setShowGallery] = useState(false);
+  const [mode, setMode] = useState<AppMode>("menu");
+  const [mpSessionId, setMpSessionId] = useState<string | null>(null);
+
+  // Bot game hook (always active for simplicity, only used in bot_game mode)
+  const botGame = useGame();
+
+  // Auth
+  const auth = useAuth();
+
+  // Lobby (only meaningful when authed)
+  const lobby = useLobby(auth.user?.id, auth.profile?.name ?? "Player");
+
+  // Multiplayer game
+  const mpGame = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
+
+  // ── Menu / Gallery ──
+  if (mode === "menu") {
+    return (
+      <GameSetup
+        onStart={(name, char, oppType, oppChar, botFirst, testDeck) => {
+          botGame.createGame(name, char, oppType, oppChar, botFirst, testDeck);
+          setMode("bot_game");
+        }}
+        onViewCards={() => setMode("gallery")}
+        onPlayOnline={() => {
+          if (auth.user) {
+            setMode("lobby");
+          } else {
+            setMode("auth");
+          }
+        }}
+      />
+    );
+  }
+
+  if (mode === "gallery") {
+    return <CardGallery onBack={() => setMode("menu")} />;
+  }
+
+  // ── Auth ──
+  if (mode === "auth") {
+    if (auth.isLoading) {
+      return <div className="game-setup"><h1>Loading...</h1></div>;
+    }
+    if (auth.user) {
+      // Already authed, go to lobby
+      setMode("lobby");
+      return null;
+    }
+    return (
+      <AuthScreen
+        onSendCode={(email) => auth.sendMagicCode(email)}
+        onLogin={async (email, code) => {
+          await auth.verifyMagicCode(email, code);
+          // After login, ensure profile exists — use email prefix as default name
+          const defaultName = email.split("@")[0];
+          auth.ensureProfile(defaultName);
+          setMode("lobby");
+        }}
+        error={auth.error}
+      />
+    );
+  }
+
+  // ── Lobby ──
+  if (mode === "lobby") {
+    // Check if room transitioned to in_game
+    if (lobby.room?.status === "in_game" && lobby.room.sessionId) {
+      if (mpSessionId !== lobby.room.sessionId) {
+        setMpSessionId(lobby.room.sessionId);
+        setMode("mp_game");
+        return null;
+      }
+    }
+
+    const handleStartGame = async () => {
+      if (!lobby.room || !auth.user) return;
+      try {
+        const resp = await fetch("/api/multiplayer/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roomId: lobby.room.id,
+            p0Id: lobby.room.hostId,
+            p0Name: lobby.room.hostName,
+            p0Char: lobby.room.hostCharacter,
+            p1Id: lobby.room.guestId,
+            p1Name: lobby.room.guestName,
+            p1Char: lobby.room.guestCharacter,
+          }),
+        });
+        const data = await resp.json();
+        if (data.sessionId) {
+          setMpSessionId(data.sessionId);
+          setMode("mp_game");
+        }
+      } catch (e) {
+        console.error("Failed to start game:", e);
+      }
+    };
+
+    return (
+      <Lobby
+        room={lobby.room}
+        myRole={lobby.myRole}
+        error={lobby.error}
+        isLoading={lobby.isLoading}
+        onCreateRoom={lobby.createRoom}
+        onJoinRoom={lobby.joinRoom}
+        onSelectCharacter={lobby.selectCharacter}
+        onReady={lobby.setReady}
+        onLeave={() => {
+          lobby.leaveRoom();
+        }}
+        onStartGame={handleStartGame}
+        onBack={() => setMode("menu")}
+      />
+    );
+  }
+
+  // ── Bot Game ──
+  if (mode === "bot_game") {
+    return (
+      <BotGameBoard
+        game={botGame}
+        onMainMenu={() => {
+          setMode("menu");
+          window.location.reload();
+        }}
+      />
+    );
+  }
+
+  // ── Multiplayer Game ──
+  if (mode === "mp_game") {
+    return (
+      <MultiplayerGameBoard
+        game={mpGame}
+        onMainMenu={() => {
+          setMpSessionId(null);
+          lobby.leaveRoom();
+          setMode("menu");
+        }}
+      />
+    );
+  }
+
+  return null;
+}
+
+// ── Bot Game Board (existing behavior, extracted) ──
+
+function BotGameBoard({
+  game,
+  onMainMenu,
+}: {
+  game: ReturnType<typeof useGame>;
+  onMainMenu: () => void;
+}) {
+  const { gameState, loading, log, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt } = game;
 
   const handleAction = (index: number) => {
     if (!loading) playAction(index);
   };
 
-  // Setup / gallery screen
   if (!gameState) {
-    if (showGallery) {
-      return <CardGallery onBack={() => setShowGallery(false)} />;
-    }
-    return (
-      <GameSetup
-        onStart={(name, char, oppType, oppChar, botFirst, testDeck) =>
-          createGame(name, char, oppType, oppChar, botFirst, testDeck)
-        }
-        onViewCards={() => setShowGallery(true)}
-      />
-    );
+    return <div className="game-setup"><h1>Loading...</h1></div>;
   }
 
   const you = gameState.players[0];
   const opp = gameState.players[1];
   const actions = gameState.availableActions;
 
-  // Game over screen
   if (gameState.phase === "game_over") {
     return (
       <div className="game-over">
         <h1>Game Over</h1>
-        <h2>
-          {gameState.winner === you.name ? "You Win!" : `${gameState.winner} Wins`}
-        </h2>
+        <h2>{gameState.winner === you.name ? "You Win!" : `${gameState.winner} Wins`}</h2>
         <p>Victory: {gameState.victoryType} | Turns: {gameState.turnCount}</p>
         <p>Your HP: {you.health} | Opponent HP: {opp.health}</p>
-        <button onClick={() => window.location.reload()}>New Game</button>
+        <button onClick={onMainMenu}>New Game</button>
       </div>
     );
   }
 
+  return (
+    <GameBoard
+      gameState={gameState}
+      you={you}
+      opp={opp}
+      actions={actions}
+      loading={loading}
+      log={log}
+      isMyTurn={true}
+      handleAction={handleAction}
+      playTwoActions={playTwoActions}
+      advanceAllMission={advanceAllMission}
+      assignDamage={assignDamage}
+      resolveSense={resolveSense}
+      resolveCloud={resolveCloud}
+      respondToPrompt={respondToPrompt}
+      onMainMenu={onMainMenu}
+    />
+  );
+}
+
+// ── Multiplayer Game Board ──
+
+function MultiplayerGameBoard({
+  game,
+  onMainMenu,
+}: {
+  game: ReturnType<typeof useMultiplayerGame>;
+  onMainMenu: () => void;
+}) {
+  const { gameState, loading, log, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit } = game;
+
+  const handleAction = (index: number) => {
+    if (!loading && isMyTurn) playAction(index);
+  };
+
+  if (!gameState) {
+    return <div className="game-setup"><h1>Loading game...</h1></div>;
+  }
+
+  const mi = myPlayerIndex ?? 0;
+  const you = gameState.players[mi];
+  const opp = gameState.players[1 - mi];
+  const actions = isMyTurn ? gameState.availableActions : [];
+
+  if (gameState.phase === "game_over") {
+    const iWon = gameState.isWinner ?? (gameState.winner === you.name);
+    return (
+      <div className="game-over">
+        <h1>Game Over</h1>
+        <h2>{iWon ? "You Win!" : `${opp.name} Wins`}</h2>
+        <p>Victory: {gameState.victoryType} | Turns: {gameState.turnCount}</p>
+        <p>Your HP: {you.health} | Opponent HP: {opp.health}</p>
+        <button onClick={onMainMenu}>Main Menu</button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <GameBoard
+        gameState={gameState}
+        you={you}
+        opp={opp}
+        actions={actions}
+        loading={loading}
+        log={log}
+        isMyTurn={isMyTurn}
+        handleAction={handleAction}
+        playTwoActions={playTwoActions}
+        advanceAllMission={advanceAllMission}
+        assignDamage={assignDamage}
+        resolveSense={resolveSense}
+        resolveCloud={resolveCloud}
+        respondToPrompt={respondToPrompt}
+        onMainMenu={onMainMenu}
+        onForfeit={forfeit}
+        isMultiplayer
+      />
+      {!isMyTurn && gameState.phase !== "game_over" && (
+        <WaitingOverlay opponentName={opp.name} phase={gameState.phase} />
+      )}
+    </>
+  );
+}
+
+// ── Shared Game Board ──
+
+import type { LogEntry } from "./hooks/useGame";
+import type { PlayerData, GameAction } from "./types/game";
+
+function GameBoard({
+  gameState,
+  you,
+  opp,
+  actions,
+  loading,
+  log,
+  isMyTurn,
+  handleAction,
+  playTwoActions,
+  advanceAllMission,
+  assignDamage,
+  resolveSense,
+  resolveCloud,
+  respondToPrompt,
+  onMainMenu,
+  onForfeit,
+  isMultiplayer,
+}: {
+  gameState: GameState;
+  you: PlayerData;
+  opp: PlayerData;
+  actions: GameAction[];
+  loading: boolean;
+  log: LogEntry[];
+  isMyTurn: boolean;
+  handleAction: (index: number) => void;
+  playTwoActions: (first: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  advanceAllMission: (name: string) => void;
+  assignDamage: (targetIndex: number) => void | Promise<unknown>;
+  resolveSense: (use: boolean) => void | Promise<unknown>;
+  resolveCloud: (cardId: number) => void | Promise<unknown>;
+  respondToPrompt: (type: string, value: number) => void | Promise<unknown>;
+  onMainMenu: () => void;
+  onForfeit?: () => void;
+  isMultiplayer?: boolean;
+}) {
   return (
     <div className="game-board">
       <div className="board-left">
@@ -96,7 +377,7 @@ function App() {
         <MissionTrack missions={gameState.missions} actions={actions} onAction={handleAction} onAdvanceAll={(name) => { if (!loading) advanceAllMission(name); }} missionPoints={you.mission} />
         <ActivityLog log={log} />
         <div className="right-footer">
-          {gameState.phase === "damage" ? (
+          {gameState.phase === "damage" && isMyTurn ? (
             <DamagePhase
               damage={you.damage}
               targets={gameState.damageTargets ?? []}
@@ -107,20 +388,26 @@ function App() {
           )}
           <div className="turn-info">
             <span>Turn {gameState.turnCount}</span>
+            {isMultiplayer && <span>{isMyTurn ? " — Your Turn" : " — Opponent's Turn"}</span>}
             {loading && <span className="loading">...</span>}
           </div>
-          <button className="main-menu-btn" onClick={() => window.location.reload()}>
+          {onForfeit && (
+            <button className="forfeit-btn" onClick={onForfeit}>
+              Forfeit
+            </button>
+          )}
+          <button className="main-menu-btn" onClick={onMainMenu}>
             Main Menu
           </button>
         </div>
       </div>
-      {gameState.prompt && (
+      {gameState.prompt && isMyTurn && (
         <PromptDialog
           prompt={gameState.prompt}
           onRespond={(type, value) => respondToPrompt(type, value)}
         />
       )}
-      {gameState.phase === "sense_defense" && gameState.senseCards && (
+      {gameState.phase === "sense_defense" && gameState.senseCards && isMyTurn && (
         <div className="modal-overlay">
           <div className="modal-dialog">
             <h3>Sense Defense</h3>
@@ -143,7 +430,7 @@ function App() {
           </div>
         </div>
       )}
-      {gameState.phase === "cloud_defense" && gameState.cloudCards && (
+      {gameState.phase === "cloud_defense" && gameState.cloudCards && isMyTurn && (
         <div className="modal-overlay">
           <div className="modal-dialog">
             <h3>Cloud Defense</h3>

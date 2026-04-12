@@ -18,9 +18,10 @@ interface Props {
     testDeck: boolean
   ) => void;
   onViewCards: () => void;
+  onPlayOnline?: () => void;
 }
 
-export function GameSetup({ onStart, onViewCards }: Props) {
+export function GameSetup({ onStart, onViewCards, onPlayOnline }: Props) {
   const [playerName, setPlayerName] = useState("Player");
   const [character, setCharacter] = useState("Random");
   const [opponentType, setOpponentType] = useState("twonky");
@@ -108,8 +109,13 @@ export function GameSetup({ onStart, onViewCards }: Props) {
         <button
           onClick={handleStart}
         >
-          Start Game
+          Play vs Bot
         </button>
+        {onPlayOnline && (
+          <button onClick={onPlayOnline}>
+            Play Online
+          </button>
+        )}
         <button className="view-cards-btn" onClick={onViewCards}>
           View All Cards
         </button>

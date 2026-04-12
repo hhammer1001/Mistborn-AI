@@ -19,6 +19,7 @@ export default defineConfig({
             const ext = path.extname(filename).toLowerCase()
             const contentType = (ext === '.jpg' || ext === '.jpeg') ? 'image/jpeg' : 'image/png'
             res.setHeader('Content-Type', contentType)
+            res.setHeader('Cache-Control', 'public, max-age=86400, immutable')
             fs.createReadStream(filePath).pipe(res)
           } else {
             next()
@@ -29,6 +30,7 @@ export default defineConfig({
   ],
   server: {
     port: 5200,
+    allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:8000',
       '/ws': {

@@ -139,4 +139,9 @@ export interface GameState {
   botLog?: BotLogEntry[];
   playerLog?: BotLogEntry[];
   prompt?: GamePrompt;
+  // Multiplayer fields
+  activePlayer?: number;
+  myPlayerIndex?: number;
+  isMyTurn?: boolean;
+  isWinner?: boolean;
 }
