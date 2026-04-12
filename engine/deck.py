@@ -121,14 +121,28 @@ class PlayerDeck(Deck):
     
 
 class Market(Deck):
-    def __init__(self, game):
+    def __init__(self, game, test_deck=False):
         super().__init__(game)
-        with open(DATA_DIR / 'marketdeck.csv', newline='') as csvfile:
-            lines = csv.reader(csvfile, delimiter=',', quotechar='|')
-            for row in lines:
-                self.cards += [self.dataToCard(row)]
+        if test_deck:
+            self._build_test_deck()
+        else:
+            with open(DATA_DIR / 'marketdeck.csv', newline='') as csvfile:
+                lines = csv.reader(csvfile, delimiter=',', quotechar='|')
+                for row in lines:
+                    self.cards += [self.dataToCard(row)]
         random.shuffle(self.cards)
-        self.draw(6)  
+        self.draw(6)
+
+    def _build_test_deck(self):
+        # 10x Houselord (cost 3, tin ally): 3,Houselord,3,1,M,2,C,1,2,,,,,
+        # 10x Pickpocket (cost 3, iron ally): 3,Pickpocket,3,6,M,1,pull,1,2,,,,,
+        # 10x Preserve (cost 4 instead of 8, atium action): 2,Preserve,4,8,Mi.D,5.2,,,,,,,,
+        for _ in range(10):
+            self.cards.append(self.dataToCard(['3', 'Houselord', '3', '1', 'M', '2', 'C', '1', '2', '', '', '', '', '']))
+        for _ in range(10):
+            self.cards.append(self.dataToCard(['3', 'Pickpocket', '3', '6', 'M', '1', 'pull', '1', '2', '', '', '', '', '']))
+        for _ in range(10):
+            self.cards.append(self.dataToCard(['2', 'Preserve', '4', '8', 'Mi.D', '5.2', '', '', '', '', '', '', '', '']))  
     
     def buy(self, choice):
         self.hand.remove(choice)

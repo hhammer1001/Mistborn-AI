@@ -26,6 +26,8 @@ class CreateGameRequest(BaseModel):
     character: str = "Kelsier"
     opponentType: str = "twonky"
     opponentCharacter: str = "Shan"
+    botFirst: bool = True
+    testDeck: bool = False
 
 
 class ActionRequest(BaseModel):
@@ -64,6 +66,8 @@ def create_game(req: CreateGameRequest):
         character=req.character,
         opponent_type=req.opponentType,
         opponent_character=req.opponentCharacter,
+        bot_first=req.botFirst,
+        test_deck=req.testDeck,
     )
     return session.get_state()
 

@@ -118,6 +118,18 @@ h3 {
   gap: 0.35rem;
   font-size: 0.8rem;
   font-weight: 500;
+}
+
+.setup-form .toggle-row {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.setup-form .toggle-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
   color: var(--text-dim);
   letter-spacing: 0.02em;
 }
@@ -887,9 +899,13 @@ h3 {
   flex-direction: column;
   gap: 0.2rem;
   min-width: 120px;
+  max-height: 80vh;
+  overflow-y: auto;
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
   margin-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
 }
 
 .hand-action-btn {
@@ -1428,10 +1444,12 @@ h3 {
 
 .card-pile-scroll {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.4rem;
-  overflow-y: auto;
-  max-height: 60vh;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
 }
 
 .card-pile-hint {
@@ -1832,8 +1850,13 @@ h3 {
   padding: 0 0.1rem;
 }
 
+.mission-advance-btns {
+  display: flex;
+  gap: 0.2rem;
+}
+
 .mission-advance-btn {
-  width: 100%;
+  flex: 1;
   text-align: center;
   font-size: 0.6rem;
   padding: 0.2rem;

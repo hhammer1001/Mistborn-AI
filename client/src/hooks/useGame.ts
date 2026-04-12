@@ -46,7 +46,9 @@ export function useGame() {
       pName: string,
       character: string,
       opponentType: string,
-      opponentCharacter: string
+      opponentCharacter: string,
+      botFirst: boolean = true,
+      testDeck: boolean = false
     ) => {
       setLoading(true);
       setError(null);
@@ -62,11 +64,24 @@ export function useGame() {
             character,
             opponentType,
             opponentCharacter,
+            botFirst,
+            testDeck,
           }),
         });
         const data: GameState = await resp.json();
         setGameState(data);
-        setLog([{ turn: data.turnCount, text: "Game started" }]);
+        const initLog: LogEntry[] = [{ turn: 1, text: "Game started" }];
+        const bName = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
+        if (data.botLog && data.botLog.length > 0) {
+          initLog.push({ turn: 1, text: `${bName}'s turn`, isBot: true });
+          for (const entry of data.botLog) {
+            initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          }
+        }
+        if (data.turnCount > 1) {
+          initLog.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        }
+        setLog(initLog);
         return data;
       } catch (e) {
         setError(String(e));
@@ -147,6 +162,23 @@ export function useGame() {
       }
     },
     [gameState]
+  );
+
+  const advanceAllMission = useCallback(
+    async (missionName: string) => {
+      if (!gameState) return;
+      let current: GameState | null = gameState;
+      // Keep advancing until no more mission action for this mission exists
+      while (current) {
+        const action = current.availableActions.find(
+          (a) => a.code === 1 && a.missionName === missionName
+        );
+        if (!action) break;
+        current = await playAction(action.index);
+        if (!current || current.phase === "game_over") break;
+      }
+    },
+    [gameState, playAction]
   );
 
   const playTwoActions = useCallback(
@@ -406,6 +438,7 @@ export function useGame() {
     log,
     createGame,
     playAction,
+    advanceAllMission,
     playTwoActions,
     assignDamage,
     resolveSense,

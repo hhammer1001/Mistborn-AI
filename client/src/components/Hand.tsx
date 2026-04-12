@@ -3,9 +3,39 @@ import { createPortal } from "react-dom";
 import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
 import { METAL_ICONS } from "../data/metalIcons";
-import { MetalChoicePopup } from "./MetalChoicePopup";
+import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
+
+const ATIUM_ICON_SRC = "/cards/atium%20token.png";
+
+function InlineMetalChoice({ onChoose }: { onChoose: (metalIndex: number) => void }) {
+  return (
+    <div className="inline-metal-choice">
+      {METAL_NAMES.map((name, i) => {
+        const icon = i < 8 ? METAL_ICONS[name]?.flat : ATIUM_ICON_SRC;
+        return (
+          <button
+            key={i}
+            className="hand-action-btn"
+            onClick={(e) => { e.stopPropagation(); onChoose(i); }}
+            title={`Burn as ${name}`}
+          >
+            {icon && <img className="hand-action-metal-icon" src={icon} alt="" draggable={false} />}
+            <span>{name}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
+const ATIUM_ICON = "/cards/atium%20token.png";
+
+function metalIcon(metalIndex: number): string | undefined {
+  if (metalIndex === 8) return ATIUM_ICON;
+  const name = METAL_NAMES[metalIndex];
+  return name ? METAL_ICONS[name]?.flat : undefined;
+}
 
 /** A composite action that fires two sequential API actions */
 export interface CompositeAction {
@@ -92,20 +122,21 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
     const menuH = menu.offsetHeight;
     const menuW = menu.offsetWidth;
 
+    const clampedH = Math.min(menuH, window.innerHeight * 0.8);
     let left = rect.left + rect.width / 2 - menuW / 2;
-    let top = rect.top - menuH - 6;
+    let top = rect.top - clampedH - 6;
 
     const margin = 8;
     if (left + menuW > window.innerWidth - margin) left = window.innerWidth - margin - menuW;
     if (left < margin) left = margin;
     if (top < margin) top = rect.bottom + 6;
+    if (top + clampedH > window.innerHeight - margin) top = window.innerHeight - margin - clampedH;
 
     setPos({ left, top });
-  }, [anchorRef]);
+  }, [anchorRef, showAtiumBurnPopup]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
-      // Don't close if clicking inside the menu
       if (menuRef.current?.contains(e.target as Node)) return;
       onClose();
     };
@@ -133,15 +164,28 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
       onClick={(e) => e.stopPropagation()}
     >
       {(() => {
-        // Group atium card burns (code 2, 9 metals) into single button
-        const atiumBurns = actions.filter((a) => a.code === 2 && actions.filter((b) => b.code === 2).length > 2);
-        const normalActions = atiumBurns.length > 2
-          ? actions.filter((a) => !(a.code === 2 && atiumBurns.includes(a)))
+        const code2Actions = actions.filter((a) => a.code === 2);
+        const isAtiumCard = code2Actions.length > 2;
+
+        // When metal choice is active, show ONLY the 9 metal buttons
+        if (showAtiumBurnPopup && isAtiumCard) {
+          return (
+            <InlineMetalChoice
+              onChoose={(metalIndex) => {
+                const burnAction = code2Actions.find((a) => a.metalIndex === metalIndex);
+                if (burnAction) { onAction(burnAction.index); onClose(); }
+              }}
+            />
+          );
+        }
+
+        const normalActions = isAtiumCard
+          ? actions.filter((a) => a.code !== 2)
           : actions;
 
         return (
           <>
-            {atiumBurns.length > 2 && (
+            {isAtiumCard && (
               <button
                 className="hand-action-btn"
                 onClick={(e) => { e.stopPropagation(); setShowAtiumBurnPopup(true); }}
@@ -166,21 +210,10 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
                 </button>
               );
             })}
-            {showAtiumBurnPopup && (
-              <MetalChoicePopup
-                title="Burn card as..."
-                onChoose={(metalIndex) => {
-                  const burnAction = atiumBurns.find((a) => a.metalIndex === metalIndex);
-                  if (burnAction) onAction(burnAction.index);
-                  onClose();
-                }}
-                onClose={() => setShowAtiumBurnPopup(false)}
-              />
-            )}
           </>
         );
       })()}
-      {composites.map((c, i) => (
+      {!showAtiumBurnPopup && composites.map((c, i) => (
         <button
           key={`composite-${i}`}
           className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
@@ -224,7 +257,7 @@ function getCompositeActions(
     const isFlare = burnCount >= player.burns;
     const verb = isFlare ? "Flare" : "Burn";
     const metalName = METAL_NAMES[cardMetal];
-    const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
+    const icon = metalIcon(cardMetal);
     composites.push({
       textBefore: verb,
       textAfter: "+ add",
@@ -241,14 +274,20 @@ function getCompositeActions(
   }
 
   // 2) "Burn [other card] + add to this card" — if another card can be burned for this metal
+  //    For stacked cards (count > 1), allow burning one copy of the same card
   const burnCardActions = actions.filter(
-    (a) => a.code === 2 && a.metalIndex === cardMetal && a.cardId !== undefined && !allIds.includes(a.cardId)
+    (a) => a.code === 2 && a.metalIndex === cardMetal && a.cardId !== undefined
+           && (allIds.length > 1 ? a.cardId !== allIds[0] : !allIds.includes(a.cardId))
   );
+  // Deduplicate by source card name (stacked cards generate duplicate actions)
+  const seenSources = new Set<string>();
   for (const burnAction of burnCardActions) {
-    // Find the source card name
     const sourceCard = player.hand.find((c) => c.id === burnAction.cardId);
+    const sourceName = sourceCard?.name ?? "card";
+    if (seenSources.has(sourceName)) continue;
+    seenSources.add(sourceName);
     const metalName = METAL_NAMES[cardMetal];
-    const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
+    const icon = metalIcon(cardMetal);
     composites.push({
       textBefore: `Burn ${sourceCard?.name ?? "card"}`,
       textAfter: "+ add",
@@ -278,6 +317,8 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
     setSelectedGroup((prev) => prev === groupId ? null : groupId);
   }, []);
 
+  const scrollRef = useHorizontalScroll<HTMLDivElement>();
+
   const handleClose = useCallback(() => {
     setSelectedGroup(null);
   }, []);
@@ -285,7 +326,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
   return (
     <div className="hand-zone">
       <h3>Your Hand <span className="subtle">Deck: {deckSize ?? "?"} | Discard: {discardSize ?? "?"}</span></h3>
-      <div className="card-row">
+      <div className="card-row" ref={scrollRef}>
         {groups.map((group) => {
           const groupActions = getGroupActions(group.allIds);
           const composites = getCompositeActions(group.card, group.allIds, actions, player);

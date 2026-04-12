@@ -6,12 +6,16 @@ interface Props {
   missions: MissionData[];
   actions: GameAction[];
   onAction: (index: number) => void;
+  onAdvanceAll: (missionName: string) => void;
+  missionPoints: number;
 }
 
-function MissionColumn({ mission, action, onAction, scale }: {
+function MissionColumn({ mission, action, onAction, onAdvanceAll, missionPoints, scale }: {
   mission: MissionData;
   action?: GameAction;
   onAction: (index: number) => void;
+  onAdvanceAll: (missionName: string) => void;
+  missionPoints: number;
   scale: number;
 }) {
   const you = mission.playerRanks[0];
@@ -75,18 +79,28 @@ function MissionColumn({ mission, action, onAction, scale }: {
         <span className="mission-col-label-first">1st</span>
       </div>
       {action && (
-        <button
-          className="action-btn mission-advance-btn"
-          onClick={() => onAction(action.index)}
-        >
-          Advance
-        </button>
+        <div className="mission-advance-btns">
+          <button
+            className="action-btn mission-advance-btn"
+            onClick={() => onAction(action.index)}
+          >
+            +1
+          </button>
+          {missionPoints > 1 && (
+            <button
+              className="action-btn mission-advance-btn"
+              onClick={() => onAdvanceAll(mission.name)}
+            >
+              +All
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-export function MissionTrack({ missions, actions, onAction }: Props) {
+export function MissionTrack({ missions, actions, onAction, onAdvanceAll, missionPoints }: Props) {
   const missionActions = actions.filter((a) => a.code === 1);
   const scale = useUIScale();
 
@@ -102,6 +116,8 @@ export function MissionTrack({ missions, actions, onAction }: Props) {
               mission={m}
               action={action}
               onAction={onAction}
+              onAdvanceAll={onAdvanceAll}
+              missionPoints={missionPoints}
               scale={scale}
             />
           );

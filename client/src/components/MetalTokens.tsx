@@ -22,12 +22,16 @@ export function MetalTokens({ player, actions, onAction }: Props) {
   const handleAtiumChoice = (metalIndex: number) => {
     // metal 0-7: use code 12 (atium as that metal)
     // metal 8: use code 5 with metal=8 (atium as atium)
+    let act;
     if (metalIndex < 8) {
-      const act = atiumActions.find((a) => a.metalIndex === metalIndex);
-      if (act) onAction(act.index);
+      act = atiumActions.find((a) => a.metalIndex === metalIndex);
     } else {
-      const act = burnActions.find((a) => a.metalIndex === 8);
-      if (act) onAction(act.index);
+      act = burnActions.find((a) => a.metalIndex === 8);
+    }
+    if (act) {
+      const idx = act.index;
+      setShowAtiumPopup(false);
+      setTimeout(() => onAction(idx), 0);
     }
   };
 
@@ -76,8 +80,8 @@ export function MetalTokens({ player, actions, onAction }: Props) {
                   draggable={false}
                 />
               )}
-              <span className={`metal-avail${available > 0 ? " has-metal" : ""}`}>
-                {available}
+              <span className={`metal-avail${player.metalBurned[i] > 0 ? " has-metal" : ""}`}>
+                {player.metalBurned[i]}/{available}
               </span>
             </div>
           );

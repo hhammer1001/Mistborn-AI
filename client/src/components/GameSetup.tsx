@@ -13,7 +13,9 @@ interface Props {
     playerName: string,
     character: string,
     opponentType: string,
-    opponentCharacter: string
+    opponentCharacter: string,
+    botFirst: boolean,
+    testDeck: boolean
   ) => void;
   onViewCards: () => void;
 }
@@ -23,15 +25,16 @@ export function GameSetup({ onStart, onViewCards }: Props) {
   const [character, setCharacter] = useState("Random");
   const [opponentType, setOpponentType] = useState("twonky");
   const [opponentCharacter, setOpponentCharacter] = useState("Random");
+  const [botFirst, setBotFirst] = useState(true);
+  const [testDeck, setTestDeck] = useState(false);
 
   const handleStart = () => {
     const playerChar = character === "Random" ? pickRandom(CHARACTERS) : character;
     let oppChar = opponentCharacter === "Random" ? pickRandom(CHARACTERS) : opponentCharacter;
-    // Avoid same character for both players
     while (oppChar === playerChar) {
       oppChar = pickRandom(CHARACTERS);
     }
-    onStart(playerName, playerChar, opponentType, oppChar);
+    onStart(playerName, playerChar, opponentType, oppChar, botFirst, testDeck);
   };
 
   return (
@@ -84,6 +87,24 @@ export function GameSetup({ onStart, onViewCards }: Props) {
             ))}
           </select>
         </label>
+        <div className="toggle-row">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={botFirst}
+              onChange={(e) => setBotFirst(e.target.checked)}
+            />
+            Bot goes first
+          </label>
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={testDeck}
+              onChange={(e) => setTestDeck(e.target.checked)}
+            />
+            Test deck
+          </label>
+        </div>
         <button
           onClick={handleStart}
         >

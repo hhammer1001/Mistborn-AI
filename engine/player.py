@@ -218,7 +218,7 @@ class Player():
             case 1:
                 sense = game.senseCheck(self)
                 if sense > 0:
-                    self.curMission = max(self.curMission - sense, 0)
+                    self.curMission -= sense  # can go negative
                 else:
                     self.curMission -= 1
                     action[1].progress(self.turnOrder, 1)
@@ -290,6 +290,7 @@ class Player():
             case 14:
                 self.curMoney = 0
                 self.curBoxings -= action[2]
+                self.charAbility2 = False
                 game.market.discard += [action[1]]
                 game.market.buy(action[1])
                 action[1].ability1(self)

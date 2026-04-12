@@ -16,7 +16,7 @@ import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 
 function App() {
-  const { gameState, loading, log, createGame, playAction, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt } = useGame();
+  const { gameState, loading, log, createGame, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt } = useGame();
   const [showGallery, setShowGallery] = useState(false);
 
   const handleAction = (index: number) => {
@@ -30,8 +30,8 @@ function App() {
     }
     return (
       <GameSetup
-        onStart={(name, char, oppType, oppChar) =>
-          createGame(name, char, oppType, oppChar)
+        onStart={(name, char, oppType, oppChar, botFirst, testDeck) =>
+          createGame(name, char, oppType, oppChar, botFirst, testDeck)
         }
         onViewCards={() => setShowGallery(true)}
       />
@@ -93,7 +93,7 @@ function App() {
       <div className="board-right">
         <PlayerInfo player={opp} isOpponent />
         <AllyZone allies={opp.allies} actions={[]} onAction={() => {}} label="Opponent Allies" />
-        <MissionTrack missions={gameState.missions} actions={actions} onAction={handleAction} />
+        <MissionTrack missions={gameState.missions} actions={actions} onAction={handleAction} onAdvanceAll={(name) => { if (!loading) advanceAllMission(name); }} missionPoints={you.mission} />
         <ActivityLog log={log} />
         <div className="right-footer">
           {gameState.phase === "damage" ? (
@@ -124,7 +124,11 @@ function App() {
         <div className="modal-overlay">
           <div className="modal-dialog">
             <h3>Sense Defense</h3>
-            <p>You have a Sense card ({gameState.senseCards.map(c => c.name).join(", ")}). Use it to block opponent mission advances this turn?</p>
+            {gameState.senseCards.map(c => (
+              <p key={c.cardId}>
+                <strong>{c.name}</strong> — blocks <strong>{c.amount}</strong> mission per advance (can go negative)
+              </p>
+            ))}
             <p className="modal-note">If the opponent advances a mission, your card will be discarded to block it.</p>
             <div className="modal-actions">
               <button className="action-btn" style={{borderColor: "var(--blue-bright)"}}

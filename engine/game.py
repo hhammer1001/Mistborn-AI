@@ -34,9 +34,10 @@ if ans in ['y', 'Y']:
 
 class Game():
 
-    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], players=False, randos=False, analysisMode=False, bots=[], mults=[]):
+    def __init__(self, names = ["Kaladin", 'Jasnah'], numPlayers=2, randChars=False, chars = ['Kelsier', 'Shan'], players=False, randos=False, analysisMode=False, bots=[], mults=[], **kwargs):
         self.victoryType = ''
-        self.market = Market(self)
+        self.test_deck = kwargs.get('test_deck', False)
+        self.market = Market(self, test_deck=self.test_deck)
         self.missionTiers = {"Canton Of Orthodoxy":[[5, 'E', 1, 'E', 1],[9, 'E', 1, 'E', 1],[12, 'E', 4, 'E', 1]], 
                                 "Luthadel Garrison":[[4, 'D', 1, 'K', 1],[7, 'D', 2, 'K', 1],[10, 'D', 3, 'K', 1],[12, 'Pd', 2, 'D', 1]], 
                                 "Keep Venture":[[4, 'M', 1, 'M', 1],[6, 'M', 1, 'M', 1],[8, 'M', 1, 'M', 1],[10, 'M', 1, 'M', 1],[12, 'Pm', 2, 'M', 3],], 

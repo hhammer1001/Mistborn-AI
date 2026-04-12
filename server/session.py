@@ -105,7 +105,8 @@ class GameSession:
     """Manages a single game instance and its turn-by-turn state for the server."""
 
     def __init__(self, player_name="Player", character="Kelsier",
-                 opponent_type="twonky", opponent_character="Shan"):
+                 opponent_type="twonky", opponent_character="Shan",
+                 bot_first=True, test_deck=False):
         self.id = str(uuid.uuid4())
         self.player_name = player_name
         self.character = character
@@ -123,6 +124,7 @@ class GameSession:
             names=[player_name, f"{opponent_type.title()} Bot"],
             chars=[character, opponent_character],
             players=[WebPlayer, bot_class],
+            test_deck=test_deck,
         )
         self.human = self.game.players[0]
         self._real_bot = self.game.players[1]
@@ -130,9 +132,24 @@ class GameSession:
         self.phase = "actions"
         self._cached_raw = None
 
-        # Start human's first turn
-        self.game.turncount += 1
-        self._resolve_training()
+        if bot_first:
+            # Bot takes first turn, then human starts
+            self.game.turncount += 1
+            human_hp_before = self.human.curHealth
+            self.bot.playTurn(self.game)
+            hp_lost = human_hp_before - self.human.curHealth
+            if hp_lost > 0:
+                self._bot_log.append({"turn": self.game.turncount,
+                                      "text": f"Dealt {hp_lost} damage to you"})
+            if self.game.winner:
+                self.phase = "game_over"
+                return
+            self.game.turncount += 1
+            self._resolve_training()
+        else:
+            # Human goes first
+            self.game.turncount += 1
+            self._resolve_training()
 
     def _save_game_state(self):
         self._save_state = pickle.dumps(self.game)

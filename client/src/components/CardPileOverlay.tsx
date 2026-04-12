@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { CardData } from "../types/game";
 import { Card } from "./Card";
+import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 
 interface Props {
   title: string;
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export function CardPileOverlay({ title, cards, onClose }: Props) {
+  const scrollRef = useHorizontalScroll<HTMLDivElement>();
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       // Right-click on a card is handled by Card component — don't close
@@ -35,7 +38,7 @@ export function CardPileOverlay({ title, cards, onClose }: Props) {
         {cards.length === 0 ? (
           <p className="card-pile-empty">Empty</p>
         ) : (
-          <div className="card-pile-scroll">
+          <div className="card-pile-scroll" ref={scrollRef}>
             {cards.map((card, i) => (
               <Card key={`${card.id}-${i}`} card={card} />
             ))}
