@@ -123,13 +123,22 @@ export function useMultiplayerGame(
 
   const playTwoActions = useCallback(
     async (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
+      if (!gameState) return;
+      // Run findSecond against a dummy to extract what it's looking for,
+      // then use the composite endpoint so both actions happen in one server call.
+      // To get the matcher, we peek at what findSecond would match by running it
+      // against the current actions with the first action removed.
+      // But we can't know the exact new actions list without the server.
+      // So: use the single action endpoint to get the intermediate state,
+      // then fire the second action. Both are fast since the first already saved.
       const afterFirst = await _playActionRaw(firstIndex);
       if (!afterFirst) return;
       const secondIndex = findSecond(afterFirst.availableActions);
       if (secondIndex === undefined) return;
+      // Second action uses the already-saved state, so just one more call
       await _playActionRaw(secondIndex);
     },
-    [_playActionRaw]
+    [gameState, _playActionRaw]
   );
 
   const respondToPrompt = useCallback(

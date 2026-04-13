@@ -183,6 +183,16 @@ class MPActionRequest(BaseModel):
     actionIndex: int
 
 
+class MPCompositeActionRequest(BaseModel):
+    sessionId: str
+    playerId: str
+    actionIndex: int
+    # Matcher for a follow-up action after the first completes
+    secondCode: int | None = None
+    secondMetalIndex: int | None = None
+    secondCardId: int | None = None
+
+
 class MPPromptRequest(BaseModel):
     sessionId: str
     playerId: str
@@ -315,6 +325,42 @@ def mp_play_action(req: MPActionRequest):
         _save_mp_session(req.sessionId, session)
         log.info(f"  -> phase={session.phase} active={session.active_player}")
         # Return the acting player's state so the client can chain composite actions
+        return {"ok": True, "state": session.get_state(pi)}
+    except Exception as e:
+        log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
+
+
+@app.post("/api/multiplayer/composite-action")
+def mp_composite_action(req: MPCompositeActionRequest):
+    """Play an action, then optionally find and play a matching follow-up. One round trip."""
+    log.info(f"MP COMPOSITE session={req.sessionId[:8]} index={req.actionIndex} second={req.secondCode}")
+    try:
+        session, record = _load_mp_session(req.sessionId)
+        if not session:
+            return {"error": "Game not found"}
+        pi = _resolve_player_index(record, req.playerId)
+
+        # Play first action
+        result = session.play_action(pi, req.actionIndex)
+        if result and "error" in result:
+            return result
+
+        # If a second action matcher is provided and we're still in actions phase, find and play it
+        if req.secondCode is not None and session.phase == "actions":
+            state = session.get_state(pi)
+            for a in state.get("availableActions", []):
+                if a["code"] != req.secondCode:
+                    continue
+                if req.secondMetalIndex is not None and a.get("metalIndex") != req.secondMetalIndex:
+                    continue
+                if req.secondCardId is not None and a.get("cardId") != req.secondCardId:
+                    continue
+                # Found the match — play it
+                session.play_action(pi, a["index"])
+                break
+
+        _save_mp_session(req.sessionId, session)
         return {"ok": True, "state": session.get_state(pi)}
     except Exception as e:
         log.error(f"  -> ERROR: {e}\n{traceback.format_exc()}")

@@ -35,7 +35,7 @@ function App() {
   const auth = useAuth();
 
   // Lobby (only meaningful when authed)
-  const lobby = useLobby(auth.user?.id, auth.profile?.name ?? "Player");
+  const lobby = useLobby(auth.user?.id, auth.profile?.name);
 
   // Multiplayer game
   const mpGame = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
