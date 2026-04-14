@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { GameState, GameAction } from "../types/game";
-
-const API_BASE = "";
+import { GameSession } from "../engine/session";
+import { resetCardIds } from "../engine/card";
 
 export interface LogEntry {
   turn: number;
@@ -40,9 +40,10 @@ export function useGame() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const playerName = useRef("Player");
   const botName = useRef("Bot");
+  const sessionRef = useRef<GameSession | null>(null);
 
   const createGame = useCallback(
-    async (
+    (
       pName: string,
       character: string,
       opponentType: string,
@@ -55,21 +56,21 @@ export function useGame() {
       setLog([]);
       playerName.current = pName;
       botName.current = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
+
       try {
-        const resp = await fetch(`${API_BASE}/api/games`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            playerName: pName,
-            character,
-            opponentType,
-            opponentCharacter,
-            botFirst,
-            testDeck,
-          }),
+        resetCardIds();
+        const session = new GameSession({
+          playerName: pName,
+          character,
+          opponentType,
+          opponentCharacter,
+          botFirst,
+          testDeck,
         });
-        const data: GameState = await resp.json();
+        sessionRef.current = session;
+        const data = session.getState() as GameState;
         setGameState(data);
+
         const initLog: LogEntry[] = [{ turn: 1, text: "Game started" }];
         const bName = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
         if (data.botLog && data.botLog.length > 0) {
@@ -94,37 +95,25 @@ export function useGame() {
   );
 
   const playAction = useCallback(
-    async (actionIndex: number) => {
-      if (!gameState) return null;
+    (actionIndex: number) => {
+      const session = sessionRef.current;
+      if (!session || !gameState) return null;
       const action = gameState.availableActions.find((a) => a.index === actionIndex);
       const desc = action?.description ?? `Action ${actionIndex}`;
       const prevTurn = gameState.turnCount;
       const pName = playerName.current;
       const bName = botName.current;
 
-      setLoading(true);
       setError(null);
       try {
-        const resp = await fetch(
-          `${API_BASE}/api/games/${gameState.sessionId}/action`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ actionIndex }),
-          }
-        );
-        const data = await resp.json();
-        if (data.error) {
-          setError(data.error);
-          return null;
-        }
+        const data = session.playAction(actionIndex);
+        if (data.error) { setError(data.error); return null; }
         setGameState(data as GameState);
 
         const newEntries: LogEntry[] = [
           { turn: prevTurn, text: `${pName} — ${desc}` },
         ];
 
-        // Player effect logs for THIS turn (abilities, buys, etc.)
         const newTurnPlayerLogs: LogEntry[] = [];
         if (data.playerLog && data.playerLog.length > 0) {
           for (const entry of data.playerLog) {
@@ -136,7 +125,6 @@ export function useGame() {
           }
         }
 
-        // If bot log entries came back, add them
         if (data.botLog && data.botLog.length > 0) {
           const botTurn = data.botLog[0]?.turn ?? prevTurn + 1;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
@@ -148,89 +136,60 @@ export function useGame() {
         if (data.turnCount > prevTurn) {
           newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
         }
-        // Append new-turn player logs after the turn header
         newEntries.push(...newTurnPlayerLogs);
 
         setLog((prev) => consolidateLog([...prev, ...newEntries]));
-
         return data;
       } catch (e) {
         setError(String(e));
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     [gameState]
   );
 
   const advanceAllMission = useCallback(
-    async (missionName: string) => {
+    (missionName: string) => {
       if (!gameState) return;
-      let current: GameState | null = gameState;
-      // Keep advancing until no more mission action for this mission exists
+      const session = sessionRef.current;
+      if (!session) return;
+
+      // Find and play all mission advances for this mission
+      let current = gameState;
       while (current) {
         const action = current.availableActions.find(
           (a) => a.code === 1 && a.missionName === missionName
         );
         if (!action) break;
-        current = await playAction(action.index);
-        if (!current || current.phase === "game_over") break;
+        const result = playAction(action.index);
+        if (!result || result.phase === "game_over") break;
+        current = result as GameState;
       }
     },
     [gameState, playAction]
   );
 
   const playTwoActions = useCallback(
-    async (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
-      const first = await playAction(firstIndex);
+    (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
+      const first = playAction(firstIndex);
       if (!first) return null;
       const secondIndex = findSecond(first.availableActions);
       if (secondIndex === undefined) return first;
-      // Fire the second action directly against the API with the fresh session
-      setLoading(true);
-      try {
-        const resp = await fetch(
-          `${API_BASE}/api/games/${first.sessionId}/action`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ actionIndex: secondIndex }),
-          }
-        );
-        const data = await resp.json();
-        if (data.error) { setError(data.error); return null; }
-        setGameState(data as GameState);
-        return data;
-      } catch (e) {
-        setError(String(e));
-        return null;
-      } finally {
-        setLoading(false);
-      }
+      return playAction(secondIndex);
     },
     [playAction]
   );
 
   const respondToPrompt = useCallback(
-    async (promptType: string, value: number) => {
-      if (!gameState) return null;
-      setLoading(true);
+    (promptType: string, value: number) => {
+      const session = sessionRef.current;
+      if (!session || !gameState) return null;
       setError(null);
       try {
-        const resp = await fetch(
-          `${API_BASE}/api/games/${gameState.sessionId}/prompt`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ promptType, value }),
-          }
-        );
-        const data = await resp.json();
+        const data = session.respondToPrompt(promptType, value);
         if (data.error) { setError(data.error); return null; }
         setGameState(data as GameState);
 
-        // Log bot actions if turn advanced
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
@@ -261,28 +220,18 @@ export function useGame() {
       } catch (e) {
         setError(String(e));
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     [gameState]
   );
 
   const assignDamage = useCallback(
-    async (targetIndex: number) => {
-      if (!gameState) return null;
-      setLoading(true);
+    (targetIndex: number) => {
+      const session = sessionRef.current;
+      if (!session || !gameState) return null;
       setError(null);
       try {
-        const resp = await fetch(
-          `${API_BASE}/api/games/${gameState.sessionId}/damage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ targetIndex }),
-          }
-        );
-        const data = await resp.json();
+        const data = session.assignDamage(targetIndex);
         if (data.error) { setError(data.error); return null; }
         setGameState(data as GameState);
 
@@ -326,25 +275,18 @@ export function useGame() {
       } catch (e) {
         setError(String(e));
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     [gameState]
   );
 
   const resolveSense = useCallback(
-    async (use: boolean) => {
-      if (!gameState) return null;
-      setLoading(true);
+    (use: boolean) => {
+      const session = sessionRef.current;
+      if (!session || !gameState) return null;
       setError(null);
       try {
-        const resp = await fetch(
-          `${API_BASE}/api/games/${gameState.sessionId}/sense`,
-          { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ use }) }
-        );
-        const data = await resp.json();
+        const data = session.resolveSense(use);
         if (data.error) { setError(data.error); return null; }
         setGameState(data as GameState);
 
@@ -356,12 +298,12 @@ export function useGame() {
           newEntries.push({ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` });
         }
 
-        if (data.playerLog && data.playerLog.length > 0) {
+        if (data.playerLog?.length) {
           for (const entry of data.playerLog) {
             newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
           }
         }
-        if (data.botLog && data.botLog.length > 0) {
+        if (data.botLog?.length) {
           const botTurn = data.botLog[0]?.turn ?? gameState.turnCount;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           for (const entry of data.botLog) {
@@ -374,22 +316,16 @@ export function useGame() {
         if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
         return data;
       } catch (e) { setError(String(e)); return null; }
-      finally { setLoading(false); }
     }, [gameState]
   );
 
   const resolveCloud = useCallback(
-    async (cardId: number) => {
-      if (!gameState) return null;
-      setLoading(true);
+    (cardId: number) => {
+      const session = sessionRef.current;
+      if (!session || !gameState) return null;
       setError(null);
       try {
-        const resp = await fetch(
-          `${API_BASE}/api/games/${gameState.sessionId}/cloud`,
-          { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cardId }) }
-        );
-        const data = await resp.json();
+        const data = session.resolveCloud(cardId);
         if (data.error) { setError(data.error); return null; }
         setGameState(data as GameState);
 
@@ -397,12 +333,12 @@ export function useGame() {
         const bName = botName.current;
         const pName = playerName.current;
 
-        if (data.playerLog && data.playerLog.length > 0) {
+        if (data.playerLog?.length) {
           for (const entry of data.playerLog) {
             newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
           }
         }
-        if (data.botLog && data.botLog.length > 0) {
+        if (data.botLog?.length) {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
@@ -413,23 +349,56 @@ export function useGame() {
         if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
         return data;
       } catch (e) { setError(String(e)); return null; }
-      finally { setLoading(false); }
     }, [gameState]
   );
 
-  const refreshState = useCallback(async () => {
-    if (!gameState) return;
-    try {
-      const resp = await fetch(
-        `${API_BASE}/api/games/${gameState.sessionId}`
-      );
-      const data = await resp.json();
-      if (data.error) { setError(data.error); return; }
-      setGameState(data as GameState);
-    } catch (e) {
-      setError(String(e));
+  const undo = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session || !session.canUndo()) return;
+
+    // Get the action history minus the last action, then rebuild
+    const history = session.getActionHistory();
+    history.pop(); // remove last action
+
+    // Recreate session with same parameters
+    resetCardIds();
+    const newSession = new GameSession({
+      playerName: playerName.current,
+      character: session.character,
+      opponentType: session.opponentType,
+      opponentCharacter: session.opponentCharacter,
+      botFirst: true, // matches original creation
+    });
+
+    // Replay all actions except the last
+    for (const idx of history) {
+      newSession.playAction(idx);
     }
-  }, [gameState]);
+
+    sessionRef.current = newSession;
+    const data = newSession.getState() as GameState;
+    setGameState(data);
+
+    // Rebuild log (simplified: just show current state)
+    setLog((prev) => {
+      // Remove last player action entry
+      const result = [...prev];
+      // Find and remove the last non-bot entry
+      for (let i = result.length - 1; i >= 0; i--) {
+        if (!result[i].isBot) {
+          result.splice(i, 1);
+          break;
+        }
+      }
+      return result;
+    });
+  }, []);
+
+  const refreshState = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    setGameState(session.getState() as GameState);
+  }, []);
 
   return {
     gameState,
@@ -445,5 +414,7 @@ export function useGame() {
     resolveCloud,
     respondToPrompt,
     refreshState,
+    undo,
+    canUndo: gameState?.canUndo ?? false,
   };
 }

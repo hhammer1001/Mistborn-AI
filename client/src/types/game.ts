@@ -78,6 +78,7 @@ export interface MarketData {
 
 export interface GameAction {
   code: number;
+  type: string; // ActionType string enum (new)
   index: number;
   description: string;
   cardId?: number;
@@ -139,6 +140,7 @@ export interface GameState {
   botLog?: BotLogEntry[];
   playerLog?: BotLogEntry[];
   prompt?: GamePrompt;
+  canUndo?: boolean;
   // Multiplayer fields
   activePlayer?: number;
   myPlayerIndex?: number;

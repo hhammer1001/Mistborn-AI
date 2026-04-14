@@ -4,7 +4,7 @@ import type { Mission } from "./mission";
 import type { Game } from "./game";
 import { CHARACTER_DEFS } from "./data/characters";
 import type { GameActionInternal, SerializedGameAction } from "./types";
-import { METAL_NAMES, TRAINING_REWARDS } from "./types";
+import { METAL_NAMES, TRAINING_REWARDS, ACTION_TYPE_TO_CODE } from "./types";
 
 export class Player {
   name: string;
@@ -769,46 +769,46 @@ export class Player {
 
   // ── Serialization ──
 
-  serializeAction(action: GameActionInternal, game: Game): SerializedGameAction {
-    const isBurn = (this.metalTokens.slice(0, -1).filter((v) => v === 1).length + this.metalTokens[8]) < this.burns;
+  serializeAction(action: GameActionInternal, _game: Game): SerializedGameAction {
+    const code = ACTION_TYPE_TO_CODE[action.type];
 
     switch (action.type) {
       case "end_actions":
-        return { type: action.type, index: action.index, description: "End actions (move to damage phase)" };
+        return { type: action.type, code, index: action.index, description: "End actions (move to damage phase)" };
       case "advance_mission":
-        return { type: action.type, index: action.index, description: `Advance mission ${action.mission.name}`, missionName: action.mission.name };
+        return { type: action.type, code, index: action.index, description: `Advance mission ${action.mission.name}`, missionName: action.mission.name };
       case "burn_card":
-        return { type: action.type, index: action.index, description: `Burn ${action.card.name} for ${METAL_NAMES[action.metalIndex]}`, cardId: action.card.id, metalIndex: action.metalIndex };
+        return { type: action.type, code, index: action.index, description: `Burn ${action.card.name} for ${METAL_NAMES[action.metalIndex]}`, cardId: action.card.id, metalIndex: action.metalIndex };
       case "refresh_metal":
-        return { type: action.type, index: action.index, description: `Use ${action.card.name} to refresh ${METAL_NAMES[action.metalIndex]}`, cardId: action.card.id, metalIndex: action.metalIndex };
+        return { type: action.type, code, index: action.index, description: `Use ${action.card.name} to refresh ${METAL_NAMES[action.metalIndex]}`, cardId: action.card.id, metalIndex: action.metalIndex };
       case "use_metal":
-        return { type: action.type, index: action.index, description: `Put metal towards abilities of ${action.card.name}`, cardId: action.card.id };
+        return { type: action.type, code, index: action.index, description: `Put metal towards abilities of ${action.card.name}`, cardId: action.card.id };
       case "burn_metal":
-        return { type: action.type, index: action.index, description: `Burn ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
+        return { type: action.type, code, index: action.index, description: `Burn ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
       case "flare_metal":
-        return { type: action.type, index: action.index, description: `Flare ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
+        return { type: action.type, code, index: action.index, description: `Flare ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
       case "buy":
-        return { type: action.type, index: action.index, description: `Buy ${action.card.name}`, cardId: action.card.id };
+        return { type: action.type, code, index: action.index, description: `Buy ${action.card.name}`, cardId: action.card.id };
       case "buy_eliminate":
-        return { type: action.type, index: action.index, description: `Buy ${action.card.name} and eliminate (use first ability)`, cardId: action.card.id };
+        return { type: action.type, code, index: action.index, description: `Buy ${action.card.name} and eliminate (use first ability)`, cardId: action.card.id };
       case "ally_ability_1":
-        return { type: action.type, index: action.index, description: `Use first ability of ally ${action.card.name}`, cardId: action.card.id };
+        return { type: action.type, code, index: action.index, description: `Use first ability of ally ${action.card.name}`, cardId: action.card.id };
       case "ally_ability_2":
-        return { type: action.type, index: action.index, description: `Use second ability of ally ${action.card.name}`, cardId: action.card.id };
+        return { type: action.type, code, index: action.index, description: `Use second ability of ally ${action.card.name}`, cardId: action.card.id };
       case "char_ability_1":
-        return { type: action.type, index: action.index, description: "Use first character ability" };
+        return { type: action.type, code, index: action.index, description: "Use first character ability" };
       case "char_ability_3":
-        return { type: action.type, index: action.index, description: "Use third character ability" };
+        return { type: action.type, code, index: action.index, description: "Use third character ability" };
       case "use_atium":
-        return { type: action.type, index: action.index, description: `Use atium token for ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
+        return { type: action.type, code, index: action.index, description: `Use atium token for ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
       case "buy_with_boxings":
-        return { type: action.type, index: action.index, description: `Buy ${action.card.name} using all money and ${action.boxingsCost} boxings`, cardId: action.card.id, boxingsCost: action.boxingsCost };
+        return { type: action.type, code, index: action.index, description: `Buy ${action.card.name} using all money and ${action.boxingsCost} boxings`, cardId: action.card.id, boxingsCost: action.boxingsCost };
       case "buy_elim_boxings":
-        return { type: action.type, index: action.index, description: `Buy ${action.card.name} using all money and ${action.boxingsCost} boxings and eliminate`, cardId: action.card.id, boxingsCost: action.boxingsCost };
+        return { type: action.type, code, index: action.index, description: `Buy ${action.card.name} using all money and ${action.boxingsCost} boxings and eliminate`, cardId: action.card.id, boxingsCost: action.boxingsCost };
       case "buy_boxing":
-        return { type: action.type, index: action.index, description: "Buy a boxing (2 money → 1 boxing)" };
+        return { type: action.type, code, index: action.index, description: "Buy a boxing (2 money → 1 boxing)" };
       case "use_boxing":
-        return { type: action.type, index: action.index, description: "Use a boxing (1 boxing → 1 money)" };
+        return { type: action.type, code, index: action.index, description: "Use a boxing (1 boxing → 1 money)" };
     }
   }
 
@@ -816,7 +816,9 @@ export class Player {
     const actions = this.availableActions(game);
     const serialized = actions.map((a, i) => {
       a.index = i;
-      return this.serializeAction(a, game);
+      const s = this.serializeAction(a, game);
+      s.code = ACTION_TYPE_TO_CODE[s.type];
+      return s;
     });
     return [serialized, actions];
   }

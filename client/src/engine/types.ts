@@ -85,6 +85,7 @@ export type GameActionInternal =
 // Serialized action for the frontend UI (JSON-safe, no object references)
 export interface SerializedGameAction {
   type: ActionType;
+  code: number; // Backward-compat numeric code for existing UI components
   index: number;
   description: string;
   cardId?: number;
@@ -92,6 +93,28 @@ export interface SerializedGameAction {
   missionName?: string;
   boxingsCost?: number;
 }
+
+// Mapping from ActionType string to legacy numeric code
+export const ACTION_TYPE_TO_CODE: Record<ActionType, number> = {
+  end_actions: 0,
+  advance_mission: 1,
+  burn_card: 2,
+  refresh_metal: 3,
+  use_metal: 4,
+  burn_metal: 5,
+  flare_metal: 5,
+  buy: 6,
+  buy_eliminate: 7,
+  ally_ability_1: 8,
+  ally_ability_2: 9,
+  char_ability_1: 10,
+  char_ability_3: 11,
+  use_atium: 12,
+  buy_with_boxings: 13,
+  buy_elim_boxings: 14,
+  buy_boxing: 15,
+  use_boxing: 16,
+};
 
 // ── Metal constants ──
 
