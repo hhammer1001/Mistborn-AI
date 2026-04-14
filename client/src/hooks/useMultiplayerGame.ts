@@ -1,13 +1,18 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { db } from "../lib/instantdb";
 import type { GameState, GameAction } from "../types/game";
 import type { LogEntry } from "./useGame";
-
-const API_BASE = "";
+import { MultiplayerGameSession } from "../engine/multiplayerSession";
 
 /**
- * Multiplayer game hook. State comes from InstantDB subscription;
- * actions are sent to the server API which updates InstantDB.
+ * Multiplayer game hook.
+ *
+ * Architecture: The HOST holds the MultiplayerGameSession in memory and
+ * processes ALL actions (both host's and guest's). The guest writes action
+ * requests to `pendingAction` in InstantDB. The host watches for these,
+ * processes them, writes the new state, and clears the pending action.
+ *
+ * Both players read state from InstantDB subscriptions.
  */
 export function useMultiplayerGame(
   sessionId: string | null,
@@ -16,6 +21,9 @@ export function useMultiplayerGame(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The HOST holds the session in memory
+  const sessionRef = useRef<MultiplayerGameSession | null>(null);
+
   // Subscribe to the game record in InstantDB
   const gameQuery = db.useQuery(
     sessionId ? { games: { $: { where: { id: sessionId } } } } : null
@@ -23,7 +31,7 @@ export function useMultiplayerGame(
 
   const gameRecord = gameQuery.data?.games?.[0] as Record<string, unknown> | undefined;
 
-  // Derive my player index and game state from the record
+  // Derive my player index
   const myPlayerIndex = useMemo(() => {
     if (!gameRecord || !userId) return null;
     if (gameRecord.p0Id === userId) return 0;
@@ -31,138 +39,275 @@ export function useMultiplayerGame(
     return null;
   }, [gameRecord, userId]);
 
+  const isHost = myPlayerIndex === 0;
+
+  // Derive game state from InstantDB record
   const gameState = useMemo<GameState | null>(() => {
     if (!gameRecord || myPlayerIndex === null) return null;
     const stateField = myPlayerIndex === 0 ? "p0State" : "p1State";
     const state = gameRecord[stateField] as GameState | undefined;
     if (!state) return null;
-    return {
-      ...state,
-      sessionId: sessionId!,
-    };
+    return { ...state, sessionId: sessionId! };
   }, [gameRecord, myPlayerIndex, sessionId]);
 
   const isMyTurn = gameState?.isMyTurn ?? false;
 
-  // Build log from cumulative server logs
+  // Build log
   const log = useMemo<LogEntry[]>(() => {
     if (!gameState) return [];
     const entries: LogEntry[] = [];
-    const playerLog = gameState.playerLog ?? [];
-    const botLog = gameState.botLog ?? [];
-
-    for (const entry of playerLog) {
+    for (const entry of gameState.playerLog ?? []) {
       entries.push({ turn: entry.turn, text: entry.text, isBot: false });
     }
-    for (const entry of botLog) {
+    for (const entry of gameState.botLog ?? []) {
       entries.push({ turn: entry.turn, text: entry.text, isBot: true });
     }
     entries.sort((a, b) => a.turn - b.turn);
     return entries;
   }, [gameState]);
 
-  // ── Action senders ──
+  // ── Host: process pending guest actions ──
 
-  /** Post to a multiplayer endpoint; returns the response JSON. */
-  const _post = useCallback(
-    async (endpoint: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
-      if (!sessionId || !userId) return null;
+  useEffect(() => {
+    if (!isHost || !sessionId || !gameRecord) return;
+    const pending = gameRecord.pendingAction as Record<string, unknown> | null;
+    if (!pending || !pending.actionType) return;
+
+    const session = sessionRef.current;
+    if (!session) return;
+
+    // Process the pending action
+    const pi = pending.playerIndex as number;
+    let result: { error?: string } | null = null;
+
+    try {
+      switch (pending.actionType) {
+        case "action":
+          result = session.playAction(pi, pending.actionIndex as number);
+          break;
+        case "prompt":
+          result = session.respondToPrompt(pi, pending.promptType as string, pending.value as number);
+          break;
+        case "damage":
+          result = session.assignDamage(pi, pending.targetIndex as number);
+          break;
+        case "sense":
+          result = session.resolveSense(pi, pending.use as boolean);
+          break;
+        case "cloud":
+          result = session.resolveCloud(pi, pending.cardId as number);
+          break;
+        case "forfeit":
+          session.forfeit(pi);
+          break;
+      }
+    } catch (e) {
+      console.error("Error processing guest action:", e);
+    }
+
+    // Write updated state and clear pending action
+    const payload = session.getInstantDBPayload();
+    db.transact(
+      db.tx.games[sessionId].update({
+        ...payload,
+        pendingAction: null,
+        stateVersion: ((gameRecord.stateVersion as number) ?? 0) + 1,
+      })
+    );
+  }, [isHost, sessionId, gameRecord]);
+
+  // ── Write helpers ──
+
+  /** Host: run action locally and write to InstantDB */
+  const _hostAction = useCallback(
+    async (actionFn: (session: MultiplayerGameSession) => { error?: string } | null) => {
+      const session = sessionRef.current;
+      if (!session || !sessionId) {
+        setError("Session not available");
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetch(`${API_BASE}/api/multiplayer/${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId, playerId: userId, ...body }),
-        });
-        const data = await resp.json();
-        if (data.error) {
-          setError(data.error);
-          return null;
-        }
-        return data;
+        const result = actionFn(session);
+        if (result?.error) { setError(result.error); return; }
+        const payload = session.getInstantDBPayload();
+        await db.transact(
+          db.tx.games[sessionId].update({
+            ...payload,
+            pendingAction: null,
+            stateVersion: ((gameRecord?.stateVersion as number) ?? 0) + 1,
+          })
+        );
       } catch (e) {
         setError(String(e));
-        return null;
       } finally {
         setLoading(false);
       }
     },
-    [sessionId, userId]
+    [sessionId, gameRecord]
   );
 
-  /** Play an action. Returns the server's immediate state response (for chaining). */
-  const _playActionRaw = useCallback(
-    async (actionIndex: number): Promise<GameState | null> => {
-      const data = await _post("action", { actionIndex });
-      return (data?.state as GameState) ?? null;
+  /** Guest: write a pending action request to InstantDB */
+  const _guestAction = useCallback(
+    async (action: Record<string, unknown>) => {
+      if (!sessionId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        await db.transact(
+          db.tx.games[sessionId].update({
+            pendingAction: { ...action, playerIndex: myPlayerIndex },
+          })
+        );
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
     },
-    [_post]
+    [sessionId, myPlayerIndex]
   );
+
+  // ── Action methods ──
 
   const playAction = useCallback(
-    (actionIndex: number) => { _playActionRaw(actionIndex); },
-    [_playActionRaw]
+    (actionIndex: number) => {
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        _hostAction((s) => s.playAction(myPlayerIndex, actionIndex));
+      } else {
+        _guestAction({ actionType: "action", actionIndex });
+      }
+    },
+    [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
   const advanceAllMission = useCallback(
     async (missionName: string) => {
-      if (!gameState) return;
-      let current: GameState | null = gameState;
-      while (current) {
-        const action = current.availableActions.find(
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        const session = sessionRef.current;
+        if (!session || !sessionId) return;
+        // Advance repeatedly
+        let state = session.getState(myPlayerIndex);
+        let actions = state.availableActions as GameAction[];
+        while (true) {
+          const action = actions?.find((a: any) => a.code === 1 && a.missionName === missionName);
+          if (!action) break;
+          const result = session.playAction(myPlayerIndex, action.index);
+          if (result?.error) break;
+          state = session.getState(myPlayerIndex);
+          actions = state.availableActions as GameAction[];
+          if (state.phase === "game_over") break;
+        }
+        const payload = session.getInstantDBPayload();
+        await db.transact(
+          db.tx.games[sessionId].update({
+            ...payload,
+            pendingAction: null,
+            stateVersion: ((gameRecord?.stateVersion as number) ?? 0) + 1,
+          })
+        );
+      } else {
+        // Guest: advance one at a time via pending actions
+        // (the host will process each one)
+        if (!gameState) return;
+        const action = gameState.availableActions.find(
           (a) => a.code === 1 && a.missionName === missionName
         );
-        if (!action) break;
-        current = await _playActionRaw(action.index);
-        if (!current || current.phase === "game_over") break;
+        if (action) {
+          await _guestAction({ actionType: "action", actionIndex: action.index });
+        }
       }
     },
-    [gameState, _playActionRaw]
+    [isHost, myPlayerIndex, sessionId, gameRecord, gameState, _guestAction]
   );
 
   const playTwoActions = useCallback(
     async (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
-      if (!gameState) return;
-      // Run findSecond against a dummy to extract what it's looking for,
-      // then use the composite endpoint so both actions happen in one server call.
-      // To get the matcher, we peek at what findSecond would match by running it
-      // against the current actions with the first action removed.
-      // But we can't know the exact new actions list without the server.
-      // So: use the single action endpoint to get the intermediate state,
-      // then fire the second action. Both are fast since the first already saved.
-      const afterFirst = await _playActionRaw(firstIndex);
-      if (!afterFirst) return;
-      const secondIndex = findSecond(afterFirst.availableActions);
-      if (secondIndex === undefined) return;
-      // Second action uses the already-saved state, so just one more call
-      await _playActionRaw(secondIndex);
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        const session = sessionRef.current;
+        if (!session || !sessionId) return;
+        session.playAction(myPlayerIndex, firstIndex);
+        const state = session.getState(myPlayerIndex);
+        const secondIndex = findSecond(state.availableActions as GameAction[]);
+        if (secondIndex !== undefined) {
+          session.playAction(myPlayerIndex, secondIndex);
+        }
+        const payload = session.getInstantDBPayload();
+        await db.transact(
+          db.tx.games[sessionId].update({
+            ...payload,
+            pendingAction: null,
+            stateVersion: ((gameRecord?.stateVersion as number) ?? 0) + 1,
+          })
+        );
+      } else {
+        // Guest: just play the first action, host will process
+        await _guestAction({ actionType: "action", actionIndex: firstIndex });
+      }
     },
-    [gameState, _playActionRaw]
+    [isHost, myPlayerIndex, sessionId, gameRecord, _guestAction]
   );
 
   const respondToPrompt = useCallback(
-    (promptType: string, value: number) =>
-      _post("prompt", { promptType, value }),
-    [_post]
+    (promptType: string, value: number) => {
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        _hostAction((s) => s.respondToPrompt(myPlayerIndex, promptType, value));
+      } else {
+        _guestAction({ actionType: "prompt", promptType, value });
+      }
+    },
+    [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
   const assignDamage = useCallback(
-    (targetIndex: number) => _post("damage", { targetIndex }),
-    [_post]
+    (targetIndex: number) => {
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        _hostAction((s) => s.assignDamage(myPlayerIndex, targetIndex));
+      } else {
+        _guestAction({ actionType: "damage", targetIndex });
+      }
+    },
+    [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
   const resolveSense = useCallback(
-    (use: boolean) => _post("sense", { use }),
-    [_post]
+    (use: boolean) => {
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        _hostAction((s) => s.resolveSense(myPlayerIndex, use));
+      } else {
+        _guestAction({ actionType: "sense", use });
+      }
+    },
+    [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
   const resolveCloud = useCallback(
-    (cardId: number) => _post("cloud", { cardId }),
-    [_post]
+    (cardId: number) => {
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        _hostAction((s) => s.resolveCloud(myPlayerIndex, cardId));
+      } else {
+        _guestAction({ actionType: "cloud", cardId });
+      }
+    },
+    [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
-  const forfeit = useCallback(() => _post("forfeit", {}), [_post]);
+  const forfeit = useCallback(() => {
+    if (myPlayerIndex === null) return;
+    if (isHost) {
+      _hostAction((s) => { s.forfeit(myPlayerIndex); return null; });
+    } else {
+      _guestAction({ actionType: "forfeit" });
+    }
+  }, [isHost, myPlayerIndex, _hostAction, _guestAction]);
 
   return {
     gameState,
@@ -179,5 +324,6 @@ export function useMultiplayerGame(
     resolveCloud,
     respondToPrompt,
     forfeit,
+    sessionRef,
   };
 }

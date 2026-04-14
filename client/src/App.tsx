@@ -4,6 +4,8 @@ import { useGame } from "./hooks/useGame";
 import { useAuth } from "./hooks/useAuth";
 import { useLobby } from "./hooks/useLobby";
 import { useMultiplayerGame } from "./hooks/useMultiplayerGame";
+import { MultiplayerGameSession } from "./engine/multiplayerSession";
+import { db, id as instantId } from "./lib/instantdb";
 import { GameSetup } from "./components/GameSetup";
 import { CardGallery } from "./components/CardGallery";
 import { AuthScreen } from "./components/AuthScreen";
@@ -103,24 +105,40 @@ function App() {
     const handleStartGame = async () => {
       if (!lobby.room || !auth.user) return;
       try {
-        const resp = await fetch("/api/multiplayer/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        // Create game session locally
+        const session = new MultiplayerGameSession(
+          lobby.room.hostName,
+          lobby.room.hostCharacter,
+          lobby.room.guestName,
+          lobby.room.guestCharacter,
+        );
+
+        const gameId = instantId();
+        const payload = session.getInstantDBPayload();
+
+        // Write initial state to InstantDB
+        await db.transact(
+          db.tx.games[gameId].update({
             roomId: lobby.room.id,
+            ...payload,
             p0Id: lobby.room.hostId,
-            p0Name: lobby.room.hostName,
-            p0Char: lobby.room.hostCharacter,
             p1Id: lobby.room.guestId,
-            p1Name: lobby.room.guestName,
-            p1Char: lobby.room.guestCharacter,
-          }),
-        });
-        const data = await resp.json();
-        if (data.sessionId) {
-          setMpSessionId(data.sessionId);
-          setMode("mp_game");
-        }
+            stateVersion: 0,
+          })
+        );
+
+        // Update room status
+        await db.transact(
+          db.tx.rooms[lobby.room.id].update({
+            status: "in_game",
+            sessionId: gameId,
+          })
+        );
+
+        // Store session ref for the active player
+        mpGame.sessionRef.current = session;
+        setMpSessionId(gameId);
+        setMode("mp_game");
       } catch (e) {
         console.error("Failed to start game:", e);
       }
