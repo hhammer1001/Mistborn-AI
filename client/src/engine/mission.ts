@@ -1,0 +1,56 @@
+import type { MissionTierDef } from "./types";
+import type { Game } from "./game";
+
+export class Mission {
+  name: string;
+  tiers: MissionTierDef[];
+  playerRanks: number[];
+  private game: Game;
+
+  constructor(name: string, game: Game, tiers: MissionTierDef[]) {
+    this.name = name;
+    this.game = game;
+    this.tiers = tiers;
+    this.playerRanks = new Array(game.numPlayers).fill(0);
+  }
+
+  progress(playerNum: number, amount: number) {
+    const oldRank = this.playerRanks[playerNum];
+    const newRank = oldRank + amount;
+
+    for (const tier of this.tiers) {
+      if (oldRank < tier.threshold && newRank >= tier.threshold) {
+        // Grant tier reward
+        this.game.players[playerNum].resolve(
+          tier.reward,
+          String(tier.rewardAmount)
+        );
+        // If this player is the first to reach this tier, grant first-player bonus
+        if (Math.max(...this.playerRanks) < tier.threshold) {
+          this.game.players[playerNum].resolve(
+            tier.firstReward,
+            String(tier.firstRewardAmount)
+          );
+        }
+      }
+    }
+
+    this.playerRanks[playerNum] = newRank;
+    this.game.missionVictoryCheck(playerNum);
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      playerRanks: [...this.playerRanks],
+      tiers: this.tiers.map((t) => ({
+        threshold: t.threshold,
+        reward: t.reward,
+        rewardAmount: t.rewardAmount,
+        firstReward: t.firstReward,
+        firstRewardAmount: t.firstRewardAmount,
+      })),
+      maxRank: this.tiers.length > 0 ? this.tiers[this.tiers.length - 1].threshold : 12,
+    };
+  }
+}
