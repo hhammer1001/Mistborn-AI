@@ -183,6 +183,9 @@ sanityTestingData.csv
 *.csv
 oldData
 
+# Allow engine data JSON files in the client
+!client/src/engine/data/*.json
+
 # OS files
 .DS_Store
 
