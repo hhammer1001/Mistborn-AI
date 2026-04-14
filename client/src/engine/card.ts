@@ -26,11 +26,11 @@ export class Card {
     this.metal = def.metal;
   }
 
-  toJSON() {
+  toJSON(): { id: number; name: string; type: string; cost: number; metal: number; metalName: string; sought: boolean; [key: string]: unknown } {
     return {
       id: this.id,
       name: this.name,
-      type: "card" as const,
+      type: "card",
       cost: this.cost,
       metal: this.metal,
       metalName: this.metal >= 0 && this.metal < METAL_NAMES.length

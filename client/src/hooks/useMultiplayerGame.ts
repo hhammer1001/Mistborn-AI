@@ -78,24 +78,23 @@ export function useMultiplayerGame(
 
     // Process the pending action
     const pi = pending.playerIndex as number;
-    let result: { error?: string } | null = null;
 
     try {
       switch (pending.actionType) {
         case "action":
-          result = session.playAction(pi, pending.actionIndex as number);
+          session.playAction(pi, pending.actionIndex as number);
           break;
         case "prompt":
-          result = session.respondToPrompt(pi, pending.promptType as string, pending.value as number);
+          session.respondToPrompt(pi, pending.promptType as string, pending.value as number);
           break;
         case "damage":
-          result = session.assignDamage(pi, pending.targetIndex as number);
+          session.assignDamage(pi, pending.targetIndex as number);
           break;
         case "sense":
-          result = session.resolveSense(pi, pending.use as boolean);
+          session.resolveSense(pi, pending.use as boolean);
           break;
         case "cloud":
-          result = session.resolveCloud(pi, pending.cardId as number);
+          session.resolveCloud(pi, pending.cardId as number);
           break;
         case "forfeit":
           session.forfeit(pi);

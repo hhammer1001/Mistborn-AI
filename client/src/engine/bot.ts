@@ -73,7 +73,7 @@ export class Twonky extends Player {
     const isBurnAvailable = () =>
       (this.metalTokens.slice(0, -1).filter((v) => v === 1).length + this.metalTokens[8]) < this.burns;
 
-    for (const { card, score } of handScores) {
+    for (const { card } of handScores) {
       if (card.burned || card.metalUsed >= card.capacity) continue;
 
       // Try use_metal

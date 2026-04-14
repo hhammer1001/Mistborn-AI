@@ -1,4 +1,4 @@
-import { Card, Action, Ally, Funding, createCard } from "./card";
+import { Card, Ally, Funding, createCard } from "./card";
 import type { CardDef } from "./types";
 import { STARTER_DECKS } from "./data/starterDecks";
 import { MARKET_DECK } from "./data/marketDeck";

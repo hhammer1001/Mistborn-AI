@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Room, RoomStatus } from "../hooks/useLobby";
+import type { Room } from "../hooks/useLobby";
 
 const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
 
@@ -153,7 +153,7 @@ function CharacterSelect({
   room,
   myRole,
   onSelectCharacter,
-  onReady,
+  onReady: _onReady,
   onStartGame,
   onLeave,
   isLoading,

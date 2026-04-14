@@ -7,7 +7,7 @@
  */
 
 import { Player } from "./player";
-import { Card, Action, Ally, Funding } from "./card";
+import { Card, Action, Ally } from "./card";
 import { PromptNeeded } from "./prompt";
 import type { PromptOption } from "./prompt";
 import type { PlayerDeck } from "./deck";

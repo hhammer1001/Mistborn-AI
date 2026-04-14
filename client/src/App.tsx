@@ -78,7 +78,7 @@ function App() {
     }
     return (
       <AuthScreen
-        onSendCode={(email) => auth.sendMagicCode(email)}
+        onSendCode={async (email) => { await auth.sendMagicCode(email); }}
         onLogin={async (email, code) => {
           await auth.verifyMagicCode(email, code);
           // After login, ensure profile exists — use email prefix as default name
@@ -147,7 +147,7 @@ function App() {
     return (
       <Lobby
         room={lobby.room}
-        myRole={lobby.myRole}
+        myRole={lobby.myRole as "host" | "guest" | null}
         error={lobby.error}
         isLoading={lobby.isLoading}
         onCreateRoom={lobby.createRoom}
@@ -307,7 +307,7 @@ function MultiplayerGameBoard({
         onForfeit={forfeit}
         isMultiplayer
       />
-      {!isMyTurn && gameState.phase !== "game_over" && (
+      {!isMyTurn && (gameState.phase as string) !== "game_over" && (
         <WaitingOverlay opponentName={opp.name} phase={gameState.phase} />
       )}
     </>
@@ -348,10 +348,10 @@ function GameBoard({
   handleAction: (index: number) => void;
   playTwoActions: (first: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
   advanceAllMission: (name: string) => void;
-  assignDamage: (targetIndex: number) => void | Promise<unknown>;
-  resolveSense: (use: boolean) => void | Promise<unknown>;
-  resolveCloud: (cardId: number) => void | Promise<unknown>;
-  respondToPrompt: (type: string, value: number) => void | Promise<unknown>;
+  assignDamage: (targetIndex: number) => unknown;
+  resolveSense: (use: boolean) => unknown;
+  resolveCloud: (cardId: number) => unknown;
+  respondToPrompt: (type: string, value: number) => unknown;
   onMainMenu: () => void;
   onForfeit?: () => void;
   isMultiplayer?: boolean;

@@ -1,5 +1,5 @@
 import { Card, Action, Ally, Funding } from "./card";
-import { PlayerDeck, Market } from "./deck";
+import { PlayerDeck } from "./deck";
 import type { Mission } from "./mission";
 import type { Game } from "./game";
 import { CHARACTER_DEFS } from "./data/characters";
@@ -121,7 +121,7 @@ export class Player {
     }
   }
 
-  selectAction(actions: GameActionInternal[], _game: Game): GameActionInternal {
+  selectAction(_actions: GameActionInternal[], _game: Game): GameActionInternal {
     // Base Player uses console (overridden by bots and WebPlayer)
     throw new Error("selectAction not implemented for base Player");
   }

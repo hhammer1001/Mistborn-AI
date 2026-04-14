@@ -9,9 +9,9 @@ import Prodigy3 from "./Prodigy3.json";
 import twonkyMissionData from "./twonkyMissionData.json";
 import categor2 from "./categor2.json";
 
-export type CardRatings = Record<string, [number, number, number]>;
+export type CardRatings = Record<string, number[]>;
 export type MissionRatings = Record<string, number>;
-export type CategoryData = Record<string, Record<string, [number, number, number]>>;
+export type CategoryData = Record<string, Record<string, number[]>>;
 
 export const CHARACTER_CARD_RATINGS: Record<string, CardRatings> = {
   Kelsier: Kelsier3 as CardRatings,

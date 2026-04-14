@@ -1,7 +1,18 @@
 import { useState, useCallback, useRef } from "react";
-import type { GameState, GameAction } from "../types/game";
+import type { GameState, GameAction, BotLogEntry } from "../types/game";
 import { GameSession } from "../engine/session";
 import { resetCardIds } from "../engine/card";
+
+// Session methods return Record<string, unknown>; this helper casts safely
+interface SessionResult {
+  error?: string;
+  turnCount?: number;
+  phase?: string;
+  playerLog?: BotLogEntry[];
+  botLog?: BotLogEntry[];
+  availableActions?: GameAction[];
+  [key: string]: unknown;
+}
 
 export interface LogEntry {
   turn: number;
@@ -68,7 +79,7 @@ export function useGame() {
           testDeck,
         });
         sessionRef.current = session;
-        const data = session.getState() as GameState;
+        const data = session.getState() as unknown as GameState;
         setGameState(data);
 
         const initLog: LogEntry[] = [{ turn: 1, text: "Game started" }];
@@ -106,9 +117,9 @@ export function useGame() {
 
       setError(null);
       try {
-        const data = session.playAction(actionIndex);
+        const data = session.playAction(actionIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as GameState);
+        setGameState(data as unknown as GameState);
 
         const newEntries: LogEntry[] = [
           { turn: prevTurn, text: `${pName} — ${desc}` },
@@ -133,8 +144,8 @@ export function useGame() {
           }
         }
 
-        if (data.turnCount > prevTurn) {
-          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        if ((data.turnCount ?? 0) > prevTurn) {
+          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
         newEntries.push(...newTurnPlayerLogs);
 
@@ -155,15 +166,15 @@ export function useGame() {
       if (!session) return;
 
       // Find and play all mission advances for this mission
-      let current = gameState;
+      let current: GameState | null = gameState;
       while (current) {
         const action = current.availableActions.find(
           (a) => a.code === 1 && a.missionName === missionName
         );
         if (!action) break;
-        const result = playAction(action.index);
+        const result = playAction(action.index) as unknown as GameState | null;
         if (!result || result.phase === "game_over") break;
-        current = result as GameState;
+        current = result;
       }
     },
     [gameState, playAction]
@@ -171,9 +182,9 @@ export function useGame() {
 
   const playTwoActions = useCallback(
     (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
-      const first = playAction(firstIndex);
+      const first = playAction(firstIndex) as unknown as SessionResult | null;
       if (!first) return null;
-      const secondIndex = findSecond(first.availableActions);
+      const secondIndex = findSecond((first.availableActions ?? []) as GameAction[]);
       if (secondIndex === undefined) return first;
       return playAction(secondIndex);
     },
@@ -186,9 +197,9 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.respondToPrompt(promptType, value);
+        const data = session.respondToPrompt(promptType, value) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as GameState);
+        setGameState(data as unknown as GameState);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
@@ -208,8 +219,8 @@ export function useGame() {
           }
         }
 
-        if (data.turnCount > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        if ((data.turnCount ?? 0) > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
 
         if (newEntries.length > 0) {
@@ -231,9 +242,9 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.assignDamage(targetIndex);
+        const data = session.assignDamage(targetIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as GameState);
+        setGameState(data as unknown as GameState);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
@@ -263,8 +274,8 @@ export function useGame() {
           }
         }
 
-        if (data.turnCount > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        if ((data.turnCount ?? 0) > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
 
         if (newEntries.length > 0) {
@@ -286,9 +297,9 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveSense(use);
+        const data = session.resolveSense(use) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as GameState);
+        setGameState(data as unknown as GameState);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
@@ -310,8 +321,8 @@ export function useGame() {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
         }
-        if (data.turnCount > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        if ((data.turnCount ?? 0) > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
         if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
         return data;
@@ -325,9 +336,9 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveCloud(cardId);
+        const data = session.resolveCloud(cardId) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as GameState);
+        setGameState(data as unknown as GameState);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
@@ -343,8 +354,8 @@ export function useGame() {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
         }
-        if (data.turnCount > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount, text: `${pName}'s turn` });
+        if ((data.turnCount ?? 0) > gameState.turnCount) {
+          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
         if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
         return data;
@@ -376,7 +387,7 @@ export function useGame() {
     }
 
     sessionRef.current = newSession;
-    const data = newSession.getState() as GameState;
+    const data = newSession.getState() as unknown as GameState;
     setGameState(data);
 
     // Rebuild log (simplified: just show current state)
@@ -397,7 +408,7 @@ export function useGame() {
   const refreshState = useCallback(() => {
     const session = sessionRef.current;
     if (!session) return;
-    setGameState(session.getState() as GameState);
+    setGameState(session.getState() as unknown as GameState);
   }, []);
 
   return {

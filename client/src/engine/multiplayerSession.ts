@@ -8,12 +8,12 @@
  */
 
 import { Game } from "./game";
-import { Action, Card, resetCardIds } from "./card";
+import { Action, resetCardIds } from "./card";
 import { Player } from "./player";
 import { WebPlayer, createWebPlayer } from "./webPlayer";
 import { PromptNeeded } from "./prompt";
-import type { GameActionInternal, SerializedGameAction } from "./types";
-import { METAL_NAMES, TRAINING_REWARDS } from "./types";
+import type { GameActionInternal } from "./types";
+import { METAL_NAMES } from "./types";
 
 // ── Snapshot helpers ──
 
@@ -166,7 +166,7 @@ export class MultiplayerGameSession {
 
   // ── Helpers ──
 
-  private _active() { return this.players[this.activePlayer]; }
+  // private _active() { return this.players[this.activePlayer]; }
   private _opponent() { return this.players[1 - this.activePlayer]; }
 
   private _getDamageTargets(playerIndex: number) {

@@ -4,12 +4,12 @@
  */
 
 import { Game, type PlayerFactory } from "./game";
-import { Action, Ally, Card } from "./card";
+import { Action } from "./card";
 import { Player } from "./player";
 import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
 import { PromptNeeded } from "./prompt";
-import type { GameActionInternal, SerializedGameAction } from "./types";
+import type { GameActionInternal } from "./types";
 import { METAL_NAMES } from "./types";
 
 // ── Snapshot helpers for effect logging ──
@@ -122,7 +122,7 @@ export class GameSession {
   private _pending_prompt: PromptNeeded | null = null;
   private _pending_action_index: number | null = null;
   private _accumulated_responses: [string, number | boolean][] = [];
-  private _save_state: ReturnType<Game["toJSON"]> | null = null;
+  // _save_state removed — prompt replay uses action history instead
   private _cached_raw: GameActionInternal[] | null = null;
   private _cloud_damage = 0;
 
@@ -323,8 +323,7 @@ export class GameSession {
     this._actionHistory.push(actionIndex);
 
     // Save state for prompt replay
-    this._save_state = structuredClone(this.game.toJSON());
-    this._pending_action_index = actionIndex;
+this._pending_action_index = actionIndex;
     this._accumulated_responses = [];
 
     const action = this._cached_raw![actionIndex];
@@ -354,7 +353,6 @@ export class GameSession {
 
       this._cached_raw = null;
       this._pending_prompt = null;
-      this._save_state = null;
       this._undoStack = []; // Clear undo on phase transition
       return this.getState();
     }
@@ -382,7 +380,6 @@ export class GameSession {
     }
 
     this._pending_prompt = null;
-    this._save_state = null;
 
     // Log effects
     const snapAfter = snapshot(this.human);
@@ -469,7 +466,6 @@ export class GameSession {
     }
 
     this._pending_prompt = null;
-    this._save_state = null;
     this._accumulated_responses = [];
     this._cached_raw = null;
 
