@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-pillow
-numpy
-matplotlib
-pytest
-requests
-python-dotenv
