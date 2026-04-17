@@ -42,7 +42,11 @@ export function GameSetup({ onStart, onViewCards, onPlayOnline }: Props) {
 
   return (
     <div className="game-setup">
-      <h1>Mistborn: Card Game</h1>
+      <div className="game-setup-mist" aria-hidden="true" />
+      <div className="setup-title-block">
+        <h1>Mistborn</h1>
+        <div className="setup-subtitle">Ash falls · The mists rise</div>
+      </div>
       <div className="setup-form">
         <label>
           Your Name
@@ -121,7 +125,9 @@ export function GameSetup({ onStart, onViewCards, onPlayOnline }: Props) {
         <button className="view-cards-btn" onClick={onViewCards}>
           View All Cards
         </button>
-        <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
+      </div>
+      <div className="setup-footer">
+        <button className="setup-footer-link" onClick={() => setFeedbackOpen(true)}>
           Send Feedback
         </button>
       </div>
