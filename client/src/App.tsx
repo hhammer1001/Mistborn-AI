@@ -202,7 +202,7 @@ function BotGameBoard({
   game: ReturnType<typeof useGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt } = game;
+  const { gameState, loading, log, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo } = game;
 
   const handleAction = (index: number) => {
     if (!loading) playAction(index);
@@ -245,6 +245,8 @@ function BotGameBoard({
       resolveCloud={resolveCloud}
       respondToPrompt={respondToPrompt}
       onMainMenu={onMainMenu}
+      onUndo={undo}
+      canUndo={canUndo}
     />
   );
 }
@@ -337,6 +339,8 @@ function GameBoard({
   onMainMenu,
   onForfeit,
   isMultiplayer,
+  onUndo,
+  canUndo,
 }: {
   gameState: GameState;
   you: PlayerData;
@@ -355,6 +359,8 @@ function GameBoard({
   onMainMenu: () => void;
   onForfeit?: () => void;
   isMultiplayer?: boolean;
+  onUndo?: () => void;
+  canUndo?: boolean;
 }) {
   return (
     <div className="game-board">
@@ -402,7 +408,14 @@ function GameBoard({
               onAssign={(idx) => { if (!loading) assignDamage(idx); }}
             />
           ) : (
-            <ActionList actions={actions} onAction={handleAction} missionRemaining={you.mission} player={you} />
+            <ActionList
+              actions={actions}
+              onAction={handleAction}
+              missionRemaining={you.mission}
+              player={you}
+              onUndo={onUndo}
+              canUndo={canUndo}
+            />
           )}
           <div className="turn-info">
             <span>Turn {gameState.turnCount}</span>

@@ -4,13 +4,67 @@
  */
 
 import { Game, type PlayerFactory } from "./game";
-import { Action } from "./card";
+import { Action, Ally, Card } from "./card";
 import { Player } from "./player";
 import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
+import { TwonkyV2 } from "./botV2";
 import { PromptNeeded } from "./prompt";
 import type { GameActionInternal } from "./types";
 import { METAL_NAMES } from "./types";
+
+// ── Full engine-state snapshot for prompt rollback & undo ──
+
+interface PlayerSnapshot {
+  curDamage: number;
+  curMoney: number;
+  curMission: number;
+  curHealth: number;
+  curBoxings: number;
+  training: number;
+  atium: number;
+  burns: number;
+  pDamage: number;
+  pMoney: number;
+  handSize: number;
+  alive: boolean;
+  smoking: boolean;
+  charAbility1: boolean;
+  charAbility2: boolean;
+  charAbility3: boolean;
+  metalTokens: number[];
+  metalAvailable: number[];
+  metalBurned: number[];
+  activeCardId: number | null;
+  senseFlag: boolean;
+  allyIds: number[];
+  handIds: number[];
+  deckIds: number[];
+  discardIds: number[];
+  setAsideIds: number[];
+}
+
+interface CardStateSnap {
+  sought: boolean;
+  burned?: boolean;
+  metalUsed?: number;
+  available1?: boolean;
+  available2?: boolean;
+  availableRiot?: boolean;
+}
+
+interface GameSnapshot {
+  winnerIndex: number | null;
+  victoryType: string;
+  turncount: number;
+  missionRanks: number[][];
+  marketHand: number[];
+  marketCards: number[];
+  marketDiscard: number[];
+  players: PlayerSnapshot[];
+  cardStates: Map<number, CardStateSnap>;
+  hiddenCardIds: Set<number>;
+}
 
 // ── Snapshot helpers for effect logging ──
 
@@ -122,12 +176,19 @@ export class GameSession {
   private _pending_prompt: PromptNeeded | null = null;
   private _pending_action_index: number | null = null;
   private _accumulated_responses: [string, number | boolean][] = [];
-  // _save_state removed — prompt replay uses action history instead
   private _cached_raw: GameActionInternal[] | null = null;
   private _cloud_damage = 0;
 
-  // Undo stack
-  private _undoStack: string[] = [];
+  // Snapshot for prompt rollback + undo.
+  // Taken before every action attempt; restored on prompt throw or undo.
+  private _preActionSnapshot: GameSnapshot | null = null;
+  // For effect logging — captured at the start of an action sequence
+  private _playerSnapBefore: Snapshot | null = null;
+  private _missionBefore = 0;
+  // Set to true if the action (or its chain) revealed hidden info (draw, market refill)
+  private _infoRevealed = false;
+  // Index of the last-completed action entry in the player log — so undo can remove it
+  private _lastLogIndex = -1;
 
   constructor(opts: {
     playerName?: string;
@@ -152,8 +213,9 @@ export class GameSession {
     this.opponentType = opponentType;
     this.opponentCharacter = opponentCharacter;
 
+    const BotClass = opponentType === "twonkyV2" ? TwonkyV2 : Twonky;
     const botFactory: PlayerFactory = (deck, game, to, name, char) =>
-      new Twonky(deck, game, to, name, char);
+      new BotClass(deck, game, to, name, char);
     const humanFactory: PlayerFactory = (deck, game, to, name, char) =>
       new WebPlayer(deck, game, to, name, char);
 
@@ -188,52 +250,194 @@ export class GameSession {
     }
   }
 
-  // ── Undo ──
+  // ── Snapshot / restore ──
 
-  private _pushUndo() {
-    this._undoStack.push(JSON.stringify(this.game.toJSON()));
+  /** Capture full engine state in a form that can be restored exactly. */
+  private _takeSnapshot(): GameSnapshot {
+    const winner = this.game.winner;
+    const winnerIndex = winner ? winner.turnOrder : null;
+
+    const players: PlayerSnapshot[] = this.game.players.map((p) => ({
+      curDamage: p.curDamage,
+      curMoney: p.curMoney,
+      curMission: p.curMission,
+      curHealth: p.curHealth,
+      curBoxings: p.curBoxings,
+      training: p.training,
+      atium: p.atium,
+      burns: p.burns,
+      pDamage: p.pDamage,
+      pMoney: p.pMoney,
+      handSize: p.handSize,
+      alive: p.alive,
+      smoking: p.smoking,
+      charAbility1: p.charAbility1,
+      charAbility2: p.charAbility2,
+      charAbility3: p.charAbility3,
+      metalTokens: [...p.metalTokens],
+      metalAvailable: [...p.metalAvailable],
+      metalBurned: [...p.metalBurned],
+      activeCardId: p._active_card?.id ?? null,
+      senseFlag: (p as WebPlayer)._sense_flag ?? false,
+      allyIds: p.allies.map((a) => a.id),
+      handIds: p.deck.hand.map((c) => c.id),
+      deckIds: p.deck.cards.map((c) => c.id),
+      discardIds: p.deck.discard.map((c) => c.id),
+      setAsideIds: p.deck.setAside.map((c) => c.id),
+    }));
+
+    // Capture all card states (sought, burned, metalUsed, ally flags)
+    const cardStates = new Map<number, CardStateSnap>();
+    for (const c of this._allCards()) {
+      const s: CardStateSnap = { sought: c.sought };
+      if (c instanceof Action) {
+        s.burned = c.burned;
+        s.metalUsed = c.metalUsed;
+      } else if (c instanceof Ally) {
+        s.available1 = c.available1;
+        s.available2 = c.available2;
+        s.availableRiot = c.availableRiot;
+      }
+      cardStates.set(c.id, s);
+    }
+
+    return {
+      winnerIndex,
+      victoryType: this.game.victoryType,
+      turncount: this.game.turncount,
+      missionRanks: this.game.missions.map((m) => [...m.playerRanks]),
+      marketHand: this.game.market.hand.map((c) => c.id),
+      marketCards: this.game.market.cards.map((c) => c.id),
+      marketDiscard: this.game.market.discard.map((c) => c.id),
+      players,
+      cardStates,
+      hiddenCardIds: this._hiddenCardIds(),
+    };
   }
+
+  /** Restore engine state from a snapshot. Cards are located by ID. */
+  private _restoreSnapshot(snap: GameSnapshot): void {
+    // Build ID → card lookup (cards never leave the game, so this covers all of them)
+    const byId = new Map<number, Card>();
+    for (const c of this._allCards()) byId.set(c.id, c);
+
+    this.game.winner = snap.winnerIndex !== null ? this.game.players[snap.winnerIndex] : null;
+    this.game.victoryType = snap.victoryType;
+    this.game.turncount = snap.turncount;
+
+    for (let i = 0; i < this.game.missions.length; i++) {
+      this.game.missions[i].playerRanks = [...snap.missionRanks[i]];
+    }
+
+    this.game.market.hand = snap.marketHand.map((id) => byId.get(id)!).filter(Boolean);
+    this.game.market.cards = snap.marketCards.map((id) => byId.get(id)!).filter(Boolean);
+    this.game.market.discard = snap.marketDiscard.map((id) => byId.get(id)!).filter(Boolean);
+
+    for (let i = 0; i < this.game.players.length; i++) {
+      const p = this.game.players[i];
+      const ps = snap.players[i];
+      p.curDamage = ps.curDamage;
+      p.curMoney = ps.curMoney;
+      p.curMission = ps.curMission;
+      p.curHealth = ps.curHealth;
+      p.curBoxings = ps.curBoxings;
+      p.training = ps.training;
+      p.atium = ps.atium;
+      p.burns = ps.burns;
+      p.pDamage = ps.pDamage;
+      p.pMoney = ps.pMoney;
+      p.handSize = ps.handSize;
+      p.alive = ps.alive;
+      p.smoking = ps.smoking;
+      p.charAbility1 = ps.charAbility1;
+      p.charAbility2 = ps.charAbility2;
+      p.charAbility3 = ps.charAbility3;
+      p.metalTokens = [...ps.metalTokens];
+      p.metalAvailable = [...ps.metalAvailable];
+      p.metalBurned = [...ps.metalBurned];
+      p._active_card = ps.activeCardId !== null ? (byId.get(ps.activeCardId) ?? null) : null;
+      if (p instanceof WebPlayer) p._sense_flag = ps.senseFlag;
+      p.allies = ps.allyIds.map((id) => byId.get(id) as Ally).filter(Boolean);
+      p.deck.hand = ps.handIds.map((id) => byId.get(id)!).filter(Boolean);
+      p.deck.cards = ps.deckIds.map((id) => byId.get(id)!).filter(Boolean);
+      p.deck.discard = ps.discardIds.map((id) => byId.get(id)!).filter(Boolean);
+      p.deck.setAside = ps.setAsideIds.map((id) => byId.get(id)!).filter(Boolean);
+    }
+
+    // Restore per-card internal state
+    for (const [id, s] of snap.cardStates) {
+      const c = byId.get(id);
+      if (!c) continue;
+      c.sought = s.sought;
+      if (c instanceof Action) {
+        c.burned = s.burned ?? false;
+        c.metalUsed = s.metalUsed ?? 0;
+      } else if (c instanceof Ally) {
+        c.available1 = s.available1 ?? false;
+        c.available2 = s.available2 ?? false;
+        c.availableRiot = s.availableRiot ?? false;
+      }
+    }
+  }
+
+  private _allCards(): Card[] {
+    const cards: Card[] = [];
+    cards.push(...this.game.market.hand, ...this.game.market.cards, ...this.game.market.discard);
+    for (const p of this.game.players) {
+      cards.push(...p.deck.hand, ...p.deck.cards, ...p.deck.discard, ...p.deck.setAside);
+      cards.push(...p.allies);
+    }
+    return cards;
+  }
+
+  /** Cards whose identity is currently hidden from the human player. */
+  private _hiddenCardIds(): Set<number> {
+    const ids = new Set<number>();
+    // Player's own deck (face-down)
+    for (const c of this.human.deck.cards) ids.add(c.id);
+    // Opponent's hand + deck (everything the human can't see)
+    const opp = this.game.players[1];
+    for (const c of opp.deck.hand) ids.add(c.id);
+    for (const c of opp.deck.cards) ids.add(c.id);
+    for (const c of opp.deck.setAside) ids.add(c.id);
+    // Market deck (not yet revealed)
+    for (const c of this.game.market.cards) ids.add(c.id);
+    return ids;
+  }
+
+  /** True if, since the pre-action snapshot, a previously-hidden card is now visible. */
+  private _didRevealInfo(): boolean {
+    if (!this._preActionSnapshot) return false;
+    const currentHidden = this._hiddenCardIds();
+    for (const id of this._preActionSnapshot.hiddenCardIds) {
+      if (!currentHidden.has(id)) return true;
+    }
+    return false;
+  }
+
+  // ── Undo (uses snapshot) ──
 
   canUndo(): boolean {
-    return this._undoStack.length > 0 && this.phase === "actions";
+    return (
+      this._preActionSnapshot !== null &&
+      !this._infoRevealed &&
+      this.phase === "actions"
+    );
   }
-
-  /** Undo is complex because we can't easily reconstruct the full Game from toJSON.
-   *  Instead, we save/restore the full game object using a simpler approach:
-   *  snapshot the entire session state before each action.
-   *  For now, we use a lightweight approach: save just enough to rebuild.
-   *
-   *  Actually, the simplest correct approach: re-create the game from scratch
-   *  with the same parameters, then replay all actions up to N-1.
-   *  But that's expensive.
-   *
-   *  Practical approach: we save the game state JSON and notify the caller
-   *  that they need to create a fresh session. The hook will manage this.
-   *
-   *  Simplest approach that works NOW: the undo stack stores serialized snapshots
-   *  of the entire game object via structuredClone-compatible deep copy.
-   *  Since our Game class uses toJSON/fromJSON... we don't have fromJSON yet
-   *  for the full game. So for Phase 2, we use a different strategy:
-   *
-   *  We store the raw action history and replay from start. This is correct
-   *  but slower. For a card game it's imperceptible.
-   */
-
-  // Store action indices for replay-based undo
-  private _actionHistory: number[] = [];
 
   undo(): boolean {
     if (!this.canUndo()) return false;
-    // Pop last action and rebuild by replaying all actions except the last
-    this._actionHistory.pop();
-    this._undoStack.pop();
-    // We need to rebuild the session from scratch and replay
-    // This is handled by the hook which creates a new session and replays
+    this._restoreSnapshot(this._preActionSnapshot!);
+    // Remove the log entry produced by the action we're undoing
+    if (this._lastLogIndex >= 0 && this._lastLogIndex < this._player_log.length) {
+      this._player_log.splice(this._lastLogIndex, 1);
+    }
+    this._preActionSnapshot = null;
+    this._playerSnapBefore = null;
+    this._infoRevealed = false;
+    this._cached_raw = null;
+    this._lastLogIndex = -1;
     return true;
-  }
-
-  getActionHistory(): number[] {
-    return [...this._actionHistory];
   }
 
   // ── State getters ──
@@ -318,18 +522,10 @@ export class GameSession {
       return { error: `Invalid action index: ${actionIndex}` };
     }
 
-    // Save for undo (before the action)
-    this._pushUndo();
-    this._actionHistory.push(actionIndex);
-
-    // Save state for prompt replay
-this._pending_action_index = actionIndex;
-    this._accumulated_responses = [];
-
     const action = this._cached_raw![actionIndex];
     this.human.clearPromptResponses();
 
-    // End actions -> damage phase
+    // End actions transitions out of the actions phase — no snapshot/rollback needed.
     if (action.type === "end_actions") {
       const h = this.human;
       h.curBoxings += Math.floor(h.curMoney / 2);
@@ -353,24 +549,35 @@ this._pending_action_index = actionIndex;
 
       this._cached_raw = null;
       this._pending_prompt = null;
-      this._undoStack = []; // Clear undo on phase transition
+      // Snapshot cleared — we've left the actions phase
+      this._preActionSnapshot = null;
+      this._playerSnapBefore = null;
+      this._infoRevealed = false;
+      this._lastLogIndex = -1;
       return this.getState();
     }
 
-    // Snapshot for logging
-    const snapBefore = snapshot(this.human);
-    const missionBefore = this.human.curMission;
+    // Take snapshot BEFORE the action — enables prompt rollback and undo.
+    this._preActionSnapshot = this._takeSnapshot();
+    this._playerSnapBefore = snapshot(this.human);
+    this._missionBefore = this.human.curMission;
+    this._infoRevealed = false;
+    this._pending_action_index = actionIndex;
+    this._accumulated_responses = [];
 
+    return this._attemptAction(action);
+  }
+
+  /** Run the action, handling PromptNeeded by restoring state and awaiting input. */
+  private _attemptAction(action: GameActionInternal) {
     try {
       this.human.performAction(action, this.game);
     } catch (e) {
       if (e instanceof PromptNeeded) {
         this._pending_prompt = e;
         this.phase = "awaiting_prompt";
-        // Undo the undo-push since the action didn't complete
-        this._undoStack.pop();
-        this._actionHistory.pop();
-        // Restore state for retry
+        // Roll back partial mutations so the replay starts clean.
+        if (this._preActionSnapshot) this._restoreSnapshot(this._preActionSnapshot);
         this._cached_raw = null;
         const [, raw] = this.human.serializeActions(this.game);
         this._cached_raw = raw;
@@ -379,18 +586,25 @@ this._pending_action_index = actionIndex;
       throw e;
     }
 
+    // Action completed — finalize logging and info-reveal state.
     this._pending_prompt = null;
+    this._accumulated_responses = [];
+    this._infoRevealed = this._didRevealInfo();
 
-    // Log effects
+    const snapBefore = this._playerSnapBefore!;
     const snapAfter = snapshot(this.human);
     const effects = diffToText(snapBefore, snapAfter);
     const source = this._actionSourceName(action);
+    const missionBefore = this._missionBefore;
 
+    this._lastLogIndex = -1;
     if (source) {
       if (action.type === "buy" || action.type === "buy_with_boxings") {
+        this._lastLogIndex = this._player_log.length;
         this._player_log.push({ turn: this.game.turncount, text: source });
       } else if (action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
         const filtered = effects.filter((e) => !e.includes("money"));
+        this._lastLogIndex = this._player_log.length;
         this._player_log.push({
           turn: this.game.turncount,
           text: filtered.length > 0 ? `${source}: ${filtered.join(", ")}` : source,
@@ -398,9 +612,11 @@ this._pending_action_index = actionIndex;
       } else if (action.type === "advance_mission") {
         const filtered = effects.filter((e) => e !== "-1 mission");
         if (filtered.length > 0) {
+          this._lastLogIndex = this._player_log.length;
           this._player_log.push({ turn: this.game.turncount, text: `${source}: ${filtered.join(", ")}` });
         }
       } else if (effects.length > 0) {
+        this._lastLogIndex = this._player_log.length;
         this._player_log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}` });
       }
     }
@@ -416,7 +632,10 @@ this._pending_action_index = actionIndex;
       }
     }
 
-    if (this.game.winner) this.phase = "game_over";
+    if (this.game.winner) {
+      this.phase = "game_over";
+      this._preActionSnapshot = null; // No undo past game over
+    }
     this._cached_raw = null;
     return this.getState();
   }
@@ -430,47 +649,25 @@ this._pending_action_index = actionIndex;
     if (promptType !== this._pending_prompt.promptType) {
       return { error: `Expected prompt type ${this._pending_prompt.promptType}, got ${promptType}` };
     }
+    if (this._preActionSnapshot === null || this._pending_action_index === null) {
+      return { error: "No pre-action snapshot — cannot replay" };
+    }
 
     this._accumulated_responses.push([promptType, value]);
     this._pending_prompt = null;
     this.phase = "actions";
 
-    // Now push undo since the action will complete (or prompt again)
-    this._pushUndo();
-    this._actionHistory.push(this._pending_action_index!);
-
-    // Replay with all responses
+    // State was already restored when the prompt was thrown; re-cache actions,
+    // queue all accumulated responses, and replay from the original action.
     const [, raw] = this.human.serializeActions(this.game);
     this._cached_raw = raw;
-    const action = this._cached_raw[this._pending_action_index!];
+    const action = this._cached_raw[this._pending_action_index];
     this.human.clearPromptResponses();
     for (const [ptype, pvalue] of this._accumulated_responses) {
       this.human.setPromptResponse(ptype, pvalue);
     }
 
-    try {
-      this.human.performAction(action, this.game);
-    } catch (e) {
-      if (e instanceof PromptNeeded) {
-        this._pending_prompt = e;
-        this.phase = "awaiting_prompt";
-        // Undo the push since action still incomplete
-        this._undoStack.pop();
-        this._actionHistory.pop();
-        this._cached_raw = null;
-        const [, newRaw] = this.human.serializeActions(this.game);
-        this._cached_raw = newRaw;
-        return this.getState();
-      }
-      throw e;
-    }
-
-    this._pending_prompt = null;
-    this._accumulated_responses = [];
-    this._cached_raw = null;
-
-    if (this.game.winner) this.phase = "game_over";
-    return this.getState();
+    return this._attemptAction(action);
   }
 
   // ── Damage phase ──
@@ -642,7 +839,11 @@ this._pending_action_index = actionIndex;
     this._resolveTraining();
     this.phase = "actions";
     this._cached_raw = null;
-    this._undoStack = [];
+    // Fresh turn — no snapshot yet, no undo available until an action is taken
+    this._preActionSnapshot = null;
+    this._playerSnapBefore = null;
+    this._infoRevealed = false;
+    this._lastLogIndex = -1;
   }
 
   private _resolveTraining() {

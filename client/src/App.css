@@ -1264,6 +1264,38 @@ h3 {
   background: transparent;
 }
 
+.undo-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  color: rgba(201, 164, 74, 0.9);
+  border: 1px solid rgba(201, 164, 74, 0.4);
+  border-radius: 2px;
+  width: 100%;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.undo-btn:hover:not(.disabled):not(:disabled) {
+  background: rgba(201, 164, 74, 0.08);
+  border-color: var(--gold);
+  color: var(--gold-bright);
+  text-shadow: 0 0 8px rgba(201, 164, 74, 0.3);
+}
+
+.undo-btn.disabled,
+.undo-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
 .end-turn-reminders {
   display: flex;
   flex-direction: column;

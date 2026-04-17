@@ -7,6 +7,8 @@ interface Props {
   onAction: (index: number) => void;
   missionRemaining: number;
   player: PlayerData;
+  onUndo?: () => void;
+  canUndo?: boolean;
 }
 
 function getReminders(player: PlayerData, actions: GameAction[]): string[] {
@@ -57,13 +59,23 @@ function getReminders(player: PlayerData, actions: GameAction[]): string[] {
   return reminders;
 }
 
-export function ActionList({ actions, onAction, missionRemaining, player }: Props) {
+export function ActionList({ actions, onAction, missionRemaining, player, onUndo, canUndo }: Props) {
   const endAction = actions.find((a) => a.code === 0);
   const blocked = missionRemaining > 0;
   const reminders = blocked ? [] : getReminders(player, actions);
 
   return (
     <div className="action-list">
+      {onUndo && (
+        <button
+          className={`action-btn undo-btn${canUndo ? "" : " disabled"}`}
+          onClick={() => { if (canUndo) onUndo(); }}
+          title={canUndo ? "Undo last action" : "Can't undo — new information has been revealed"}
+          disabled={!canUndo}
+        >
+          ↶ Undo
+        </button>
+      )}
       {endAction && (
         <>
           <button

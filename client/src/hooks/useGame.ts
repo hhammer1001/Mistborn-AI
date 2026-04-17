@@ -367,36 +367,21 @@ export function useGame() {
     const session = sessionRef.current;
     if (!session || !session.canUndo()) return;
 
-    // Get the action history minus the last action, then rebuild
-    const history = session.getActionHistory();
-    history.pop(); // remove last action
+    const pName = playerName.current;
 
-    // Recreate session with same parameters
-    resetCardIds();
-    const newSession = new GameSession({
-      playerName: playerName.current,
-      character: session.character,
-      opponentType: session.opponentType,
-      opponentCharacter: session.opponentCharacter,
-      botFirst: true, // matches original creation
-    });
+    // Restore in place — session handles state rollback and log cleanup.
+    const ok = session.undo();
+    if (!ok) return;
 
-    // Replay all actions except the last
-    for (const idx of history) {
-      newSession.playAction(idx);
-    }
-
-    sessionRef.current = newSession;
-    const data = newSession.getState() as unknown as GameState;
+    const data = session.getState() as unknown as GameState;
     setGameState(data);
 
-    // Rebuild log (simplified: just show current state)
+    // Session's own log entry was removed by undo() — also remove the matching
+    // "Player — <action description>" line from the hook-side log.
     setLog((prev) => {
-      // Remove last player action entry
       const result = [...prev];
-      // Find and remove the last non-bot entry
       for (let i = result.length - 1; i >= 0; i--) {
-        if (!result[i].isBot) {
+        if (!result[i].isBot && result[i].text.startsWith(`${pName} — `)) {
           result.splice(i, 1);
           break;
         }
