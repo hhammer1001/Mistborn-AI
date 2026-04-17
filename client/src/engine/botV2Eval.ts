@@ -34,7 +34,7 @@ const SELFPLAY_WEIGHTS: Record<string, SelfPlayWeights> = {
 // Minimum sample size before we trust a self-play weight
 const SELFPLAY_MIN_SAMPLES = 100;
 // How strongly to weight self-play vs analytical (additive blend)
-const SELFPLAY_BLEND_STRENGTH = 60.0;
+const SELFPLAY_BLEND_STRENGTH = 150.0;
 
 // ── Resource Base Values ──
 // These are the "exchange rates" of the game economy.
@@ -241,7 +241,6 @@ export function buildSnapshot(player: Player, game: Game): GameStateSnapshot {
 
 export function damageWeight(snap: GameStateSnapshot): number {
   let w = RV.D;
-  // Scale with kill proximity — damage compounds as HP drops
   if (snap.oppHealth <= 8) w += 3.0;
   else if (snap.oppHealth <= 15) w += 1.5;
   else if (snap.oppHealth <= 25) w += 0.5;
@@ -346,7 +345,7 @@ export function estimateEffectValue(
       case "pull": total += a * RV.pull; break;
       case "push": total += a * RV.push; break;
       case "riot": total += RV.riot; break;
-      case "seek": total += Math.abs(a) * 0.4; break;
+      case "seek": total += Math.abs(a) * 0.8; break;
       case "choose": total += estimateChooseValue(amounts[i], snap); break;
       default:
         if (e.startsWith("special")) {
@@ -441,7 +440,7 @@ function computeStaticEffectValue(effect: string, amount: string): number {
       case "pull": total += a * RV.pull; break;
       case "push": total += a * RV.push; break;
       case "riot": total += RV.riot; break;
-      case "seek": total += Math.abs(a) * 0.4; break;
+      case "seek": total += Math.abs(a) * 0.8; break;
       case "choose": {
         // Estimate as the average of options (bot will pick best at runtime)
         const inner = (amounts[i] || "").replace(/[()]/g, "");

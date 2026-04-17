@@ -183,7 +183,6 @@ export class TwonkyV2 extends Player {
 
     // Opportunity cost: we lose this card's ability for the turn.
     // Even if metal isn't available yet, we could get it via burn_metal token.
-    // So the cost is always some fraction of the card's tier value.
     let opportunityCost = 0;
     if (card.metalUsed < card.capacity) {
       const nextTier = card.metalUsed + 1;
@@ -194,11 +193,10 @@ export class TwonkyV2 extends Player {
       ];
       if (nextTier >= 1 && nextTier <= 3 && effects[nextTier - 1][0]) {
         const tierVal = estimateEffectValue(effects[nextTier - 1][0], effects[nextTier - 1][1], snap);
-        // Full cost if metal is available now; partial if we could still get metal another way
         if (this.metalAvailable[card.metal] > 0) {
           opportunityCost = tierVal;
         } else {
-          opportunityCost = tierVal * 0.6; // likely could get metal via token burn
+          opportunityCost = tierVal * 0.6;
         }
       }
     }
