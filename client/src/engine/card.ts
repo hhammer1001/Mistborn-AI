@@ -43,6 +43,14 @@ export class Card {
   reset() {
     // Base reset — overridden by subclasses
   }
+
+  snapshot(): Record<string, unknown> {
+    return { sought: this.sought };
+  }
+
+  applySnapshot(s: Record<string, unknown>): void {
+    this.sought = s.sought as boolean;
+  }
 }
 
 // ── Action Card ──

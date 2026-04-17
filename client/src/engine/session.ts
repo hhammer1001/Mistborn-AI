@@ -179,15 +179,20 @@ export class GameSession {
   private _cached_raw: GameActionInternal[] | null = null;
   private _cloud_damage = 0;
 
-  // Snapshot for prompt rollback + undo.
-  // Taken before every action attempt; restored on prompt throw or undo.
+  // Snapshot of state at the start of the current in-flight action — used for
+  // rolling back mid-action on PromptNeeded. Cleared once the action completes.
   private _preActionSnapshot: GameSnapshot | null = null;
-  // For effect logging — captured at the start of an action sequence
+  // Stack of committed snapshots (one per completed clean action). Each entry
+  // can be restored by undo. Cleared when a dirty action happens or the phase
+  // changes (end actions, start of turn, etc).
+  private _undoStack: Array<{ snapshot: GameSnapshot; logIndex: number }> = [];
+  // Once an action reveals hidden info (draw / market refill), no undo is
+  // allowed for the rest of this action sequence.
+  private _dirty = false;
+  // For effect logging of the current in-flight action
   private _playerSnapBefore: Snapshot | null = null;
   private _missionBefore = 0;
-  // Set to true if the action (or its chain) revealed hidden info (draw, market refill)
-  private _infoRevealed = false;
-  // Index of the last-completed action entry in the player log — so undo can remove it
+  // Log index of the entry produced by the current in-flight action (if any)
   private _lastLogIndex = -1;
 
   constructor(opts: {
@@ -405,38 +410,34 @@ export class GameSession {
     return ids;
   }
 
-  /** True if, since the pre-action snapshot, a previously-hidden card is now visible. */
-  private _didRevealInfo(): boolean {
-    if (!this._preActionSnapshot) return false;
+  /** True if, relative to the given snapshot, a previously-hidden card is now visible. */
+  private _didRevealInfo(snap: GameSnapshot): boolean {
     const currentHidden = this._hiddenCardIds();
-    for (const id of this._preActionSnapshot.hiddenCardIds) {
+    for (const id of snap.hiddenCardIds) {
       if (!currentHidden.has(id)) return true;
     }
     return false;
   }
 
-  // ── Undo (uses snapshot) ──
+  // ── Undo (uses snapshot stack) ──
 
   canUndo(): boolean {
     return (
-      this._preActionSnapshot !== null &&
-      !this._infoRevealed &&
+      this._undoStack.length > 0 &&
+      !this._dirty &&
       this.phase === "actions"
     );
   }
 
   undo(): boolean {
     if (!this.canUndo()) return false;
-    this._restoreSnapshot(this._preActionSnapshot!);
+    const entry = this._undoStack.pop()!;
+    this._restoreSnapshot(entry.snapshot);
     // Remove the log entry produced by the action we're undoing
-    if (this._lastLogIndex >= 0 && this._lastLogIndex < this._player_log.length) {
-      this._player_log.splice(this._lastLogIndex, 1);
+    if (entry.logIndex >= 0 && entry.logIndex < this._player_log.length) {
+      this._player_log.splice(entry.logIndex, 1);
     }
-    this._preActionSnapshot = null;
-    this._playerSnapBefore = null;
-    this._infoRevealed = false;
     this._cached_raw = null;
-    this._lastLogIndex = -1;
     return true;
   }
 
@@ -549,10 +550,11 @@ export class GameSession {
 
       this._cached_raw = null;
       this._pending_prompt = null;
-      // Snapshot cleared — we've left the actions phase
+      // Left the actions phase — clear undo state
       this._preActionSnapshot = null;
       this._playerSnapBefore = null;
-      this._infoRevealed = false;
+      this._undoStack = [];
+      this._dirty = false;
       this._lastLogIndex = -1;
       return this.getState();
     }
@@ -561,7 +563,6 @@ export class GameSession {
     this._preActionSnapshot = this._takeSnapshot();
     this._playerSnapBefore = snapshot(this.human);
     this._missionBefore = this.human.curMission;
-    this._infoRevealed = false;
     this._pending_action_index = actionIndex;
     this._accumulated_responses = [];
 
@@ -589,7 +590,10 @@ export class GameSession {
     // Action completed — finalize logging and info-reveal state.
     this._pending_prompt = null;
     this._accumulated_responses = [];
-    this._infoRevealed = this._didRevealInfo();
+
+    const revealedInfo = this._preActionSnapshot
+      ? this._didRevealInfo(this._preActionSnapshot)
+      : false;
 
     const snapBefore = this._playerSnapBefore!;
     const snapAfter = snapshot(this.human);
@@ -632,9 +636,22 @@ export class GameSession {
       }
     }
 
+    // Commit the snapshot to the undo stack — only while we haven't crossed a
+    // dirty action. Once dirty, we stop pushing (undo is blocked anyway).
+    if (!this._dirty && this._preActionSnapshot) {
+      this._undoStack.push({
+        snapshot: this._preActionSnapshot,
+        logIndex: this._lastLogIndex,
+      });
+    }
+    if (revealedInfo) this._dirty = true;
+
+    this._preActionSnapshot = null;
+    this._playerSnapBefore = null;
+
     if (this.game.winner) {
       this.phase = "game_over";
-      this._preActionSnapshot = null; // No undo past game over
+      this._undoStack = []; // No undo past game over
     }
     this._cached_raw = null;
     return this.getState();
@@ -839,10 +856,11 @@ export class GameSession {
     this._resolveTraining();
     this.phase = "actions";
     this._cached_raw = null;
-    // Fresh turn — no snapshot yet, no undo available until an action is taken
+    // Fresh turn — no snapshots yet, dirty flag reset
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
-    this._infoRevealed = false;
+    this._undoStack = [];
+    this._dirty = false;
     this._lastLogIndex = -1;
   }
 

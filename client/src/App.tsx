@@ -413,8 +413,6 @@ function GameBoard({
               onAction={handleAction}
               missionRemaining={you.mission}
               player={you}
-              onUndo={onUndo}
-              canUndo={canUndo}
             />
           )}
           <div className="turn-info">
@@ -425,6 +423,16 @@ function GameBoard({
           {onForfeit && (
             <button className="forfeit-btn" onClick={onForfeit}>
               Forfeit
+            </button>
+          )}
+          {onUndo && (
+            <button
+              className={`undo-btn${canUndo ? "" : " disabled"}`}
+              onClick={() => { if (canUndo) onUndo(); }}
+              title={canUndo ? "Undo last action" : "Can't undo — new information has been revealed"}
+              disabled={!canUndo}
+            >
+              ↶ Undo
             </button>
           )}
           <button className="main-menu-btn" onClick={onMainMenu}>
