@@ -1298,28 +1298,28 @@ h3 {
 }
 
 .undo-btn {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.75rem;
+  /* Sit just above the fixed Main Menu button, matching its size */
+  position: fixed;
+  bottom: 2.6rem;
+  right: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   background: transparent;
   color: rgba(201, 164, 74, 0.9);
-  border: 1px solid rgba(201, 164, 74, 0.4);
-  border-radius: 2px;
-  width: 100%;
-  text-align: center;
+  border: 1px solid rgba(201, 164, 74, 0.5);
+  border-radius: 4px;
   cursor: pointer;
-  margin-bottom: 0.4rem;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  z-index: 100;
 }
 
 .undo-btn:hover:not(.disabled):not(:disabled) {
   background: rgba(201, 164, 74, 0.08);
   border-color: var(--gold);
   color: var(--gold-bright);
-  text-shadow: 0 0 8px rgba(201, 164, 74, 0.3);
 }
 
 .undo-btn.disabled,
