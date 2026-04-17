@@ -132,8 +132,7 @@ export class Market extends Deck {
 
   private _buildTestDeck() {
     // Test deck for reproducing the Seeker + riot + seek bug.
-    // Market-side: Seeker (bronze ally with seek-5 / special16), plus several
-    // riotable action cards so seek has targets that will riot Seeker back.
+    // Only Seekers (ally with seek-5 / special16) and Enrage (riotable action).
     const seekerDef: CardDef = {
       cardType: 3, name: "Seeker", cost: 5, metal: 2,
       ability1Effect: "seek", ability1Amount: "-5",
@@ -144,23 +143,9 @@ export class Market extends Deck {
       cardType: 2, name: "Enrage", cost: 2, metal: 4,
       ability1Effect: "D.M.riot", ability1Amount: "1.2.0",
     };
-    const inspireDef: CardDef = {
-      cardType: 2, name: "Inspire", cost: 3, metal: 4,
-      ability1Effect: "M.riot", ability1Amount: "3.1",
-    };
-    // A Houselord for money/draw (useful filler)
-    const houselordDef: CardDef = {
-      cardType: 3, name: "Houselord", cost: 3, metal: 1,
-      ability1Effect: "M", ability1Amount: "2",
-      ability2Effect: "C", ability2Amount: "1",
-      health: 2,
-    };
-    // Push plenty of copies so market.hand + refills will always contain them.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
       this.cards.push(createCard(seekerDef));
       this.cards.push(createCard(enrageDef));
-      this.cards.push(createCard(inspireDef));
-      this.cards.push(createCard(houselordDef));
     }
   }
 
