@@ -264,7 +264,7 @@ export class TwonkyV2 extends Player {
 
     if (!effectStr) return 0;
     const effectVal = estimateEffectValue(effectStr, amountStr, snap);
-    return 40 + effectVal; // Ally abilities are "free" (no card cost)
+    return 40 + effectVal;
   }
 
   private scoreCharAbility1(snap: GameStateSnapshot): number {

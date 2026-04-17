@@ -1,4 +1,5 @@
-import type { GamePrompt, PromptOption } from "../types/game";
+import type { GamePrompt, GameState, PromptOption, CardData } from "../types/game";
+import { Card } from "./Card";
 
 const EFFECT_NAMES: Record<string, string> = {
   D: "Damage", M: "Money", H: "Heal", C: "Draw", E: "Eliminate",
@@ -28,25 +29,86 @@ function optionLabel(opt: PromptOption): string {
 
 interface Props {
   prompt: GamePrompt;
+  gameState: GameState;
   onRespond: (promptType: string, value: number) => void;
 }
 
-export function PromptDialog({ prompt, onRespond }: Props) {
+/** Find the CardData for a given cardId by searching all visible locations. */
+function findCard(cardId: number, gameState: GameState): CardData | undefined {
+  const you = gameState.players[0];
+  const byId = (c: CardData) => c.id === cardId;
+  return (
+    you.hand.find(byId) ||
+    you.discard.find(byId) ||
+    you.allies.find(byId) ||
+    gameState.market.hand.find(byId) ||
+    gameState.market.discard.find(byId)
+  );
+}
+
+export function PromptDialog({ prompt, gameState, onRespond }: Props) {
+  // Split card options from other options (skip, effect, metal, etc.)
+  const cardOptions = prompt.options.filter(
+    (o) => o.cardId !== undefined && o.source !== "skip"
+  );
+  const otherOptions = prompt.options.filter(
+    (o) => o.cardId === undefined || o.source === "skip"
+  );
+
+  const hasCardGrid = cardOptions.length > 0;
+
   return (
     <div className="prompt-overlay">
-      <div className="prompt-dialog">
+      <div className={`prompt-dialog${hasCardGrid ? " prompt-dialog-grid" : ""}`}>
         <div className="prompt-title">{prompt.context || "Choose"}</div>
-        <div className="prompt-options">
-          {prompt.options.map((opt) => (
-            <button
-              key={opt.index}
-              className={`prompt-option-btn${opt.source === "skip" ? " prompt-skip" : ""}`}
-              onClick={() => onRespond(prompt.type, opt.index)}
-            >
-              {optionLabel(opt)}
-            </button>
-          ))}
-        </div>
+
+        {hasCardGrid && (
+          <div className="prompt-card-grid">
+            {cardOptions.map((opt) => {
+              const card = findCard(opt.cardId as number, gameState);
+              if (!card) {
+                // Fallback: card not visible in game state — show as button
+                return (
+                  <button
+                    key={opt.index}
+                    className="prompt-option-btn"
+                    onClick={() => onRespond(prompt.type, opt.index)}
+                  >
+                    {optionLabel(opt)}
+                  </button>
+                );
+              }
+              return (
+                <div key={opt.index} className="prompt-card-choice">
+                  <Card
+                    card={card}
+                    highlighted
+                    highlightColor="gold"
+                    baseWidth={130}
+                    onClick={() => onRespond(prompt.type, opt.index)}
+                  />
+                  {opt.source && opt.source !== "hand" && opt.source !== "market" && (
+                    <div className="prompt-card-source">{opt.source}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {otherOptions.length > 0 && (
+          <div className="prompt-options">
+            {otherOptions.map((opt) => (
+              <button
+                key={opt.index}
+                className={`prompt-option-btn${opt.source === "skip" ? " prompt-skip" : ""}`}
+                onClick={() => onRespond(prompt.type, opt.index)}
+              >
+                {optionLabel(opt)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -88,10 +88,11 @@ export class WebPlayer extends Player {
     for (let i = 0; i < this.deck.hand.length; i++) {
       const c = this.deck.hand[i];
       if (this._active_card && c.id === this._active_card.id) continue;
-      options.push({ index: i, name: c.name, source: "hand" });
+      options.push({ index: i, name: c.name, source: "hand", cardId: c.id });
     }
     for (let i = 0; i < this.deck.discard.length; i++) {
-      options.push({ index: i + h, name: this.deck.discard[i].name, source: "discard" });
+      const c = this.deck.discard[i];
+      options.push({ index: i + h, name: c.name, source: "discard", cardId: c.id });
     }
     if (options.length === 0) return -1;
     options.push({ index: -1, name: "Skip", source: "skip" });
@@ -104,7 +105,7 @@ export class WebPlayer extends Player {
 
     if (this.deck.discard.length === 0) return -1;
     const options: PromptOption[] = this.deck.discard.map((c, i) => ({
-      index: i, name: c.name, source: "discard",
+      index: i, name: c.name, source: "discard", cardId: c.id,
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("pull", options, "Choose a card to pull to top of deck");
@@ -116,7 +117,7 @@ export class WebPlayer extends Player {
     if (resp !== undefined) return Number(resp);
 
     const options: PromptOption[] = choices.map((c, i) => ({
-      index: i, name: c.name, cost: c.cost,
+      index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market",
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("subdue", options, "Choose a market card to gain (cost ≤ 5)");
@@ -128,7 +129,7 @@ export class WebPlayer extends Player {
     if (resp !== undefined) return Number(resp);
 
     const options: PromptOption[] = choices.map((c, i) => ({
-      index: i, name: c.name,
+      index: i, name: c.name, cardId: c.id, source: "market-discard",
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("soar", options, "Choose an eliminated card to gain");
@@ -140,7 +141,7 @@ export class WebPlayer extends Player {
     if (resp !== undefined) return Number(resp);
 
     const options: PromptOption[] = choices.map((c, i) => ({
-      index: i, name: c.name,
+      index: i, name: c.name, cardId: c.id, source: "market-discard",
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("confrontation", options, "Choose an action card to play its top ability");
@@ -159,7 +160,7 @@ export class WebPlayer extends Player {
     if (resp !== undefined) return Number(resp);
 
     const options: PromptOption[] = choices.map((c, i) => ({
-      index: i, name: c.name,
+      index: i, name: c.name, cardId: c.id, source: "hand",
     }));
     throw new PromptNeeded("keeper", options, "Choose a card to set aside (draw next turn)");
   }
@@ -197,7 +198,7 @@ export class WebPlayer extends Player {
     if (market.length === 0) return -1;
 
     const options: PromptOption[] = market.map((c, i) => ({
-      index: i, name: c.name, cost: c.cost,
+      index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market",
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("push", options, "Choose a market card to eliminate");
@@ -209,7 +210,7 @@ export class WebPlayer extends Player {
     if (resp !== undefined) return riotable[Number(resp)];
 
     const options: PromptOption[] = riotable.map((a, i) => ({
-      index: i, name: a.name,
+      index: i, name: a.name, cardId: a.id, source: "allies",
     }));
     throw new PromptNeeded("riot", options, "Choose an ally to activate");
   }
@@ -221,7 +222,7 @@ export class WebPlayer extends Player {
     const resp1 = this._getQueueResponse("seek");
     if (resp1 === undefined) {
       const options: PromptOption[] = choices.map((c, i) => ({
-        index: i, name: c.name, cost: c.cost,
+        index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market",
       }));
       options.push({ index: -1, name: "Skip", source: "skip" });
       const ctx = twice
@@ -239,7 +240,7 @@ export class WebPlayer extends Player {
     const resp2 = this._getQueueResponse("seek");
     if (resp2 === undefined) {
       const options: PromptOption[] = choices
-        .map((c, i) => ({ index: i, name: c.name, cost: c.cost }))
+        .map((c, i) => ({ index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market" as const }))
         .filter((o) => o.index !== choice1);
       options.push({ index: -1, name: "Skip", source: "skip" });
       throw new PromptNeeded("seek", options, "Choose a 2nd action to use (different from 1st)");

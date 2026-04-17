@@ -443,6 +443,7 @@ function GameBoard({
       {gameState.prompt && isMyTurn && (
         <PromptDialog
           prompt={gameState.prompt}
+          gameState={gameState}
           onRespond={(type, value) => respondToPrompt(type, value)}
         />
       )}

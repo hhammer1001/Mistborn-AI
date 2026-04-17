@@ -94,6 +94,13 @@ export interface BotLogEntry {
 
 export interface PromptOption {
   index: number;
+  cardId?: number;
+  name?: string;
+  cost?: number;
+  source?: string;
+  effect?: string;
+  amount?: string;
+  metal?: string;
   [key: string]: unknown;
 }
 

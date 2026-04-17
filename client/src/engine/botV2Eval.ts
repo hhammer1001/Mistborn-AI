@@ -34,7 +34,7 @@ const SELFPLAY_WEIGHTS: Record<string, SelfPlayWeights> = {
 // Minimum sample size before we trust a self-play weight
 const SELFPLAY_MIN_SAMPLES = 100;
 // How strongly to weight self-play vs analytical (additive blend)
-const SELFPLAY_BLEND_STRENGTH = 0.0;
+const SELFPLAY_BLEND_STRENGTH = 60.0;
 
 // ── Resource Base Values ──
 // These are the "exchange rates" of the game economy.
@@ -170,14 +170,17 @@ export function buildSnapshot(player: Player, game: Game): GameStateSnapshot {
   }
 
   // Victory path — mission is the dominant strategy in most games.
-  // Commit to damage only when:
+  // Commit to damage when:
   //   (a) Kelsier (steel metal, +2 damage char ability), OR
-  //   (b) we own a key damage engine card (House War, Crushing Blow, Maelstrom)
+  //   (b) we own a key damage engine card (House War, Crushing Blow, Maelstrom, Ruin)
+  // Hybrid for characters without natural mission generation (Shan, Prodigy) —
+  // they can go either way based on mid-game state.
   const DAMAGE_ENGINE_CARDS = new Set(["House War", "Crushing Blow", "Maelstrom", "Ruin"]);
   const ownedCards = [...player.deck.hand, ...player.deck.discard, ...player.deck.cards];
   const hasDamageEngine = ownedCards.some((c) => DAMAGE_ENGINE_CARDS.has(c.name));
   const isKelsier = player.character === "Kelsier";
 
+  // Default: mission is dominant. Damage only with specific engines.
   let victoryPath: VictoryPath;
   if (isKelsier || hasDamageEngine) {
     victoryPath = "damage";
@@ -185,8 +188,7 @@ export function buildSnapshot(player: Player, game: Game): GameStateSnapshot {
     victoryPath = "mission";
   }
 
-  // Exception: if we're way behind on our default path and way ahead on the other,
-  // flip to the path we're actually winning
+  // Flip based on actual progress when one path is clearly ahead
   const missionProgress = missions.reduce((sum, m) => sum + m.myRank / 12, 0) / 3;
   const damageProgress = (1 - opp.curHealth / 40) + player.pDamage * 0.1;
   if (victoryPath === "mission" && damageProgress > missionProgress + 0.3) {
@@ -249,8 +251,12 @@ export function damageWeight(snap: GameStateSnapshot): number {
 }
 
 export function moneyWeight(snap: GameStateSnapshot): number {
+  // Money is useful only when it converts to a card purchase.
+  // Diminishing returns above thresholds (most cards cost 2-6).
   let w = RV.M;
-  if (snap.curMoney >= 6) w *= 0.5;
+  if (snap.curMoney >= 8) w *= 0.3;
+  else if (snap.curMoney >= 6) w *= 0.5;
+  else if (snap.curMoney >= 4) w *= 0.75;
   return w;
 }
 
