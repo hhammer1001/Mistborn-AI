@@ -2239,3 +2239,100 @@ h3 {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ─── Feedback Button & Modal ─────────────────────────────────────────────── */
+
+.feedback-btn {
+  background: transparent !important;
+  color: var(--gold-dim) !important;
+  border: 1px solid var(--gold-dim) !important;
+  font-family: var(--font-display) !important;
+  letter-spacing: 0.04em !important;
+  font-size: 0.9em !important;
+}
+
+.feedback-btn:hover {
+  background: rgba(201, 164, 74, 0.08) !important;
+  color: var(--gold) !important;
+  border-color: var(--gold) !important;
+}
+
+.feedback-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.feedback-modal {
+  background: var(--bg-panel, #1a1a2e);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: var(--text);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.feedback-modal h2 {
+  margin: 0 0 1rem 0;
+  color: var(--gold);
+  font-family: var(--font-display);
+}
+
+.feedback-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.feedback-modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.95em;
+  color: var(--text);
+}
+
+.feedback-modal textarea,
+.feedback-modal input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  padding: 0.6rem;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 1em;
+  resize: vertical;
+}
+
+.feedback-modal textarea:focus,
+.feedback-modal input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.feedback-success {
+  color: var(--gold);
+  font-size: 1.1em;
+  margin: 1rem 0;
+}
+
+.feedback-error {
+  color: #e66;
+  font-size: 0.9em;
+  margin: 0;
+}

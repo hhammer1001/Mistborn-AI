@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { FeedbackModal } from "./FeedbackModal";
 
 const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
 const CHARACTER_OPTIONS = ["Random", ...CHARACTERS];
-const BOT_TYPES = ["twonky", "random", "focus", "hammer"];
+const BOT_TYPES = ["twonkyV2", "twonky", "random", "focus", "hammer"];
 
 function pickRandom(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -28,6 +29,7 @@ export function GameSetup({ onStart, onViewCards, onPlayOnline }: Props) {
   const [opponentCharacter, setOpponentCharacter] = useState("Random");
   const [botFirst, setBotFirst] = useState(true);
   const [testDeck, setTestDeck] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const handleStart = () => {
     const playerChar = character === "Random" ? pickRandom(CHARACTERS) : character;
@@ -119,7 +121,11 @@ export function GameSetup({ onStart, onViewCards, onPlayOnline }: Props) {
         <button className="view-cards-btn" onClick={onViewCards}>
           View All Cards
         </button>
+        <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
+          Send Feedback
+        </button>
       </div>
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }
