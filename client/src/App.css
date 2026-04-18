@@ -2646,6 +2646,14 @@ h3 {
   text-shadow: 0 2px 16px rgba(201, 164, 74, 0.3);
 }
 
+.copy-code-btn {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  min-width: 5.5rem;
+}
+
 .waiting-text {
   color: var(--text-dim);
   font-size: 0.85rem;
