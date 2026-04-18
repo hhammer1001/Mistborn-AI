@@ -2128,13 +2128,13 @@ h3 {
   cursor: default;
 }
 
-/* Permanent-reward marker (Pd, Pm, Pc) — big white "P" next to the
-   number baked into the icon, styled to match .reward-icon-number. */
+/* Permanent-reward marker (Pd, Pm, Pc) — big white "P" to the left of
+   the number baked into the icon, styled to match .reward-icon-number. */
 .reward-icon-perm-badge {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 8%;
+  left: 28%;
   display: flex;
   align-items: center;
   justify-content: center;
