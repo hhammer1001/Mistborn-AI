@@ -94,9 +94,7 @@ export function RewardIcon({ code, amount, size = 24, className }: Props) {
   const showOverlay = amount !== undefined && amount > 0 && !hasVariant
     && !(code === "B" && amount === 1);
   const isPermanent = code.startsWith("P") && code.length === 2;
-  const overlayText = showOverlay
-    ? isPermanent ? `${amount}P` : `${amount}`
-    : null;
+  const overlayText = showOverlay ? `${amount}` : null;
 
   return (
     <span
@@ -117,13 +115,13 @@ export function RewardIcon({ code, amount, size = 24, className }: Props) {
           {overlayText}
         </span>
       )}
-      {/* Permanent badge — always show for Pd/Pm/Pc so it's distinct from
-          the one-time version. Placed top-left so it doesn't collide with
-          the bottom-right number overlay. */}
-      {isPermanent && !overlayText && (
+      {/* Permanent marker — big white "P" next to the number so Pd/Pm/Pc
+          are visually distinct from the one-time versions. Always shown
+          (regardless of numbered-variant vs overlay rendering). */}
+      {isPermanent && (
         <span
           className="reward-icon-perm-badge"
-          style={{ fontSize: size * 0.55, width: size * 0.55, height: size * 0.55 }}
+          style={{ fontSize: size * 0.7 }}
         >
           P
         </span>

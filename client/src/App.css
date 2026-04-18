@@ -2128,23 +2128,27 @@ h3 {
   cursor: default;
 }
 
-/* Permanent-reward badge (Pd, Pm, Pc) — small gold "P" in the top-left */
+/* Permanent-reward marker (Pd, Pm, Pc) — big white "P" next to the
+   number baked into the icon, styled to match .reward-icon-number. */
 .reward-icon-perm-badge {
   position: absolute;
-  top: -2px;
-  left: -2px;
+  top: 0;
+  bottom: 0;
+  left: 8%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--gold);
-  color: var(--bg-deep);
-  border: 1px solid var(--bg-deep);
-  border-radius: 50%;
+  color: #fff;
   font-family: var(--font-display);
   font-weight: 800;
   line-height: 1;
   pointer-events: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0    0   4px rgba(0, 0, 0, 0.8);
 }
 
 .mission-bar-val {
