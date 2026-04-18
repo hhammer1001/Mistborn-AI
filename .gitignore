@@ -186,6 +186,7 @@ oldData
 # Allow engine data JSON files in the client
 !client/src/engine/data/*.json
 !client/src/engine/data/v2_weights/*.json
+!client/src/engine/data/synergyData/*.json
 !client/package.json
 !client/package-lock.json
 !client/tsconfig.json
