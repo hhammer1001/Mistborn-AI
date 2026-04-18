@@ -8,7 +8,15 @@
 import { Game, type PlayerFactory } from "./game";
 import { createTwonky } from "./bot";
 import { createTwonkyV2 } from "./botV2";
+import { createSynergyBotPrime } from "./synergyBot";
 import { resetCardIds } from "./card";
+
+type BotName = "V1" | "V2" | "Synergy";
+const BOT_FACTORIES: Record<BotName, PlayerFactory> = {
+  V1: createTwonky as PlayerFactory,
+  V2: createTwonkyV2 as PlayerFactory,
+  Synergy: createSynergyBotPrime as PlayerFactory,
+};
 
 interface MatchResult {
   winnerName: string;
@@ -130,6 +138,78 @@ function benchmark(numGamesPerMatchup: number) {
   console.log("Victory type distribution:", totalVT);
 }
 
+// ── Generic matchup (any bot vs any bot) ──
+
+function matchup(botA: BotName, botB: BotName, numGamesPerMatchup: number) {
+  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+  const fA = BOT_FACTORIES[botA];
+  const fB = BOT_FACTORIES[botB];
+
+  let totalAWins = 0;
+  let totalGames = 0;
+  const vt: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };
+
+  console.log(`\n${botA} vs ${botB} — ${numGamesPerMatchup} games per matchup (${numGamesPerMatchup * chars.length * (chars.length - 1)} total)\n`);
+  console.log("Matchup".padEnd(25) + `${botA} Win%`.padStart(12) + `${botA} Wins`.padStart(12) + "Avg Turns".padStart(12) + "  Victory Distribution");
+  console.log("-".repeat(95));
+
+  for (const c1 of chars) {
+    for (const c2 of chars) {
+      if (c1 === c2) continue;
+
+      let aWins = 0;
+      let total = 0;
+      let totalTurns = 0;
+      const mVt: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };
+
+      for (let i = 0; i < numGamesPerMatchup; i++) {
+        const aFirst = i % 2 === 0;
+        const [f1, f2, n1, n2, ch1, ch2] = aFirst
+          ? [fA, fB, botA, botB, c1, c2]
+          : [fB, fA, botB, botA, c2, c1];
+
+        try {
+          resetCardIds();
+          const game = new Game({
+            playerFactories: [f1, f2],
+            names: [n1, n2],
+            chars: [ch1, ch2],
+          });
+          const winner = game.play();
+          total++;
+          totalTurns += game.turncount;
+          if (winner.name === botA) aWins++;
+          if (game.victoryType in mVt) mVt[game.victoryType]++;
+        } catch (e) {
+          console.error(`  Error in ${c1} vs ${c2} game ${i}: ${e}`);
+        }
+      }
+
+      totalAWins += aWins;
+      totalGames += total;
+      for (const k of Object.keys(vt)) vt[k] += mVt[k];
+
+      const winPct = total > 0 ? (aWins / total * 100).toFixed(1) : "N/A";
+      const avgTurns = total > 0 ? (totalTurns / total).toFixed(0) : "N/A";
+      const vtDist = Object.entries(mVt).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v}`).join(" ");
+
+      console.log(
+        `${c1} vs ${c2}`.padEnd(25) +
+        `${winPct}%`.padStart(12) +
+        `${aWins}/${total}`.padStart(12) +
+        `${avgTurns}`.padStart(12) +
+        `  ${vtDist}`,
+      );
+    }
+  }
+
+  console.log("-".repeat(95));
+  const overallPct = totalGames > 0 ? (totalAWins / totalGames * 100).toFixed(1) : "N/A";
+  console.log(`\n${botA} vs ${botB} overall: ${totalAWins}/${totalGames} (${overallPct}%)`);
+  console.log("Victory type distribution:", vt, "\n");
+  return { botA, botB, wins: totalAWins, total: totalGames, pct: overallPct };
+}
+
 // ── Baseline: V1 vs V1 sanity check ──
 
 function baseline(numGames: number) {
@@ -160,10 +240,28 @@ function baseline(numGames: number) {
 
 const args = process.argv.slice(2);
 const mode = args[0] || "benchmark";
-const numGames = parseInt(args[1] || args[0] || "20", 10);
 
 if (mode === "baseline") {
-  baseline(isNaN(numGames) ? 100 : numGames);
+  const n = parseInt(args[1] || "100", 10);
+  baseline(isNaN(n) ? 100 : n);
+} else if (mode === "synergy") {
+  const n = parseInt(args[1] || "20", 10);
+  const games = isNaN(n) ? 20 : n;
+  const r1 = matchup("Synergy", "V1", games);
+  const r2 = matchup("Synergy", "V2", games);
+  console.log("\n=== Summary ===");
+  console.log(`Synergy vs V1:  ${r1.wins}/${r1.total} (${r1.pct}%)`);
+  console.log(`Synergy vs V2:  ${r2.wins}/${r2.total} (${r2.pct}%)`);
+} else if (mode === "matchup") {
+  const a = args[1] as BotName;
+  const b = args[2] as BotName;
+  const n = parseInt(args[3] || "20", 10);
+  if (!BOT_FACTORIES[a] || !BOT_FACTORIES[b]) {
+    console.error(`Usage: matchup <V1|V2|Synergy> <V1|V2|Synergy> [games]`);
+    process.exit(1);
+  }
+  matchup(a, b, isNaN(n) ? 20 : n);
 } else {
-  benchmark(isNaN(numGames) ? 20 : numGames);
+  const n = parseInt(args[1] || args[0] || "20", 10);
+  benchmark(isNaN(n) ? 20 : n);
 }

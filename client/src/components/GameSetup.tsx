@@ -3,7 +3,7 @@ import { FeedbackModal } from "./FeedbackModal";
 
 const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
 const CHARACTER_OPTIONS = ["Random", ...CHARACTERS];
-const BOT_TYPES = ["twonkyV2", "twonky", "random", "focus", "hammer"];
+const BOT_TYPES = ["twonkyV2", "twonky", "synergy", "random", "hammer"];
 
 function pickRandom(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)];

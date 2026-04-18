@@ -9,6 +9,7 @@ import { Player } from "./player";
 import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
 import { TwonkyV2 } from "./botV2";
+import { SynergyBotPrime } from "./synergyBot";
 import { PromptNeeded } from "./prompt";
 import type { GameActionInternal } from "./types";
 import { METAL_NAMES } from "./types";
@@ -128,10 +129,10 @@ interface LogEntry {
 }
 
 class LoggingBot {
-  bot: Twonky;
+  bot: Player;
   private session: GameSession;
 
-  constructor(bot: Twonky, session: GameSession) {
+  constructor(bot: Player, session: GameSession) {
     this.bot = bot;
     this.session = session;
   }
@@ -167,7 +168,7 @@ export class GameSession {
   opponentCharacter: string;
   game: Game;
   human: WebPlayer;
-  private _realBot: Twonky;
+  private _realBot: Player;
   private bot: LoggingBot;
   phase: GamePhase = "actions";
 
@@ -218,7 +219,10 @@ export class GameSession {
     this.opponentType = opponentType;
     this.opponentCharacter = opponentCharacter;
 
-    const BotClass = opponentType === "twonkyV2" ? TwonkyV2 : Twonky;
+    const BotClass =
+      opponentType === "twonkyV2" ? TwonkyV2 :
+      opponentType === "synergy" ? SynergyBotPrime :
+      Twonky;
     const botFactory: PlayerFactory = (deck, game, to, name, char) =>
       new BotClass(deck, game, to, name, char);
     const humanFactory: PlayerFactory = (deck, game, to, name, char) =>
@@ -232,7 +236,7 @@ export class GameSession {
     });
 
     this.human = this.game.players[0] as WebPlayer;
-    this._realBot = this.game.players[1] as Twonky;
+    this._realBot = this.game.players[1];
     this.bot = new LoggingBot(this._realBot, this);
 
     if (botFirst) {
