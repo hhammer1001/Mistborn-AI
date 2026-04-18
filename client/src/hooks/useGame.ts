@@ -279,13 +279,21 @@ export function useGame() {
 
   const playTwoActions = useCallback(
     (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => {
-      const first = playAction(firstIndex) as unknown as SessionResult | null;
-      if (!first) return null;
-      const actions = (first.availableActions ?? []) as GameAction[];
-      const second = actions.find((a) => a.code === secondMatch.code
-        && (secondMatch.cardIds === undefined || (a.cardId !== undefined && secondMatch.cardIds.includes(a.cardId))));
-      if (!second) return first;
-      return playAction(second.index);
+      const session = sessionRef.current;
+      if (!session) return null;
+      // Wrap both plays so a single undo rolls back the whole composite.
+      session.beginUndoBatch();
+      try {
+        const first = playAction(firstIndex) as unknown as SessionResult | null;
+        if (!first) return null;
+        const actions = (first.availableActions ?? []) as GameAction[];
+        const second = actions.find((a) => a.code === secondMatch.code
+          && (secondMatch.cardIds === undefined || (a.cardId !== undefined && secondMatch.cardIds.includes(a.cardId))));
+        if (!second) return first;
+        return playAction(second.index);
+      } finally {
+        session.endUndoBatch();
+      }
     },
     [playAction]
   );

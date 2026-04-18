@@ -105,6 +105,10 @@ interface GameSnapshot {
   players: PlayerSnapshot[];
   cardStates: Map<number, CardStateSnap>;
   hiddenCardIds: Set<number>;
+  /** Log lengths at snapshot time — used by undo to trim any entries that
+   *  were appended during the action(s) being rolled back. Works for
+   *  single actions and composite (multi-step) actions alike. */
+  logLengths: [number, number];
 }
 
 // ── Snapshot helpers for effect logging ──
@@ -177,11 +181,12 @@ export class GameSession {
 
   // Snapshot-based prompt rollback and undo
   private _preActionSnapshot: GameSnapshot | null = null;
-  private _undoStack: Array<{ snapshot: GameSnapshot; logIndex: number }> = [];
+  private _undoStack: GameSnapshot[] = [];
   private _dirty = false;
   private _playerSnapBefore: PSnap | null = null;
   private _missionBefore = 0;
-  private _lastLogIndex = -1;
+  // Undo-batch: while open, multiple playAction calls collapse to one undo entry.
+  private _batchStart: { snapshot: GameSnapshot; stackLen: number; dirtyBefore: boolean } | null = null;
 
   // Per-player logs (cumulative). Index 0 = player 0, index 1 = player 1.
   private _logs: [LogEntry[], LogEntry[]] = [[], []];
@@ -271,6 +276,7 @@ export class GameSession {
       players,
       cardStates,
       hiddenCardIds: this._hiddenCardIds(this.activePlayer),
+      logLengths: [this._logs[0].length, this._logs[1].length],
     };
   }
 
@@ -362,17 +368,35 @@ export class GameSession {
     );
   }
 
+  /** Open a batch so subsequent playAction calls collapse to one undo entry. */
+  beginUndoBatch(): void {
+    if (this._batchStart) return;
+    this._batchStart = {
+      snapshot: this._takeSnapshot(),
+      stackLen: this._undoStack.length,
+      dirtyBefore: this._dirty,
+    };
+  }
+
+  /** Close the batch opened by beginUndoBatch; collapses pushed entries. */
+  endUndoBatch(): void {
+    if (!this._batchStart) return;
+    const { snapshot, stackLen, dirtyBefore } = this._batchStart;
+    this._batchStart = null;
+    while (this._undoStack.length > stackLen) this._undoStack.pop();
+    if (!dirtyBefore) this._undoStack.push(snapshot);
+  }
+
   undo(): boolean {
     if (!this.canUndo()) return false;
-    const entry = this._undoStack.pop()!;
-    this._restoreSnapshot(entry.snapshot);
-    if (entry.logIndex >= 0 && entry.logIndex < this._logs[this.activePlayer].length) {
-      this._logs[this.activePlayer].splice(entry.logIndex, 1);
-      // Keep the read pointer in bounds so future delta slices don't re-emit.
-      if (this._logRead[this.activePlayer] > this._logs[this.activePlayer].length) {
-        this._logRead[this.activePlayer] = this._logs[this.activePlayer].length;
-      }
-    }
+    const snap = this._undoStack.pop()!;
+    this._restoreSnapshot(snap);
+    // Trim any log entries added since the snapshot was taken. Works for
+    // single actions and composite (multi-step) actions uniformly.
+    this._logs[0].length = Math.min(this._logs[0].length, snap.logLengths[0]);
+    this._logs[1].length = Math.min(this._logs[1].length, snap.logLengths[1]);
+    this._logRead[0] = Math.min(this._logRead[0], this._logs[0].length);
+    this._logRead[1] = Math.min(this._logRead[1], this._logs[1].length);
     this._cached_raw = null;
     return true;
   }
@@ -530,7 +554,6 @@ export class GameSession {
       this._playerSnapBefore = null;
       this._undoStack = [];
       this._dirty = false;
-      this._lastLogIndex = -1;
       return this.getState(playerIndex);
     }
 
@@ -541,6 +564,52 @@ export class GameSession {
     this._accumulated_responses = [];
 
     return this._attemptAction(action, playerIndex);
+  }
+
+  /**
+   * Play two actions atomically with a single undo entry. Used for composite
+   * UI interactions like "burn card + add metal to target" — pressing one
+   * button should be one undo step, not two.
+   *
+   * Takes a snapshot before the first action, plays both via `playAction`
+   * (which each push their own snapshots), then collapses the stack so only
+   * the pre-composite snapshot remains as the undo point for the pair.
+   */
+  playComposite(
+    playerIndex: number,
+    firstIndex: number,
+    secondMatch: { code: number; cardIds?: number[] },
+  ): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
+    if (this.phase !== "actions") return { error: `Cannot play action in phase: ${this.phase}` };
+
+    const stackLenBefore = this._undoStack.length;
+    const dirtyBefore = this._dirty;
+    const preCompositeSnapshot = this._takeSnapshot();
+
+    const first = this.playAction(playerIndex, firstIndex) as Record<string, unknown> & {
+      error?: string;
+      availableActions?: Array<{ index: number; code: number; cardId?: number }>;
+    };
+    if (first.error) return first;
+    if (this.phase !== "actions") return first;
+
+    const serialized = first.availableActions ?? [];
+    const secondAction = serialized.find(
+      (a) =>
+        a.code === secondMatch.code &&
+        (secondMatch.cardIds === undefined ||
+          (a.cardId !== undefined && secondMatch.cardIds.includes(a.cardId))),
+    );
+    if (!secondAction) return first;
+
+    const second = this.playAction(playerIndex, secondAction.index);
+
+    // Collapse any snapshots pushed during the composite into a single entry.
+    while (this._undoStack.length > stackLenBefore) this._undoStack.pop();
+    if (!dirtyBefore) this._undoStack.push(preCompositeSnapshot);
+
+    return second;
   }
 
   private _attemptAction(action: GameActionInternal, playerIndex: number): Record<string, unknown> {
@@ -570,16 +639,13 @@ export class GameSession {
     const source = this._actionSourceName(action, playerIndex);
     const missionBefore = this._missionBefore;
 
-    this._lastLogIndex = -1;
     const card = ("card" in action && action.card) ? action.card.toJSON() as CardData : undefined;
     if (source) {
       const log = this._logs[playerIndex];
       if (action.type === "buy" || action.type === "buy_with_boxings") {
-        this._lastLogIndex = log.length;
         log.push({ turn: this.game.turncount, text: source, card, actionType: action.type });
       } else if (action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
         const filtered = effects.filter((e) => !e.includes("money"));
-        this._lastLogIndex = log.length;
         log.push({
           turn: this.game.turncount,
           text: filtered.length > 0 ? `${source}: ${filtered.join(", ")}` : source,
@@ -588,17 +654,14 @@ export class GameSession {
       } else if (action.type === "advance_mission") {
         const filtered = effects.filter((e) => e !== "-1 mission");
         if (filtered.length > 0) {
-          this._lastLogIndex = log.length;
           log.push({ turn: this.game.turncount, text: `${source}: ${filtered.join(", ")}`, actionType: action.type });
         }
       } else if (card) {
         // Any card-bearing action (use_metal, burn_card, refresh_metal, ally_ability_*)
         // always logs so the opponent's UI can flash it, regardless of measurable effects.
-        this._lastLogIndex = log.length;
         const text = effects.length > 0 ? `${source}: ${effects.join(", ")}` : source;
         log.push({ turn: this.game.turncount, text, card, actionType: action.type });
       } else if (effects.length > 0) {
-        this._lastLogIndex = log.length;
         log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}`, actionType: action.type });
       }
     }
@@ -614,7 +677,7 @@ export class GameSession {
     }
 
     if (!this._dirty && this._preActionSnapshot) {
-      this._undoStack.push({ snapshot: this._preActionSnapshot, logIndex: this._lastLogIndex });
+      this._undoStack.push(this._preActionSnapshot);
     }
     if (revealedInfo) this._dirty = true;
 
@@ -835,7 +898,6 @@ export class GameSession {
     this._playerSnapBefore = null;
     this._undoStack = [];
     this._dirty = false;
-    this._lastLogIndex = -1;
 
     if (this._isBot(nextPi)) {
       this._runBotTurn(nextPi);
