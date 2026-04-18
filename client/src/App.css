@@ -2128,16 +2128,14 @@ h3 {
   cursor: default;
 }
 
-/* Permanent-reward marker (Pd, Pm, Pc) — big white "P" to the left of
-   the number baked into the icon, styled to match .reward-icon-number. */
+/* Permanent-reward marker (Pd, Pm, Pc) — big white "P" sitting just
+   outside the icon on its left, so it doesn't cover the baked-in number. */
 .reward-icon-perm-badge {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 28%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  margin-right: -4px;
   color: #fff;
   font-family: var(--font-display);
   font-weight: 800;
