@@ -68,7 +68,7 @@ export function useGame() {
 
   const enqueueFlashes = useCallback((entries: BotLogEntry[] | undefined) => {
     if (!entries) return;
-    const withCards = entries.filter((e) => e.card);
+    const withCards = entries.filter((e) => e.card && e.actionType !== "refresh_metal" && e.actionType !== "burn_card");
     if (withCards.length) setFlashQueue((q) => [...q, ...withCards]);
   }, []);
 

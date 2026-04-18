@@ -267,7 +267,7 @@ function MultiplayerGameBoard({
   game: ReturnType<typeof useMultiplayerGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit, undo, canUndo } = game;
 
   const handleAction = (index: number) => {
     if (!loading && isMyTurn) playAction(index);
@@ -314,6 +314,8 @@ function MultiplayerGameBoard({
         respondToPrompt={respondToPrompt}
         onMainMenu={onMainMenu}
         onForfeit={forfeit}
+        onUndo={undo}
+        canUndo={canUndo}
         isMultiplayer
       />
       {!isMyTurn && (gameState.phase as string) !== "game_over" && (

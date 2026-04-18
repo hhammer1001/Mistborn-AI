@@ -452,7 +452,10 @@ export class GameSession {
     // Log fields: cumulative by default (matches multiplayer semantics).
     state["playerLog"] = this._logs[perspective];
     state["botLog"] = this._logs[1 - perspective];
-    state["canUndo"] = this.canUndo();
+    // canUndo is perspective-aware: only true for whichever human is currently
+    // on their turn and can legitimately roll back. Prevents the opponent's
+    // undo button from lighting up during your turn in multiplayer.
+    state["canUndo"] = this.activePlayer === perspective && this.canUndo();
     return state;
   }
 

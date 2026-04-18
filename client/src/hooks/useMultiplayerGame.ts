@@ -69,7 +69,7 @@ export function useMultiplayerGame(
     const botLog = (gameState.botLog ?? []) as BotLogEntry[];
     const seen = seenBotLogLenRef.current;
     if (botLog.length > seen) {
-      const newEntries = botLog.slice(seen).filter((e) => e.card);
+      const newEntries = botLog.slice(seen).filter((e) => e.card && e.actionType !== "refresh_metal" && e.actionType !== "burn_card");
       if (newEntries.length) setFlashQueue((q) => [...q, ...newEntries]);
       seenBotLogLenRef.current = botLog.length;
     }
@@ -166,6 +166,11 @@ export function useMultiplayerGame(
       switch (pending.actionType) {
         case "action":
           session.playAction(pi, pending.actionIndex as number);
+          break;
+        case "undo":
+          // Guest requested undo. Only valid if it's still their turn and the
+          // session's canUndo check passes (intra-turn, no info revealed).
+          session.undo();
           break;
         case "composite": {
           // Two-step action (e.g. burn_card + use_metal). Play the first,
@@ -407,6 +412,20 @@ export function useMultiplayerGame(
     }
   }, [isHost, myPlayerIndex, _hostAction, _guestAction]);
 
+  const undo = useCallback(() => {
+    if (myPlayerIndex === null) return;
+    if (isHost) {
+      _hostAction((s) => { const ok = s.undo(); return ok ? null : { error: "Can't undo" }; });
+    } else {
+      _guestAction({ actionType: "undo" });
+    }
+  }, [isHost, myPlayerIndex, _hostAction, _guestAction]);
+
+  // canUndo comes from the server-computed perspective state — true only when
+  // it's the active player's turn AND the session's undo preconditions pass
+  // (snapshot stack non-empty, not dirty, phase=actions).
+  const canUndo = gameState?.canUndo ?? false;
+
   return {
     gameState,
     loading: loading || gameQuery.isLoading,
@@ -426,6 +445,8 @@ export function useMultiplayerGame(
     resolveCloud,
     respondToPrompt,
     forfeit,
+    undo,
+    canUndo,
     sessionRef,
   };
 }
