@@ -433,14 +433,9 @@ function GameBoard({
             {isMultiplayer && <span>{isMyTurn ? " — Your Turn" : " — Opponent's Turn"}</span>}
             {loading && <span className="loading">...</span>}
           </div>
-          {onForfeit && (
-            <button className="forfeit-btn" onClick={onForfeit}>
-              Forfeit
-            </button>
-          )}
           {onUndo && (
             <button
-              className={`undo-btn${canUndo ? "" : " disabled"}${onForfeit ? " undo-btn-beside-forfeit" : ""}`}
+              className={`undo-btn${canUndo ? "" : " disabled"}`}
               onClick={() => { if (canUndo) onUndo(); }}
               title={canUndo ? "Undo last action" : "Can't undo — new information has been revealed"}
               disabled={!canUndo}
@@ -448,7 +443,15 @@ function GameBoard({
               ↶ Undo
             </button>
           )}
-          <button className="main-menu-btn" onClick={onMainMenu}>
+          <button className="main-menu-btn" onClick={() => {
+            // In multiplayer, leaving an in-progress match = forfeit. The
+            // Leave Match button doubles as the forfeit trigger (prior
+            // separate Forfeit button removed for redundancy).
+            if (isMultiplayer && onForfeit && gameState.phase !== "game_over") {
+              onForfeit();
+            }
+            onMainMenu();
+          }}>
             {isMultiplayer ? "Leave Match" : "Main Menu"}
           </button>
         </div>

@@ -1341,12 +1341,6 @@ h3 {
   border-style: dashed;
 }
 
-/* Multiplayer variant: forfeit button occupies the spot directly above the
-   Main Menu, so the undo sits on the same row as forfeit, to its left. */
-.undo-btn.undo-btn-beside-forfeit {
-  bottom: 2.75rem;
-  right: 5.25rem;
-}
 
 .end-turn-reminders {
   display: flex;
