@@ -117,6 +117,17 @@ export function RewardIcon({ code, amount, size = 24, className }: Props) {
           {overlayText}
         </span>
       )}
+      {/* Permanent badge — always show for Pd/Pm/Pc so it's distinct from
+          the one-time version. Placed top-left so it doesn't collide with
+          the bottom-right number overlay. */}
+      {isPermanent && !overlayText && (
+        <span
+          className="reward-icon-perm-badge"
+          style={{ fontSize: size * 0.55, width: size * 0.55, height: size * 0.55 }}
+        >
+          P
+        </span>
+      )}
     </span>
   );
 }
