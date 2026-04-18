@@ -11,6 +11,7 @@ function generateRoomCode(): string {
 }
 
 export type RoomStatus = "waiting" | "character_select" | "in_game" | "finished";
+export type FirstPlayerChoice = "random" | "host" | "guest";
 
 export interface Room {
   id: string;
@@ -26,6 +27,7 @@ export interface Room {
   guestReady: boolean;
   sessionId?: string;
   createdAt: number;
+  firstPlayer?: FirstPlayerChoice;
 }
 
 export function useLobby(userId: string | undefined, userName: string | undefined) {
@@ -54,12 +56,13 @@ export function useLobby(userId: string | undefined, userName: string | undefine
           status: "waiting",
           hostId: userId,
           hostName: userName || "Player 1",
-          hostCharacter: "",
+          hostCharacter: "Random",
           hostReady: false,
           guestId: "",
           guestName: "",
           guestCharacter: "",
           guestReady: false,
+          firstPlayer: "random", // default; host can override in lobby
           createdAt: Date.now(),
         })
       );
@@ -91,11 +94,12 @@ export function useLobby(userId: string | undefined, userName: string | undefine
           setError("You can't join your own room");
           return;
         }
-        // Join as guest
+        // Join as guest — default to "Random" (resolved at game-start time).
         await db.transact(
           db.tx.rooms[found.id].update({
             guestId: userId,
             guestName: userName || "Player 2",
+            guestCharacter: "Random",
             status: "character_select",
           })
         );
@@ -114,6 +118,14 @@ export function useLobby(userId: string | undefined, userName: string | undefine
       await db.transact(db.tx.rooms[room.id].update({ [field]: character }));
     },
     [room, myRole]
+  );
+
+  const setFirstPlayer = useCallback(
+    async (firstPlayer: FirstPlayerChoice) => {
+      if (!room || !isHost) return;
+      await db.transact(db.tx.rooms[room.id].update({ firstPlayer }));
+    },
+    [room, isHost]
   );
 
   const setReady = useCallback(
@@ -156,6 +168,7 @@ export function useLobby(userId: string | undefined, userName: string | undefine
     createRoom,
     joinRoom,
     selectCharacter,
+    setFirstPlayer,
     setReady,
     leaveRoom,
     setRoomId,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Room } from "../hooks/useLobby";
+import type { Room, FirstPlayerChoice } from "../hooks/useLobby";
 
 const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
 
@@ -15,6 +15,7 @@ interface LobbyProps {
   onLeave: () => void;
   onStartGame: () => void;
   onBack: () => void;
+  onSetFirstPlayer: (choice: FirstPlayerChoice) => void;
 }
 
 export function Lobby({
@@ -29,6 +30,7 @@ export function Lobby({
   onLeave,
   onStartGame,
   onBack,
+  onSetFirstPlayer,
 }: LobbyProps) {
   // No room yet — show create/join
   if (!room) {
@@ -62,6 +64,7 @@ export function Lobby({
         onReady={onReady}
         onStartGame={onStartGame}
         onLeave={onLeave}
+        onSetFirstPlayer={onSetFirstPlayer}
         isLoading={isLoading}
       />
     );
@@ -132,6 +135,16 @@ function WaitingForOpponent({
   roomCode: string;
   onLeave: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — no-op.
+    }
+  };
   return (
     <div className="game-setup">
       <h1>Waiting for Opponent</h1>
@@ -139,6 +152,9 @@ function WaitingForOpponent({
         <div className="room-code-display">
           <p>Share this code:</p>
           <span className="room-code">{roomCode}</span>
+          <button className="copy-code-btn" onClick={handleCopy}>
+            {copied ? "Copied!" : "Copy"}
+          </button>
         </div>
         <p className="waiting-text">Waiting for someone to join...</p>
         <button className="view-cards-btn" onClick={onLeave}>
@@ -156,6 +172,7 @@ function CharacterSelect({
   onReady: _onReady,
   onStartGame,
   onLeave,
+  onSetFirstPlayer,
   isLoading,
 }: {
   room: Room;
@@ -164,16 +181,14 @@ function CharacterSelect({
   onReady: (ready: boolean) => void;
   onStartGame: () => void;
   onLeave: () => void;
+  onSetFirstPlayer: (choice: FirstPlayerChoice) => void;
   isLoading: boolean;
 }) {
   const myCharacter = myRole === "host" ? room.hostCharacter : room.guestCharacter;
   const oppName = myRole === "host" ? room.guestName : room.hostName;
   const oppCharacter = myRole === "host" ? room.guestCharacter : room.hostCharacter;
   const bothChosen = !!(room.hostCharacter && room.guestCharacter);
-
-  // Don't allow same character
-  const oppSelected = myRole === "host" ? room.guestCharacter : room.hostCharacter;
-  const availableCharacters = CHARACTERS.filter((c) => c !== oppSelected);
+  const firstChoice: FirstPlayerChoice = room.firstPlayer ?? "random";
 
   return (
     <div className="game-setup">
@@ -187,19 +202,31 @@ function CharacterSelect({
         <label>
           Your Character
           <select
-            value={myCharacter || ""}
+            value={myCharacter || "Random"}
             onChange={(e) => onSelectCharacter(e.target.value)}
           >
-            <option value="" disabled>
-              Choose...
-            </option>
-            {availableCharacters.map((c) => (
+            <option value="Random">Random</option>
+            {CHARACTERS.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
         </label>
+
+        {myRole === "host" && (
+          <label>
+            First Player
+            <select
+              value={firstChoice}
+              onChange={(e) => onSetFirstPlayer(e.target.value as FirstPlayerChoice)}
+            >
+              <option value="random">Random</option>
+              <option value="host">{room.hostName || "Host"}</option>
+              <option value="guest">{room.guestName || "Guest"}</option>
+            </select>
+          </label>
+        )}
 
         {bothChosen && myRole === "host" && (
           <button onClick={onStartGame} disabled={isLoading}>

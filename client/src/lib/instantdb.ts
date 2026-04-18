@@ -28,6 +28,8 @@ const schema = i.schema({
       guestReady: i.boolean(),
       sessionId: i.string(), // game ID when status is "in_game"
       createdAt: i.number(),
+      // First-player choice: "random" | "host" | "guest". Random decided at start time.
+      firstPlayer: i.string(),
     }),
     games: i.entity({
       roomId: i.string().indexed(),

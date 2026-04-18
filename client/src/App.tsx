@@ -107,13 +107,27 @@ function App() {
     const handleStartGame = async () => {
       if (!lobby.room || !auth.user) return;
       try {
+        // Resolve first-player choice: "random" rolls at start time.
+        const choice = lobby.room.firstPlayer ?? "random";
+        const firstPlayer: 0 | 1 =
+          choice === "host" ? 0
+          : choice === "guest" ? 1
+          : Math.random() < 0.5 ? 0 : 1;
+
+        // Resolve "Random" characters independently at start time.
+        const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+        const pickRandom = () => CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+        const resolveChar = (c: string) => (c === "Random" || !c ? pickRandom() : c);
+        const hostChar = resolveChar(lobby.room.hostCharacter);
+        const guestChar = resolveChar(lobby.room.guestCharacter);
+
         // Create game session locally
         const session = new GameSession({
           players: [
-            { kind: "human", name: lobby.room.hostName, character: lobby.room.hostCharacter },
-            { kind: "human", name: lobby.room.guestName, character: lobby.room.guestCharacter },
+            { kind: "human", name: lobby.room.hostName, character: hostChar },
+            { kind: "human", name: lobby.room.guestName, character: guestChar },
           ],
-          firstPlayer: 0,
+          firstPlayer,
         });
 
         const gameId = instantId();
@@ -162,6 +176,7 @@ function App() {
         }}
         onStartGame={handleStartGame}
         onBack={() => setMode("menu")}
+        onSetFirstPlayer={lobby.setFirstPlayer}
       />
     );
   }
