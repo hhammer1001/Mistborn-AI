@@ -2,12 +2,12 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { db } from "../lib/instantdb";
 import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
 import type { LogEntry, TurnRecap } from "./useGame";
-import { MultiplayerGameSession } from "../engine/multiplayerSession";
+import { GameSession } from "../engine/session";
 
 /**
  * Multiplayer game hook.
  *
- * Architecture: The HOST holds the MultiplayerGameSession in memory and
+ * Architecture: The HOST holds the GameSession in memory and
  * processes ALL actions (both host's and guest's). The guest writes action
  * requests to `pendingAction` in InstantDB. The host watches for these,
  * processes them, writes the new state, and clears the pending action.
@@ -22,7 +22,7 @@ export function useMultiplayerGame(
   const [error, setError] = useState<string | null>(null);
 
   // The HOST holds the session in memory
-  const sessionRef = useRef<MultiplayerGameSession | null>(null);
+  const sessionRef = useRef<GameSession | null>(null);
 
   // Subscribe to the game record in InstantDB
   const gameQuery = db.useQuery(
@@ -202,7 +202,7 @@ export function useMultiplayerGame(
 
   /** Host: run action locally and write to InstantDB */
   const _hostAction = useCallback(
-    async (actionFn: (session: MultiplayerGameSession) => { error?: string } | null) => {
+    async (actionFn: (session: GameSession) => { error?: string } | null) => {
       const session = sessionRef.current;
       if (!session || !sessionId) {
         setError("Session not available");

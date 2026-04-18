@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
-import { GameSession } from "../engine/session";
+import { GameSession, opponentTypeToKind } from "../engine/session";
 import { resetCardIds } from "../engine/card";
 
 export interface TurnRecap {
@@ -144,26 +144,30 @@ export function useGame() {
 
       try {
         resetCardIds();
+        const botKind = opponentTypeToKind(opponentType);
         const session = new GameSession({
-          playerName: pName,
-          character,
-          opponentType,
-          opponentCharacter,
-          botFirst,
+          players: [
+            { kind: "human", name: pName, character },
+            { kind: botKind, name: `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`, character: opponentCharacter },
+          ],
+          firstPlayer: botFirst ? 1 : 0,
           testDeck,
         });
         sessionRef.current = session;
-        const data = session.getState() as unknown as GameState;
+        const data = session.getState(0) as unknown as GameState;
         setGameState(data);
+
+        // Consume the initial log deltas (bot-first turn produces bot-log entries).
+        const { botLogDelta } = session.consumeLogDeltas(0);
 
         const initLog: LogEntry[] = [{ turn: 1, text: "Game started" }];
         const bName = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
-        if (data.botLog && data.botLog.length > 0) {
+        if (botLogDelta.length > 0) {
           initLog.push({ turn: 1, text: `${bName}'s turn`, isBot: true });
-          for (const entry of data.botLog) {
+          for (const entry of botLogDelta) {
             initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
-          enqueueFlashes(data.botLog);
+          enqueueFlashes(botLogDelta);
           // Bot's very first turn (bot-first): reconstruct starting HP from engine rule
           // (36 + 2*turnOrder, Prodigy = 40). Training/mission/ranks always start at 0.
           const startHp = (p: PlayerData) =>
@@ -176,7 +180,7 @@ export function useGame() {
             ],
             missions: [],
           };
-          const r = computeRecap(baseline, data as unknown as SessionResult, data.botLog);
+          const r = computeRecap(baseline, data as unknown as SessionResult, botLogDelta);
           if (r) setRecap(r);
         }
         if (data.turnCount > 1) {
@@ -206,17 +210,18 @@ export function useGame() {
 
       setError(null);
       try {
-        const data = session.playAction(actionIndex) as SessionResult;
+        const data = session.playAction(0, actionIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         setGameState(data as unknown as GameState);
+        const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [
           { turn: prevTurn, text: `${pName} — ${desc}` },
         ];
 
         const newTurnPlayerLogs: LogEntry[] = [];
-        if (data.playerLog && data.playerLog.length > 0) {
-          for (const entry of data.playerLog) {
+        if (playerLogDelta.length > 0) {
+          for (const entry of playerLogDelta) {
             if (entry.turn > prevTurn) {
               newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}` });
             } else {
@@ -225,14 +230,14 @@ export function useGame() {
           }
         }
 
-        if (data.botLog && data.botLog.length > 0) {
-          const botTurn = data.botLog[0]?.turn ?? prevTurn + 1;
+        if (botLogDelta.length > 0) {
+          const botTurn = botLogDelta[0]?.turn ?? prevTurn + 1;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of data.botLog) {
+          for (const entry of botLogDelta) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
-          enqueueFlashes(data.botLog);
-          const r = computeRecap(gameState, data, data.botLog);
+          enqueueFlashes(botLogDelta);
+          const r = computeRecap(gameState, data, botLogDelta);
           if (r) setRecap(r);
         }
 
@@ -289,28 +294,29 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.respondToPrompt(promptType, value) as SessionResult;
+        const data = session.respondToPrompt(0, promptType, value) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         setGameState(data as unknown as GameState);
+        const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
 
-        if (data.playerLog && data.playerLog.length > 0) {
-          for (const entry of data.playerLog) {
+        if (playerLogDelta.length > 0) {
+          for (const entry of playerLogDelta) {
             newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
           }
         }
 
-        if (data.botLog && data.botLog.length > 0) {
-          const botTurn = data.botLog[0]?.turn ?? gameState.turnCount + 1;
+        if (botLogDelta.length > 0) {
+          const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount + 1;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of data.botLog) {
+          for (const entry of botLogDelta) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
-          enqueueFlashes(data.botLog);
-          const r = computeRecap(gameState, data, data.botLog);
+          enqueueFlashes(botLogDelta);
+          const r = computeRecap(gameState, data, botLogDelta);
           if (r) setRecap(r);
         }
 
@@ -337,9 +343,10 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.assignDamage(targetIndex) as SessionResult;
+        const data = session.assignDamage(0, targetIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         setGameState(data as unknown as GameState);
+        const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
@@ -355,20 +362,20 @@ export function useGame() {
           newEntries.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
         }
 
-        if (data.playerLog && data.playerLog.length > 0) {
-          for (const entry of data.playerLog) {
+        if (playerLogDelta.length > 0) {
+          for (const entry of playerLogDelta) {
             newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
           }
         }
 
-        if (data.botLog && data.botLog.length > 0) {
-          const botTurn = data.botLog[0]?.turn ?? gameState.turnCount + 1;
+        if (botLogDelta.length > 0) {
+          const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount + 1;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of data.botLog) {
+          for (const entry of botLogDelta) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
-          enqueueFlashes(data.botLog);
-          const r = computeRecap(gameState, data, data.botLog);
+          enqueueFlashes(botLogDelta);
+          const r = computeRecap(gameState, data, botLogDelta);
           if (r) setRecap(r);
         }
 
@@ -395,9 +402,10 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveSense(use) as SessionResult;
+        const data = session.resolveSense(0, use) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         setGameState(data as unknown as GameState);
+        const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
@@ -407,19 +415,19 @@ export function useGame() {
           newEntries.push({ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` });
         }
 
-        if (data.playerLog?.length) {
-          for (const entry of data.playerLog) {
+        if (playerLogDelta.length) {
+          for (const entry of playerLogDelta) {
             newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
           }
         }
-        if (data.botLog?.length) {
-          const botTurn = data.botLog[0]?.turn ?? gameState.turnCount;
+        if (botLogDelta.length) {
+          const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount;
           newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of data.botLog) {
+          for (const entry of botLogDelta) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
-          enqueueFlashes(data.botLog);
-          const r = computeRecap(gameState, data, data.botLog);
+          enqueueFlashes(botLogDelta);
+          const r = computeRecap(gameState, data, botLogDelta);
           if (r) setRecap(r);
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
@@ -437,25 +445,26 @@ export function useGame() {
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveCloud(cardId) as SessionResult;
+        const data = session.resolveCloud(0, cardId) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         setGameState(data as unknown as GameState);
+        const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
 
-        if (data.playerLog?.length) {
-          for (const entry of data.playerLog) {
+        if (playerLogDelta.length) {
+          for (const entry of playerLogDelta) {
             newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
           }
         }
-        if (data.botLog?.length) {
-          for (const entry of data.botLog) {
+        if (botLogDelta.length) {
+          for (const entry of botLogDelta) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
-          enqueueFlashes(data.botLog);
-          const r = computeRecap(gameState, data, data.botLog);
+          enqueueFlashes(botLogDelta);
+          const r = computeRecap(gameState, data, botLogDelta);
           if (r) setRecap(r);
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
@@ -477,7 +486,7 @@ export function useGame() {
     const ok = session.undo();
     if (!ok) return;
 
-    const data = session.getState() as unknown as GameState;
+    const data = session.getState(0) as unknown as GameState;
     setGameState(data);
 
     // Session's own log entry was removed by undo() — also remove the matching
@@ -497,7 +506,7 @@ export function useGame() {
   const refreshState = useCallback(() => {
     const session = sessionRef.current;
     if (!session) return;
-    setGameState(session.getState() as unknown as GameState);
+    setGameState(session.getState(0) as unknown as GameState);
   }, []);
 
   return {

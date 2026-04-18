@@ -4,7 +4,7 @@ import { useGame } from "./hooks/useGame";
 import { useAuth } from "./hooks/useAuth";
 import { useLobby } from "./hooks/useLobby";
 import { useMultiplayerGame } from "./hooks/useMultiplayerGame";
-import { MultiplayerGameSession } from "./engine/multiplayerSession";
+import { GameSession } from "./engine/session";
 import { db, id as instantId } from "./lib/instantdb";
 import { GameSetup } from "./components/GameSetup";
 import { CardGallery } from "./components/CardGallery";
@@ -108,12 +108,13 @@ function App() {
       if (!lobby.room || !auth.user) return;
       try {
         // Create game session locally
-        const session = new MultiplayerGameSession(
-          lobby.room.hostName,
-          lobby.room.hostCharacter,
-          lobby.room.guestName,
-          lobby.room.guestCharacter,
-        );
+        const session = new GameSession({
+          players: [
+            { kind: "human", name: lobby.room.hostName, character: lobby.room.hostCharacter },
+            { kind: "human", name: lobby.room.guestName, character: lobby.room.guestCharacter },
+          ],
+          firstPlayer: 0,
+        });
 
         const gameId = instantId();
         const payload = session.getInstantDBPayload();

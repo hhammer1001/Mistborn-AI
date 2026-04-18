@@ -1,6 +1,14 @@
 /**
- * GameSession: manages a single-player game (human vs bot).
- * Ported from server/session.py with added undo support.
+ * GameSession: unified session that handles both single-player (human vs bot)
+ * and multiplayer (human vs human) games.
+ *
+ * The session tracks an `activePlayer` index at all times. When the active
+ * player is a bot, the session auto-runs their turn. When it's a human, the
+ * session waits for `playAction()` / `respondToPrompt()` / etc. calls.
+ *
+ * This replaces the previous split between `GameSession` (single-player) and
+ * `MultiplayerGameSession` which duplicated most of this logic and drifted
+ * apart for bug fixes.
  */
 
 import { Game, type PlayerFactory } from "./game";
@@ -13,6 +21,37 @@ import { SynergyBotPrime } from "./synergyBot";
 import { PromptNeeded } from "./prompt";
 import type { GameActionInternal } from "./types";
 import { METAL_NAMES } from "./types";
+
+// ── Player kinds ──
+
+export type PlayerKind = "human" | "bot_twonky" | "bot_twonkyV2" | "bot_synergy";
+
+export interface PlayerConfig {
+  kind: PlayerKind;
+  name: string;
+  character: string;
+}
+
+function makePlayerFactory(kind: PlayerKind): PlayerFactory {
+  switch (kind) {
+    case "human":
+      return (deck, game, to, name, char) => new WebPlayer(deck, game, to, name, char);
+    case "bot_twonkyV2":
+      return (deck, game, to, name, char) => new TwonkyV2(deck, game, to, name, char);
+    case "bot_synergy":
+      return (deck, game, to, name, char) => new SynergyBotPrime(deck, game, to, name, char);
+    case "bot_twonky":
+    default:
+      return (deck, game, to, name, char) => new Twonky(deck, game, to, name, char);
+  }
+}
+
+/** Map the legacy opponentType strings from the UI to a PlayerKind. */
+export function opponentTypeToKind(opponentType: string): PlayerKind {
+  if (opponentType === "twonkyV2") return "bot_twonkyV2";
+  if (opponentType === "synergy") return "bot_synergy";
+  return "bot_twonky";
+}
 
 // ── Full engine-state snapshot for prompt rollback & undo ──
 
@@ -69,41 +108,25 @@ interface GameSnapshot {
 
 // ── Snapshot helpers for effect logging ──
 
-interface Snapshot {
-  damage: number;
-  money: number;
-  health: number;
-  mission: number;
-  training: number;
-  atium: number;
-  burns: number;
-  handSize: number;
-  pDamage: number;
-  pMoney: number;
-  hand_count: number;
-  allies: string[];
+interface PSnap {
+  damage: number; money: number; health: number; mission: number;
+  training: number; atium: number; burns: number; handSize: number;
+  pDamage: number; pMoney: number; hand_count: number; allies: string[];
 }
 
-function snapshot(p: Player): Snapshot {
+function psnap(p: Player): PSnap {
   return {
-    damage: p.curDamage,
-    money: p.curMoney,
-    health: p.curHealth,
-    mission: p.curMission,
-    training: p.training,
-    atium: p.atium,
-    burns: p.burns,
-    handSize: p.handSize,
-    pDamage: p.pDamage,
-    pMoney: p.pMoney,
-    hand_count: p.deck.hand.length,
+    damage: p.curDamage, money: p.curMoney, health: p.curHealth,
+    mission: p.curMission, training: p.training, atium: p.atium,
+    burns: p.burns, handSize: p.handSize, pDamage: p.pDamage,
+    pMoney: p.pMoney, hand_count: p.deck.hand.length,
     allies: p.allies.map((a) => a.name),
   };
 }
 
-function diffToText(before: Snapshot, after: Snapshot): string[] {
+function diffToText(before: PSnap, after: PSnap): string[] {
   const parts: string[] = [];
-  const diffs: [keyof Snapshot, string][] = [
+  const diffs: [keyof PSnap, string][] = [
     ["damage", "damage"], ["money", "money"], ["health", "heal"],
     ["mission", "mission"], ["training", "training"], ["atium", "atium"],
     ["burns", "burns"], ["handSize", "+hand size"],
@@ -121,171 +144,91 @@ function diffToText(before: Snapshot, after: Snapshot): string[] {
   return parts;
 }
 
-// ── Logging bot wrapper ──
-
-interface LogEntry {
-  turn: number;
-  text: string;
-  card?: unknown;
-  actionType?: string;
-}
-
-class LoggingBot {
-  bot: Player;
-  private session: GameSession;
-
-  constructor(bot: Player, session: GameSession) {
-    this.bot = bot;
-    this.session = session;
-  }
-
-  playTurn(game: Game) {
-    const originalPerform = this.bot.performAction.bind(this.bot);
-    const botTurn = game.turncount;
-    const self = this;
-
-    this.bot.performAction = function (action: GameActionInternal, g: Game) {
-      const desc = self.bot.serializeAction(action, g).description;
-      const card = ("card" in action && action.card) ? action.card.toJSON() : undefined;
-      self.session._bot_log.push({ turn: botTurn, text: desc, card, actionType: action.type });
-      return originalPerform(action, g);
-    };
-
-    try {
-      this.bot.playTurn(game);
-    } finally {
-      this.bot.performAction = originalPerform;
-    }
-  }
-}
+import type { CardData } from "../types/game";
+interface LogEntry { turn: number; text: string; card?: CardData; actionType?: string }
 
 // ── GameSession ──
 
 export type GamePhase = "actions" | "damage" | "sense_defense" | "cloud_defense" | "awaiting_prompt" | "game_over";
 
+export interface GameSessionOpts {
+  players: [PlayerConfig, PlayerConfig];
+  firstPlayer?: 0 | 1;
+  testDeck?: boolean;
+}
+
 export class GameSession {
   id: string;
-  playerName: string;
-  character: string;
-  opponentType: string;
-  opponentCharacter: string;
   game: Game;
-  human: WebPlayer;
-  private _realBot: Player;
-  private bot: LoggingBot;
+  players: Player[];
+  playerKinds: PlayerKind[];
+  activePlayer: 0 | 1 = 0;
   phase: GamePhase = "actions";
 
-  _bot_log: LogEntry[] = [];
-  private _player_log: LogEntry[] = [];
+  // Prompt / replay state
   private _pending_prompt: PromptNeeded | null = null;
   private _pending_action_index: number | null = null;
   private _accumulated_responses: [string, number | boolean][] = [];
   private _cached_raw: GameActionInternal[] | null = null;
   private _cloud_damage = 0;
+  private _defender_hp_at_turn_start: number | null = null;
+  private _next_player_after_sense: 0 | 1 = 0;
 
-  // Snapshot of state at the start of the current in-flight action — used for
-  // rolling back mid-action on PromptNeeded. Cleared once the action completes.
+  // Snapshot-based prompt rollback and undo
   private _preActionSnapshot: GameSnapshot | null = null;
-  // Stack of committed snapshots (one per completed clean action). Each entry
-  // can be restored by undo. Cleared when a dirty action happens or the phase
-  // changes (end actions, start of turn, etc).
   private _undoStack: Array<{ snapshot: GameSnapshot; logIndex: number }> = [];
-  // Once an action reveals hidden info (draw / market refill), no undo is
-  // allowed for the rest of this action sequence.
   private _dirty = false;
-  // For effect logging of the current in-flight action
-  private _playerSnapBefore: Snapshot | null = null;
+  private _playerSnapBefore: PSnap | null = null;
   private _missionBefore = 0;
-  // Log index of the entry produced by the current in-flight action (if any)
   private _lastLogIndex = -1;
 
-  constructor(opts: {
-    playerName?: string;
-    character?: string;
-    opponentType?: string;
-    opponentCharacter?: string;
-    botFirst?: boolean;
-    testDeck?: boolean;
-  } = {}) {
-    const {
-      playerName = "Player",
-      character = "Kelsier",
-      opponentType = "twonky",
-      opponentCharacter = "Shan",
-      botFirst = true,
-      testDeck = false,
-    } = opts;
+  // Per-player logs (cumulative). Index 0 = player 0, index 1 = player 1.
+  private _logs: [LogEntry[], LogEntry[]] = [[], []];
+  // Read-pointer into each log for delta consumption (single-player hook use).
+  private _logRead: [number, number] = [0, 0];
 
+  constructor(opts: GameSessionOpts) {
     this.id = crypto.randomUUID();
-    this.playerName = playerName;
-    this.character = character;
-    this.opponentType = opponentType;
-    this.opponentCharacter = opponentCharacter;
+    this.playerKinds = [opts.players[0].kind, opts.players[1].kind];
 
-    const BotClass =
-      opponentType === "twonkyV2" ? TwonkyV2 :
-      opponentType === "synergy" ? SynergyBotPrime :
-      Twonky;
-    const botFactory: PlayerFactory = (deck, game, to, name, char) =>
-      new BotClass(deck, game, to, name, char);
-    const humanFactory: PlayerFactory = (deck, game, to, name, char) =>
-      new WebPlayer(deck, game, to, name, char);
+    const factories: [PlayerFactory, PlayerFactory] = [
+      makePlayerFactory(this.playerKinds[0]),
+      makePlayerFactory(this.playerKinds[1]),
+    ];
 
     this.game = new Game({
-      names: [playerName, `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`],
-      chars: [character, opponentCharacter],
-      playerFactories: [humanFactory, botFactory],
-      testDeck,
+      names: [opts.players[0].name, opts.players[1].name],
+      chars: [opts.players[0].character, opts.players[1].character],
+      playerFactories: factories,
+      testDeck: opts.testDeck ?? false,
     });
+    this.players = this.game.players;
 
-    this.human = this.game.players[0] as WebPlayer;
-    this._realBot = this.game.players[1];
-    this.bot = new LoggingBot(this._realBot, this);
+    const first = opts.firstPlayer ?? 0;
+    this.activePlayer = first;
+    this.game.turncount = 1;
+    this._resolveTraining(first);
 
-    if (botFirst) {
-      this.game.turncount += 1;
-      const humanHpBefore = this.human.curHealth;
-      this.bot.playTurn(this.game);
-      const hpLost = humanHpBefore - this.human.curHealth;
-      if (hpLost > 0) {
-        this._bot_log.push({ turn: this.game.turncount, text: `Dealt ${hpLost} damage to you` });
-      }
-      if (this.game.winner) {
-        this.phase = "game_over";
-        return;
-      }
-      this.game.turncount += 1;
-      this._resolveTraining();
-    } else {
-      this.game.turncount += 1;
-      this._resolveTraining();
+    // If the first player is a bot, run their turn right away.
+    if (this._isBot(this.activePlayer)) {
+      this._runBotTurn(this.activePlayer);
     }
+  }
+
+  private _isBot(i: number): boolean {
+    return this.playerKinds[i] !== "human";
   }
 
   // ── Snapshot / restore ──
 
-  /** Capture full engine state in a form that can be restored exactly. */
   private _takeSnapshot(): GameSnapshot {
     const winner = this.game.winner;
-    const winnerIndex = winner ? winner.turnOrder : null;
-
-    const players: PlayerSnapshot[] = this.game.players.map((p) => ({
-      curDamage: p.curDamage,
-      curMoney: p.curMoney,
-      curMission: p.curMission,
-      curHealth: p.curHealth,
-      curBoxings: p.curBoxings,
-      training: p.training,
-      atium: p.atium,
-      burns: p.burns,
-      pDamage: p.pDamage,
-      pMoney: p.pMoney,
-      handSize: p.handSize,
-      alive: p.alive,
-      smoking: p.smoking,
-      charAbility1: p.charAbility1,
-      charAbility2: p.charAbility2,
-      charAbility3: p.charAbility3,
+    const players: PlayerSnapshot[] = this.players.map((p) => ({
+      curDamage: p.curDamage, curMoney: p.curMoney, curMission: p.curMission,
+      curHealth: p.curHealth, curBoxings: p.curBoxings, training: p.training,
+      atium: p.atium, burns: p.burns, pDamage: p.pDamage, pMoney: p.pMoney,
+      handSize: p.handSize, alive: p.alive, smoking: p.smoking,
+      charAbility1: p.charAbility1, charAbility2: p.charAbility2, charAbility3: p.charAbility3,
       metalTokens: [...p.metalTokens],
       metalAvailable: [...p.metalAvailable],
       metalBurned: [...p.metalBurned],
@@ -297,24 +240,19 @@ export class GameSession {
       discardIds: p.deck.discard.map((c) => c.id),
       setAsideIds: p.deck.setAside.map((c) => c.id),
     }));
-
-    // Capture all card states (sought, burned, metalUsed, ally flags)
     const cardStates = new Map<number, CardStateSnap>();
     for (const c of this._allCards()) {
       const s: CardStateSnap = { sought: c.sought };
-      if (c instanceof Action) {
-        s.burned = c.burned;
-        s.metalUsed = c.metalUsed;
-      } else if (c instanceof Ally) {
+      if (c instanceof Action) { s.burned = c.burned; s.metalUsed = c.metalUsed; }
+      else if (c instanceof Ally) {
         s.available1 = c.available1;
         s.available2 = c.available2;
         s.availableRiot = c.availableRiot;
       }
       cardStates.set(c.id, s);
     }
-
     return {
-      winnerIndex,
+      winnerIndex: winner ? winner.turnOrder : null,
       victoryType: this.game.victoryType,
       turncount: this.game.turncount,
       missionRanks: this.game.missions.map((m) => [...m.playerRanks]),
@@ -323,47 +261,32 @@ export class GameSession {
       marketDiscard: this.game.market.discard.map((c) => c.id),
       players,
       cardStates,
-      hiddenCardIds: this._hiddenCardIds(),
+      hiddenCardIds: this._hiddenCardIds(this.activePlayer),
     };
   }
 
-  /** Restore engine state from a snapshot. Cards are located by ID. */
   private _restoreSnapshot(snap: GameSnapshot): void {
-    // Build ID → card lookup (cards never leave the game, so this covers all of them)
     const byId = new Map<number, Card>();
     for (const c of this._allCards()) byId.set(c.id, c);
 
-    this.game.winner = snap.winnerIndex !== null ? this.game.players[snap.winnerIndex] : null;
+    this.game.winner = snap.winnerIndex !== null ? this.players[snap.winnerIndex] : null;
     this.game.victoryType = snap.victoryType;
     this.game.turncount = snap.turncount;
-
     for (let i = 0; i < this.game.missions.length; i++) {
       this.game.missions[i].playerRanks = [...snap.missionRanks[i]];
     }
-
     this.game.market.hand = snap.marketHand.map((id) => byId.get(id)!).filter(Boolean);
     this.game.market.cards = snap.marketCards.map((id) => byId.get(id)!).filter(Boolean);
     this.game.market.discard = snap.marketDiscard.map((id) => byId.get(id)!).filter(Boolean);
 
-    for (let i = 0; i < this.game.players.length; i++) {
-      const p = this.game.players[i];
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
       const ps = snap.players[i];
-      p.curDamage = ps.curDamage;
-      p.curMoney = ps.curMoney;
-      p.curMission = ps.curMission;
-      p.curHealth = ps.curHealth;
-      p.curBoxings = ps.curBoxings;
-      p.training = ps.training;
-      p.atium = ps.atium;
-      p.burns = ps.burns;
-      p.pDamage = ps.pDamage;
-      p.pMoney = ps.pMoney;
-      p.handSize = ps.handSize;
-      p.alive = ps.alive;
-      p.smoking = ps.smoking;
-      p.charAbility1 = ps.charAbility1;
-      p.charAbility2 = ps.charAbility2;
-      p.charAbility3 = ps.charAbility3;
+      p.curDamage = ps.curDamage; p.curMoney = ps.curMoney; p.curMission = ps.curMission;
+      p.curHealth = ps.curHealth; p.curBoxings = ps.curBoxings; p.training = ps.training;
+      p.atium = ps.atium; p.burns = ps.burns; p.pDamage = ps.pDamage; p.pMoney = ps.pMoney;
+      p.handSize = ps.handSize; p.alive = ps.alive; p.smoking = ps.smoking;
+      p.charAbility1 = ps.charAbility1; p.charAbility2 = ps.charAbility2; p.charAbility3 = ps.charAbility3;
       p.metalTokens = [...ps.metalTokens];
       p.metalAvailable = [...ps.metalAvailable];
       p.metalBurned = [...ps.metalBurned];
@@ -375,16 +298,12 @@ export class GameSession {
       p.deck.discard = ps.discardIds.map((id) => byId.get(id)!).filter(Boolean);
       p.deck.setAside = ps.setAsideIds.map((id) => byId.get(id)!).filter(Boolean);
     }
-
-    // Restore per-card internal state
     for (const [id, s] of snap.cardStates) {
       const c = byId.get(id);
       if (!c) continue;
       c.sought = s.sought;
-      if (c instanceof Action) {
-        c.burned = s.burned ?? false;
-        c.metalUsed = s.metalUsed ?? 0;
-      } else if (c instanceof Ally) {
+      if (c instanceof Action) { c.burned = s.burned ?? false; c.metalUsed = s.metalUsed ?? 0; }
+      else if (c instanceof Ally) {
         c.available1 = s.available1 ?? false;
         c.available2 = s.available2 ?? false;
         c.availableRiot = s.availableRiot ?? false;
@@ -395,44 +314,41 @@ export class GameSession {
   private _allCards(): Card[] {
     const cards: Card[] = [];
     cards.push(...this.game.market.hand, ...this.game.market.cards, ...this.game.market.discard);
-    for (const p of this.game.players) {
+    for (const p of this.players) {
       cards.push(...p.deck.hand, ...p.deck.cards, ...p.deck.discard, ...p.deck.setAside);
       cards.push(...p.allies);
     }
     return cards;
   }
 
-  /** Cards whose identity is currently hidden from the human player. */
-  private _hiddenCardIds(): Set<number> {
+  private _hiddenCardIds(perspective: number): Set<number> {
     const ids = new Set<number>();
-    // Player's own deck (face-down)
-    for (const c of this.human.deck.cards) ids.add(c.id);
-    // Opponent's hand + deck (everything the human can't see)
-    const opp = this.game.players[1];
+    const me = this.players[perspective];
+    const opp = this.players[1 - perspective];
+    for (const c of me.deck.cards) ids.add(c.id);
     for (const c of opp.deck.hand) ids.add(c.id);
     for (const c of opp.deck.cards) ids.add(c.id);
     for (const c of opp.deck.setAside) ids.add(c.id);
-    // Market deck (not yet revealed)
     for (const c of this.game.market.cards) ids.add(c.id);
     return ids;
   }
 
-  /** True if, relative to the given snapshot, a previously-hidden card is now visible. */
   private _didRevealInfo(snap: GameSnapshot): boolean {
-    const currentHidden = this._hiddenCardIds();
+    const currentHidden = this._hiddenCardIds(this.activePlayer);
     for (const id of snap.hiddenCardIds) {
       if (!currentHidden.has(id)) return true;
     }
     return false;
   }
 
-  // ── Undo (uses snapshot stack) ──
+  // ── Undo ──
 
   canUndo(): boolean {
     return (
       this._undoStack.length > 0 &&
       !this._dirty &&
-      this.phase === "actions"
+      this.phase === "actions" &&
+      !this._isBot(this.activePlayer)
     );
   }
 
@@ -440,24 +356,21 @@ export class GameSession {
     if (!this.canUndo()) return false;
     const entry = this._undoStack.pop()!;
     this._restoreSnapshot(entry.snapshot);
-    // Remove the log entry produced by the action we're undoing
-    if (entry.logIndex >= 0 && entry.logIndex < this._player_log.length) {
-      this._player_log.splice(entry.logIndex, 1);
+    if (entry.logIndex >= 0 && entry.logIndex < this._logs[this.activePlayer].length) {
+      this._logs[this.activePlayer].splice(entry.logIndex, 1);
+      // Keep the read pointer in bounds so future delta slices don't re-emit.
+      if (this._logRead[this.activePlayer] > this._logs[this.activePlayer].length) {
+        this._logRead[this.activePlayer] = this._logs[this.activePlayer].length;
+      }
     }
     this._cached_raw = null;
     return true;
   }
 
-  // ── State getters ──
+  // ── Action source name (for logs) ──
 
-  private _getDamageTargets() {
-    const [targets] = this.game.validTargets(this.human);
-    return targets.map((t, i) => ({
-      index: i, name: t.name, health: t.health, cardId: t.id,
-    }));
-  }
-
-  private _actionSourceName(action: GameActionInternal): string | null {
+  private _actionSourceName(action: GameActionInternal, playerIndex: number): string | null {
+    const p = this.players[playerIndex];
     switch (action.type) {
       case "burn_card": return `${action.card.name} (burn)`;
       case "use_metal": return action.card.name;
@@ -465,8 +378,8 @@ export class GameSession {
       case "flare_metal": return `Flare ${METAL_NAMES[action.metalIndex]}`;
       case "ally_ability_1": return `${action.card.name} ability 1`;
       case "ally_ability_2": return `${action.card.name} ability 2`;
-      case "char_ability_1": return `${this.human.character} ability I`;
-      case "char_ability_3": return `${this.human.character} ability III`;
+      case "char_ability_1": return `${p.character} ability I`;
+      case "char_ability_3": return `${p.character} ability III`;
       case "buy": return `Bought ${action.card.name} for ${action.card.cost}`;
       case "buy_eliminate": return `Buy+eliminate ${action.card.name}`;
       case "buy_with_boxings": return `Bought ${action.card.name} for ${action.card.cost} (${action.boxingsCost} boxings)`;
@@ -477,179 +390,212 @@ export class GameSession {
     }
   }
 
-  getState() {
-    const state: Record<string, unknown> = this.game.toJSON(0);
+  // ── State for clients ──
+
+  getState(perspective: number = this.activePlayer): Record<string, unknown> {
+    const state: Record<string, unknown> = this.game.toJSON(perspective);
     state["sessionId"] = this.id;
     state["phase"] = this.phase;
+    state["activePlayer"] = this.activePlayer;
+    state["myPlayerIndex"] = perspective;
+    state["isMyTurn"] = this.activePlayer === perspective;
+    state["turnCount"] = this.game.turncount;
 
-    if (this.phase === "actions") {
-      const [serialized, raw] = this.human.serializeActions(this.game);
+    if (this.game.winner) {
+      const wi = this.game.winner.turnOrder;
+      state["isWinner"] = wi === perspective;
+    } else {
+      state["isWinner"] = false;
+    }
+
+    if (this.phase === "actions" && this.activePlayer === perspective) {
+      const [serialized, raw] = this.players[perspective].serializeActions(this.game);
       this._cached_raw = raw;
       state["availableActions"] = serialized;
     } else {
       state["availableActions"] = [];
     }
 
-    if (this.phase === "damage") {
-      state["damageTargets"] = this._getDamageTargets();
+    if (this.phase === "damage" && this.activePlayer === perspective) {
+      state["damageTargets"] = this._getDamageTargets(perspective);
     }
 
-    if (this.phase === "sense_defense") {
-      state["senseCards"] = this.human.deck.hand
+    if (this.phase === "sense_defense" && this.activePlayer === perspective) {
+      const p = this.players[perspective];
+      state["senseCards"] = p.deck.hand
         .filter((c): c is Action => c instanceof Action && c.data[9] === "sense")
         .map((c) => ({ cardId: c.id, name: c.name, amount: parseInt(c.data[10], 10) }));
     }
 
-    if (this.phase === "cloud_defense") {
-      state["cloudCards"] = this.human.deck.hand
+    if (this.phase === "cloud_defense" && this.activePlayer === perspective) {
+      const p = this.players[perspective];
+      state["cloudCards"] = p.deck.hand
         .filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP")
         .map((c) => ({ cardId: c.id, name: c.name, reduction: parseInt(c.data[10], 10) }));
       state["incomingDamage"] = this._cloud_damage;
     }
 
-    if (this._pending_prompt) {
+    if (this._pending_prompt && this.activePlayer === perspective) {
       state["prompt"] = this._pending_prompt.toJSON();
     }
 
-    state["botLog"] = this._bot_log;
-    this._bot_log = [];
-    state["playerLog"] = this._player_log;
-    this._player_log = [];
+    // Log fields: cumulative by default (matches multiplayer semantics).
+    state["playerLog"] = this._logs[perspective];
+    state["botLog"] = this._logs[1 - perspective];
     state["canUndo"] = this.canUndo();
-
     return state;
   }
 
-  // ── Action handling ──
+  /**
+   * Consume and return log entries added since the last call, formatted for
+   * the single-player hook that wants delta-style logs. Returns two arrays:
+   * new entries for perspective (playerLogDelta) and for opponent (botLogDelta).
+   */
+  consumeLogDeltas(perspective: number = 0): { playerLogDelta: LogEntry[]; botLogDelta: LogEntry[] } {
+    const pi = perspective as 0 | 1;
+    const oi = (1 - pi) as 0 | 1;
+    const playerLogDelta = this._logs[pi].slice(this._logRead[pi]);
+    const botLogDelta = this._logs[oi].slice(this._logRead[oi]);
+    this._logRead[pi] = this._logs[pi].length;
+    this._logRead[oi] = this._logs[oi].length;
+    return { playerLogDelta, botLogDelta };
+  }
 
-  playAction(actionIndex: number) {
+  getBothStates(): [Record<string, unknown>, Record<string, unknown>] {
+    return [this.getState(0), this.getState(1)];
+  }
+
+  private _getDamageTargets(playerIndex: number) {
+    const attacker = this.players[playerIndex];
+    const [targets] = this.game.validTargets(attacker);
+    return targets.map((t, i) => ({
+      index: i, name: t.name, health: t.health, cardId: t.id,
+    }));
+  }
+
+  // ── Action dispatch ──
+
+  playAction(playerIndex: number, actionIndex: number): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "actions") return { error: `Cannot play action in phase: ${this.phase}` };
 
-    if (this._cached_raw === null) this.getState();
+    const p = this.players[playerIndex] as WebPlayer;
+
+    if (this._cached_raw === null) this.getState(playerIndex);
     if (actionIndex < 0 || actionIndex >= this._cached_raw!.length) {
       return { error: `Invalid action index: ${actionIndex}` };
     }
 
     const action = this._cached_raw![actionIndex];
-    this.human.clearPromptResponses();
+    p.clearPromptResponses?.();
 
-    // End actions transitions out of the actions phase — no snapshot/rollback needed.
+    // end_actions: session-managed flow (defer cleanUp until after damage phase
+    // so the player can still see their hand during damage assignment).
     if (action.type === "end_actions") {
-      const h = this.human;
-      h.curBoxings += Math.floor(h.curMoney / 2);
-      h.curMoney = h.pMoney;
-      h.curMission = 0;
-      h.metalTokens = h.metalTokens.map((v) => h.resetToken(v));
-      h.metalTokens[8] = 0;
-      h.metalAvailable = new Array(9).fill(0);
-      h.metalBurned = new Array(9).fill(0);
-      h.charAbility1 = true;
-      h.charAbility2 = true;
-      h.charAbility3 = true;
+      p.curBoxings += Math.floor(p.curMoney / 2);
+      p.curMoney = p.pMoney;
+      p.curMission = 0;
+      p.metalTokens = p.metalTokens.map((v) => p.resetToken(v));
+      p.metalTokens[8] = 0;
+      p.metalAvailable = new Array(9).fill(0);
+      p.metalBurned = new Array(9).fill(0);
+      p.charAbility1 = true;
+      p.charAbility2 = true;
+      p.charAbility3 = true;
 
-      if (h.curDamage > 0) {
+      this._defender_hp_at_turn_start = this.players[1 - playerIndex].curHealth;
+
+      if (p.curDamage > 0) {
         this.phase = "damage";
       } else {
-        this.game.attack(h);
-        h.curDamage = h.pDamage;
-        this._cleanupAndFinish();
+        this._executeAttackAndTransition(playerIndex);
       }
 
       this._cached_raw = null;
       this._pending_prompt = null;
-      // Left the actions phase — clear undo state
       this._preActionSnapshot = null;
       this._playerSnapBefore = null;
       this._undoStack = [];
       this._dirty = false;
       this._lastLogIndex = -1;
-      return this.getState();
+      return this.getState(playerIndex);
     }
 
-    // Take snapshot BEFORE the action — enables prompt rollback and undo.
     this._preActionSnapshot = this._takeSnapshot();
-    this._playerSnapBefore = snapshot(this.human);
-    this._missionBefore = this.human.curMission;
+    this._playerSnapBefore = psnap(p);
+    this._missionBefore = p.curMission;
     this._pending_action_index = actionIndex;
     this._accumulated_responses = [];
 
-    return this._attemptAction(action);
+    return this._attemptAction(action, playerIndex);
   }
 
-  /** Run the action, handling PromptNeeded by restoring state and awaiting input. */
-  private _attemptAction(action: GameActionInternal) {
+  private _attemptAction(action: GameActionInternal, playerIndex: number): Record<string, unknown> {
+    const p = this.players[playerIndex] as WebPlayer;
     try {
-      this.human.performAction(action, this.game);
+      p.performAction(action, this.game);
     } catch (e) {
       if (e instanceof PromptNeeded) {
         this._pending_prompt = e;
         this.phase = "awaiting_prompt";
-        // Roll back partial mutations so the replay starts clean.
         if (this._preActionSnapshot) this._restoreSnapshot(this._preActionSnapshot);
         this._cached_raw = null;
-        const [, raw] = this.human.serializeActions(this.game);
+        const [, raw] = p.serializeActions(this.game);
         this._cached_raw = raw;
-        return this.getState();
+        return this.getState(playerIndex);
       }
       throw e;
     }
 
-    // Action completed — finalize logging and info-reveal state.
     this._pending_prompt = null;
     this._accumulated_responses = [];
-
-    const revealedInfo = this._preActionSnapshot
-      ? this._didRevealInfo(this._preActionSnapshot)
-      : false;
+    const revealedInfo = this._preActionSnapshot ? this._didRevealInfo(this._preActionSnapshot) : false;
 
     const snapBefore = this._playerSnapBefore!;
-    const snapAfter = snapshot(this.human);
+    const snapAfter = psnap(p);
     const effects = diffToText(snapBefore, snapAfter);
-    const source = this._actionSourceName(action);
+    const source = this._actionSourceName(action, playerIndex);
     const missionBefore = this._missionBefore;
 
     this._lastLogIndex = -1;
+    const card = ("card" in action && action.card) ? action.card.toJSON() as CardData : undefined;
     if (source) {
+      const log = this._logs[playerIndex];
       if (action.type === "buy" || action.type === "buy_with_boxings") {
-        this._lastLogIndex = this._player_log.length;
-        this._player_log.push({ turn: this.game.turncount, text: source });
+        this._lastLogIndex = log.length;
+        log.push({ turn: this.game.turncount, text: source, card, actionType: action.type });
       } else if (action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
         const filtered = effects.filter((e) => !e.includes("money"));
-        this._lastLogIndex = this._player_log.length;
-        this._player_log.push({
+        this._lastLogIndex = log.length;
+        log.push({
           turn: this.game.turncount,
           text: filtered.length > 0 ? `${source}: ${filtered.join(", ")}` : source,
+          card, actionType: action.type,
         });
       } else if (action.type === "advance_mission") {
         const filtered = effects.filter((e) => e !== "-1 mission");
         if (filtered.length > 0) {
-          this._lastLogIndex = this._player_log.length;
-          this._player_log.push({ turn: this.game.turncount, text: `${source}: ${filtered.join(", ")}` });
+          this._lastLogIndex = log.length;
+          log.push({ turn: this.game.turncount, text: `${source}: ${filtered.join(", ")}`, actionType: action.type });
         }
       } else if (effects.length > 0) {
-        this._lastLogIndex = this._player_log.length;
-        this._player_log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}` });
+        this._lastLogIndex = log.length;
+        log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}`, card, actionType: action.type });
       }
     }
 
-    // Log sense block
     if (action.type === "advance_mission") {
-      const missionSpent = missionBefore - this.human.curMission;
+      const missionSpent = missionBefore - p.curMission;
       if (missionSpent !== 1) {
-        this._bot_log.push({
+        this._logs[1 - playerIndex].push({
           turn: this.game.turncount,
           text: `Opponent used Sense to block mission advance! (−${missionSpent} mission)`,
         });
       }
     }
 
-    // Commit the snapshot to the undo stack — only while we haven't crossed a
-    // dirty action. Once dirty, we stop pushing (undo is blocked anyway).
     if (!this._dirty && this._preActionSnapshot) {
-      this._undoStack.push({
-        snapshot: this._preActionSnapshot,
-        logIndex: this._lastLogIndex,
-      });
+      this._undoStack.push({ snapshot: this._preActionSnapshot, logIndex: this._lastLogIndex });
     }
     if (revealedInfo) this._dirty = true;
 
@@ -658,18 +604,15 @@ export class GameSession {
 
     if (this.game.winner) {
       this.phase = "game_over";
-      this._undoStack = []; // No undo past game over
+      this._undoStack = [];
     }
     this._cached_raw = null;
-    return this.getState();
+    return this.getState(playerIndex);
   }
 
-  // ── Prompt response ──
-
-  respondToPrompt(promptType: string, value: number | boolean) {
-    if (this.phase !== "awaiting_prompt" || !this._pending_prompt) {
-      return { error: "No pending prompt" };
-    }
+  respondToPrompt(playerIndex: number, promptType: string, value: number | boolean): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
+    if (this.phase !== "awaiting_prompt" || !this._pending_prompt) return { error: "No pending prompt" };
     if (promptType !== this._pending_prompt.promptType) {
       return { error: `Expected prompt type ${this._pending_prompt.promptType}, got ${promptType}` };
     }
@@ -681,206 +624,305 @@ export class GameSession {
     this._pending_prompt = null;
     this.phase = "actions";
 
-    // State was already restored when the prompt was thrown; re-cache actions,
-    // queue all accumulated responses, and replay from the original action.
-    const [, raw] = this.human.serializeActions(this.game);
+    const p = this.players[playerIndex] as WebPlayer;
+    const [, raw] = p.serializeActions(this.game);
     this._cached_raw = raw;
     const action = this._cached_raw[this._pending_action_index];
-    this.human.clearPromptResponses();
+    p.clearPromptResponses();
     for (const [ptype, pvalue] of this._accumulated_responses) {
-      this.human.setPromptResponse(ptype, pvalue);
+      p.setPromptResponse(ptype, pvalue);
     }
-
-    return this._attemptAction(action);
+    return this._attemptAction(action, playerIndex);
   }
 
-  // ── Damage phase ──
-
-  assignDamage(targetIndex: number) {
+  assignDamage(playerIndex: number, targetIndex: number): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "damage") return { error: `Cannot assign damage in phase: ${this.phase}` };
 
+    const p = this.players[playerIndex];
     if (targetIndex === -1) {
-      this.game.attack(this.human);
-      this.human.curDamage = this.human.pDamage;
-      this._cleanupAndFinish();
-      return this.getState();
+      this._executeAttackAndTransition(playerIndex);
+      return this.getState(playerIndex);
     }
 
-    const [targets, opp] = this.game.validTargets(this.human);
+    const [targets, opp] = this.game.validTargets(p);
     if (targetIndex < 0 || targetIndex >= targets.length) {
       return { error: `Invalid target index: ${targetIndex}` };
     }
-
     const target = targets[targetIndex];
-    this.human.curDamage -= target.health;
+    p.curDamage -= target.health;
     opp.killAlly(target);
+    this._logs[playerIndex].push({ turn: this.game.turncount, text: `Killed ${opp.name}'s ${target.name}` });
+    this._logs[1 - playerIndex].push({ turn: this.game.turncount, text: `Opponent killed your ${target.name}` });
 
-    const [newTargets] = this.game.validTargets(this.human);
+    const [newTargets] = this.game.validTargets(p);
     if (newTargets.length === 0) {
-      this.game.attack(this.human);
-      this.human.curDamage = this.human.pDamage;
-      this._cleanupAndFinish();
+      this._executeAttackAndTransition(playerIndex);
     }
-
-    return this.getState();
+    return this.getState(playerIndex);
   }
 
-  // ── Sense defense ──
-
-  resolveSense(use: boolean) {
+  resolveSense(playerIndex: number, use: boolean): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "sense_defense") return { error: `Cannot resolve sense in phase: ${this.phase}` };
-    (this.human as WebPlayer)._sense_flag = use;
-    this._runBotTurn();
-    return this.getState();
+    (this.players[playerIndex] as WebPlayer)._sense_flag = use;
+    this._startNextTurn(this._next_player_after_sense);
+    return this.getState(playerIndex);
   }
 
-  // ── Cloud defense ──
-
-  resolveCloud(cardId: number) {
+  resolveCloud(playerIndex: number, cardId: number): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "cloud_defense") return { error: `Cannot resolve cloud in phase: ${this.phase}` };
+
+    const p = this.players[playerIndex];
+    const attackerIndex = (1 - playerIndex) as 0 | 1;
 
     if (cardId === -1) {
       if (this.game.winner) this.phase = "game_over";
-      else this._startNextHumanTurn();
-      return this.getState();
+      else this._postAttackCleanup(attackerIndex);
+      return this.getState(playerIndex);
     }
 
     let card: Action | null = null;
-    for (const c of this.human.deck.hand) {
-      if (c.id === cardId && c instanceof Action && c.data[9] === "cloudP") {
-        card = c;
-        break;
-      }
+    for (const c of p.deck.hand) {
+      if (c.id === cardId && c instanceof Action && c.data[9] === "cloudP") { card = c; break; }
     }
     if (!card) return { error: "Cloud card not found in hand" };
 
     const reduction = parseInt(card.data[10], 10);
-    this.human.curHealth = Math.min(this.human.curHealth + reduction, 40);
-    const idx = this.human.deck.hand.indexOf(card);
-    if (idx !== -1) this.human.deck.hand.splice(idx, 1);
-    this.human.deck.discard.push(card);
+    p.curHealth = Math.min(p.curHealth + reduction, 40);
+    const idx = p.deck.hand.indexOf(card);
+    if (idx !== -1) p.deck.hand.splice(idx, 1);
+    p.deck.discard.push(card);
 
-    this._bot_log.push({ turn: this.game.turncount, text: `Your ${card.name} blocked ${reduction} damage` });
+    this._logs[playerIndex].push({ turn: this.game.turncount, text: `Your ${card.name} blocked ${reduction} damage` });
+    this._logs[attackerIndex].push({ turn: this.game.turncount, text: `Opponent's ${card.name} blocked ${reduction} damage` });
 
-    if (this.human.curHealth > 0) {
-      this.human.alive = true;
-      if (this.game.victoryType === "D" && this.game.winner !== this.human) {
+    if (p.curHealth > 0) {
+      p.alive = true;
+      if (this.game.victoryType === "D" && this.game.winner !== p) {
         this.game.winner = null;
         this.game.victoryType = "";
       }
     }
 
-    const remaining = this.human.deck.hand.filter(
-      (c): c is Action => c instanceof Action && c.data[9] === "cloudP"
-    );
+    const remaining = p.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
     if (remaining.length === 0) {
       if (this.game.winner) this.phase = "game_over";
-      else this._startNextHumanTurn();
+      else this._postAttackCleanup(attackerIndex);
+    }
+    return this.getState(playerIndex);
+  }
+
+  forfeit(playerIndex: number): Record<string, unknown> {
+    const winnerIndex = (1 - playerIndex) as 0 | 1;
+    this.game.winner = this.players[winnerIndex];
+    this.game.victoryType = "F";
+    this.phase = "game_over";
+    return this.getState(playerIndex);
+  }
+
+  // ── Turn flow internals ──
+
+  private _executeAttackAndTransition(attackerIndex: number) {
+    const pi = attackerIndex as 0 | 1;
+    const oi = (1 - pi) as 0 | 1;
+    const p = this.players[pi];
+    const opp = this.players[oi];
+
+    const oppHpBefore = this._defender_hp_at_turn_start ?? opp.curHealth;
+    this.game.attack(p);
+    p.curDamage = p.pDamage;
+    const hpLost = oppHpBefore - opp.curHealth;
+
+    if (hpLost > 0) {
+      this._logs[pi].push({ turn: this.game.turncount, text: `Dealt ${hpLost} damage to ${opp.name}` });
     }
 
-    return this.getState();
+    const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
+    if (hpLost > 0 && cloudCards.length > 0) {
+      this._cloud_damage = hpLost;
+      this._logs[oi].push({ turn: this.game.turncount, text: `Incoming: ${hpLost} damage` });
+      this.phase = "cloud_defense";
+      this.activePlayer = oi;
+      // If the defender is a bot, auto-skip cloud defense (bot's cloudP already
+      // returns false; matching prior single-player behavior).
+      if (this._isBot(oi)) {
+        this.resolveCloud(oi, -1);
+      }
+      return;
+    }
+
+    if (this.game.winner) { this.phase = "game_over"; return; }
+    this._postAttackCleanup(pi);
   }
 
-  // ── Internal turn flow ──
+  private _postAttackCleanup(attackerIndex: number) {
+    const pi = attackerIndex as 0 | 1;
+    const oi = (1 - pi) as 0 | 1;
+    const p = this.players[pi];
 
-  private _cleanupAndFinish() {
-    this.human.deck.cleanUp(this.human, this.game.market);
-    for (const ally of this.human.allies) ally.reset();
-    this._finishHumanTurn();
-  }
+    // Humans: cleanUp is deferred until now (so they could see their hand in
+    // the damage phase). Bots already cleaned up inside performAction("end_actions")
+    // before attack — don't double-clean.
+    if (!this._isBot(pi)) {
+      p.deck.cleanUp(p, this.game.market);
+      for (const ally of p.allies) ally.reset();
+    }
 
-  private _finishHumanTurn() {
     if (this.game.winner) { this.phase = "game_over"; return; }
 
+    // Only humans need the sense_defense phase to choose whether to activate
+    // sense. Bots' senseCheckIn already returns true automatically.
+    if (!this._isBot(pi)) {
+      const senseCards = p.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "sense");
+      if (senseCards.length > 0) {
+        this.phase = "sense_defense";
+        this.activePlayer = pi;
+        this._next_player_after_sense = oi;
+        return;
+      }
+      (p as WebPlayer)._sense_flag = false;
+    }
+
+    this._startNextTurn(oi);
+  }
+
+  private _startNextTurn(nextPlayerIndex: number) {
+    const nextPi = nextPlayerIndex as 0 | 1;
+    this.activePlayer = nextPi;
     this.game.turncount += 1;
     if (this.game.turncount > 1000) {
       this.game.victoryType = "T";
-      this.game.winner = this.game.players[1];
+      this.game.winner = this.players[0];
       this.phase = "game_over";
       return;
     }
-
-    const senseCards = this.human.deck.hand.filter(
-      (c): c is Action => c instanceof Action && c.data[9] === "sense"
-    );
-    if (senseCards.length > 0) {
-      this.phase = "sense_defense";
-      return;
-    }
-
-    (this.human as WebPlayer)._sense_flag = false;
-    this._runBotTurn();
-  }
-
-  private _runBotTurn() {
-    const humanHpBefore = this.human.curHealth;
-    const humanAlliesBefore = this.human.allies.map((a) => a.name);
-    const humanHandBefore = new Set(this.human.deck.hand.map((c) => c.id));
-
-    this.bot.playTurn(this.game);
-    const botTurn = this.game.turncount;
-
-    // Log ally kills
-    const killed = humanAlliesBefore.filter(
-      (n) => !this.human.allies.some((a) => a.name === n)
-    );
-    for (const name of killed) {
-      this._bot_log.push({ turn: botTurn, text: `Killed your ${name}` });
-    }
-
-    // Log sense card usage
-    const humanHandAfter = new Set(this.human.deck.hand.map((c) => c.id));
-    const usedIds = [...humanHandBefore].filter((id) => !humanHandAfter.has(id));
-    for (const card of this.human.deck.discard) {
-      if (usedIds.includes(card.id) && card instanceof Action && card.data[9] === "sense") {
-        this._bot_log.push({ turn: botTurn, text: `Your ${card.name} blocked a mission advance` });
-      }
-    }
-
-    const hpLost = humanHpBefore - this.human.curHealth;
-
-    // Check cloud defense
-    const cloudCards = this.human.deck.hand.filter(
-      (c): c is Action => c instanceof Action && c.data[9] === "cloudP"
-    );
-    if (hpLost > 0 && cloudCards.length > 0) {
-      this._cloud_damage = hpLost;
-      this._bot_log.push({ turn: botTurn, text: `Incoming: ${hpLost} damage` });
-      this.phase = "cloud_defense";
-      return;
-    }
-
-    if (hpLost > 0) {
-      this._bot_log.push({ turn: botTurn, text: `Dealt ${hpLost} damage to you` });
-    }
-
-    if (this.game.winner) { this.phase = "game_over"; return; }
-    this._startNextHumanTurn();
-  }
-
-  private _startNextHumanTurn() {
-    this.game.turncount += 1;
-    this._resolveTraining();
+    this._resolveTraining(nextPi);
     this.phase = "actions";
     this._cached_raw = null;
-    // Fresh turn — no snapshots yet, dirty flag reset
+    this._defender_hp_at_turn_start = null;
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
     this._undoStack = [];
     this._dirty = false;
     this._lastLogIndex = -1;
+
+    if (this._isBot(nextPi)) {
+      this._runBotTurn(nextPi);
+    }
   }
 
-  private _resolveTraining() {
-    const snap = snapshot(this.human);
-    this.human.resolve("T", "1");
-    let effects = diffToText(snap, snapshot(this.human));
+  private _resolveTraining(playerIndex: number) {
+    const p = this.players[playerIndex];
+    const snap = psnap(p);
+    p.resolve("T", "1");
+    let effects = diffToText(snap, psnap(p));
     effects = effects.filter((e) => e !== "+1 training");
     if (effects.length > 0) {
-      this._player_log.push({
+      this._logs[playerIndex].push({
         turn: this.game.turncount,
-        text: `Training reward (level ${this.human.training}): ${effects.join(", ")}`,
+        text: `Training reward (level ${p.training}): ${effects.join(", ")}`,
       });
     }
+  }
+
+  /** Run a bot's full turn (training already resolved). Handles logging,
+   *  opponent-visible events (ally kills, sense blocks, damage, cloud check). */
+  private _runBotTurn(botIndex: number) {
+    const bi = botIndex as 0 | 1;
+    const oi = (1 - bi) as 0 | 1;
+    const bot = this.players[bi];
+    const opp = this.players[oi];
+
+    const oppHpBefore = opp.curHealth;
+    const oppAlliesBefore = opp.allies.map((a) => a.name);
+    const oppHandBefore = new Set(opp.deck.hand.map((c) => c.id));
+
+    // Wrap bot.performAction to capture each action for the bot log
+    const originalPerform = bot.performAction.bind(bot);
+    const botTurn = this.game.turncount;
+    const bi_captured = bi;
+    bot.performAction = (action: GameActionInternal, g: Game) => {
+      const desc = bot.serializeAction(action, g).description;
+      const card = ("card" in action && action.card) ? action.card.toJSON() as CardData : undefined;
+      this._logs[bi_captured].push({ turn: botTurn, text: desc, card, actionType: action.type });
+      return originalPerform(action, g);
+    };
+
+    try {
+      // Bot's Player.playTurn: calls training (already done → re-does it, so
+      // skip that by running takeActions+assignDamage+attack manually).
+      // Actually Player.playTurn re-trains. Instead we mirror it minus training.
+      bot.takeActions(this.game);
+      bot.assignDamage(this.game);
+      this.game.attack(bot);
+      bot.curDamage = bot.pDamage;
+    } finally {
+      bot.performAction = originalPerform;
+    }
+
+    // Opponent-visible logs: ally kills, sense usage, damage
+    const killed = oppAlliesBefore.filter((n) => !opp.allies.some((a) => a.name === n));
+    for (const name of killed) {
+      this._logs[oi].push({ turn: botTurn, text: `Opponent killed your ${name}` });
+    }
+    const oppHandAfter = new Set(opp.deck.hand.map((c) => c.id));
+    const usedIds = [...oppHandBefore].filter((id) => !oppHandAfter.has(id));
+    for (const card of opp.deck.discard) {
+      if (usedIds.includes(card.id) && card instanceof Action && card.data[9] === "sense") {
+        this._logs[oi].push({ turn: botTurn, text: `Your ${card.name} blocked a mission advance` });
+      }
+    }
+
+    const hpLost = oppHpBefore - opp.curHealth;
+
+    // Check cloud defense for opponent
+    const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
+    if (hpLost > 0 && cloudCards.length > 0) {
+      this._cloud_damage = hpLost;
+      this._logs[oi].push({ turn: botTurn, text: `Incoming: ${hpLost} damage` });
+      this.phase = "cloud_defense";
+      this.activePlayer = oi;
+      // If the opp is also a bot (shouldn't happen in normal single/multiplayer
+      // but cheap to handle), auto-skip.
+      if (this._isBot(oi)) {
+        this.resolveCloud(oi, -1);
+      }
+      return;
+    }
+
+    if (hpLost > 0) {
+      this._logs[oi].push({ turn: botTurn, text: `Dealt ${hpLost} damage to you` });
+    }
+
+    if (this.game.winner) { this.phase = "game_over"; return; }
+
+    // Use the same post-attack path as humans. For bots, this skips cleanUp
+    // (already done in end_actions) and the sense prompt (auto-true).
+    this._postAttackCleanup(bi);
+  }
+
+  // ── Multiplayer-specific payload ──
+
+  /** Data to write to InstantDB after an action (host-only). */
+  getInstantDBPayload(): Record<string, unknown> {
+    const [p0State, p1State] = this.getBothStates();
+    let p0Prompt: Record<string, unknown> | null = null;
+    let p1Prompt: Record<string, unknown> | null = null;
+    if (this._pending_prompt && this.phase === "awaiting_prompt") {
+      const promptData = this._pending_prompt.toJSON();
+      if (this.activePlayer === 0) p0Prompt = promptData;
+      else p1Prompt = promptData;
+    }
+    return {
+      phase: this.phase,
+      activePlayer: this.activePlayer,
+      turnCount: this.game.turncount,
+      p0State, p1State, p0Prompt, p1Prompt,
+      winner: this.game.winner?.name ?? "",
+      victoryType: this.game.victoryType || "",
+      updatedAt: Date.now(),
+    };
   }
 }
