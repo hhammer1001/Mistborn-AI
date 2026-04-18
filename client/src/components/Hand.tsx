@@ -45,8 +45,9 @@ export interface CompositeAction {
   title: string;
   isFlare?: boolean;
   firstActionIndex: number;
-  /** Finds the follow-up action in the new action list after the first resolves */
-  findSecond: (actions: GameAction[]) => number | undefined;
+  /** Declarative spec for the follow-up action. Used by both local play and
+   *  multiplayer guest→host dispatch (serializable). */
+  secondMatch: { code: number; cardIds?: number[] };
 }
 
 interface Props {
@@ -54,7 +55,7 @@ interface Props {
   actions: GameAction[];
   player: PlayerData;
   onAction: (index: number) => void;
-  onCompositeAction: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  onCompositeAction: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   deckSize?: number;
   discardSize?: number;
 }
@@ -105,7 +106,7 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
   actions: GameAction[];
   composites: CompositeAction[];
   onAction: (index: number) => void;
-  onCompositeAction: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  onCompositeAction: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -217,7 +218,7 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
         <button
           key={`composite-${i}`}
           className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
-          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.findSecond); onClose(); }}
+          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.secondMatch); onClose(); }}
           title={c.title}
         >
           <span className={c.isFlare ? "flare-text" : ""}>{c.textBefore}</span>
@@ -265,11 +266,8 @@ function getCompositeActions(
       isFlare,
       title: `${verb} ${metalName} token and add to ${card.name}`,
       firstActionIndex: burnTokenAction.index,
-      findSecond: (newActions) => {
-        // After burning the token, find the "use metal on card" action (code 4) for any of our card IDs
-        const match = newActions.find((a) => a.code === 4 && a.cardId !== undefined && allIds.includes(a.cardId));
-        return match?.index;
-      },
+      // After burning the token, find the "use metal on card" action (code 4) for any of our card IDs
+      secondMatch: { code: 4, cardIds: allIds },
     });
   }
 
@@ -294,10 +292,7 @@ function getCompositeActions(
       metalIcon: icon,
       title: `Burn ${sourceCard?.name ?? "card"} for ${metalName} and add to ${card.name}`,
       firstActionIndex: burnAction.index,
-      findSecond: (newActions) => {
-        const match = newActions.find((a) => a.code === 4 && a.cardId !== undefined && allIds.includes(a.cardId));
-        return match?.index;
-      },
+      secondMatch: { code: 4, cardIds: allIds },
     });
   }
 
@@ -360,7 +355,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
                   actions={groupActions}
                   composites={composites}
                   onAction={(idx) => { triggerPulse(group.card.id); onAction(idx); }}
-                  onCompositeAction={(first, findSecond) => { triggerPulse(group.card.id); onCompositeAction(first, findSecond); }}
+                  onCompositeAction={(first, secondMatch) => { triggerPulse(group.card.id); onCompositeAction(first, secondMatch); }}
                   onClose={handleClose}
                   anchorRef={{ current: cardRefs.current.get(group.card.id) ?? null }}
                 />

@@ -83,7 +83,7 @@ interface Props {
   isOpponent?: boolean;
   actions?: GameAction[];
   onAction?: (index: number) => void;
-  onCompositeAction?: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  onCompositeAction?: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   discard?: CardData[];
   marketDiscard?: CardData[];
 }
@@ -250,9 +250,7 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                     return (
                       <button
                         className={`action-btn${isFlare ? " flare-btn" : ""}`}
-                        onClick={() => onCompositeAction(burnAction!.index, (newActions) =>
-                          newActions.find((a) => a.code === 10)?.index
-                        )}
+                        onClick={() => onCompositeAction(burnAction!.index, { code: 10 })}
                       >
                         {verb} + Ability I
                       </button>
@@ -276,9 +274,7 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                     return (
                       <button
                         className="action-btn"
-                        onClick={() => onCompositeAction(burnAction!.index, (newActions) =>
-                          newActions.find((a) => a.code === 11)?.index
-                        )}
+                        onClick={() => onCompositeAction(burnAction!.index, { code: 11 })}
                       >
                         Burn + Ability III
                       </button>

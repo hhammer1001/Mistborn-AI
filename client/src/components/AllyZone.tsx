@@ -13,7 +13,7 @@ interface CompositeAllyAction {
   isFlare?: boolean;
   title: string;
   firstActionIndex: number;
-  findSecond: (actions: GameAction[]) => number | undefined;
+  secondMatch: { code: number; cardIds?: number[] };
 }
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
   actions: GameAction[];
   player?: PlayerData;
   onAction: (index: number) => void;
-  onCompositeAction?: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  onCompositeAction?: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   label: string;
 }
 
@@ -55,8 +55,7 @@ function getCompositeAllyActions(
       isFlare,
       title: `${verb} ${metalName} and use ${ally.name}'s first ability`,
       firstActionIndex: burnTokenAction.index,
-      findSecond: (newActions) =>
-        newActions.find((a) => a.code === 8 && a.cardId === ally.id)?.index,
+      secondMatch: { code: 8, cardIds: [ally.id] },
     });
   }
 
@@ -71,8 +70,7 @@ function getCompositeAllyActions(
       isFlare,
       title: `${verb} ${metalName} and use ${ally.name}'s second ability`,
       firstActionIndex: burnTokenAction.index,
-      findSecond: (newActions) =>
-        newActions.find((a) => a.code === 9 && a.cardId === ally.id)?.index,
+      secondMatch: { code: 9, cardIds: [ally.id] },
     });
   }
 
@@ -83,7 +81,7 @@ function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, 
   allyActions: GameAction[];
   composites: CompositeAllyAction[];
   onAction: (index: number) => void;
-  onCompositeAction: (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  onCompositeAction: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -139,7 +137,7 @@ function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, 
         <button
           key={`composite-${i}`}
           className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
-          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.findSecond); onClose(); }}
+          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.secondMatch); onClose(); }}
           title={c.title}
         >
           <span className={c.isFlare ? "flare-text" : ""}>{c.textBefore}</span>

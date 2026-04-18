@@ -278,12 +278,14 @@ export function useGame() {
   );
 
   const playTwoActions = useCallback(
-    (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
+    (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => {
       const first = playAction(firstIndex) as unknown as SessionResult | null;
       if (!first) return null;
-      const secondIndex = findSecond((first.availableActions ?? []) as GameAction[]);
-      if (secondIndex === undefined) return first;
-      return playAction(secondIndex);
+      const actions = (first.availableActions ?? []) as GameAction[];
+      const second = actions.find((a) => a.code === secondMatch.code
+        && (secondMatch.cardIds === undefined || (a.cardId !== undefined && secondMatch.cardIds.includes(a.cardId))));
+      if (!second) return first;
+      return playAction(second.index);
     },
     [playAction]
   );

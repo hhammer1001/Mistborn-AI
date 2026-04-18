@@ -87,6 +87,13 @@ export interface GameAction {
   boxingsCost?: number;
 }
 
+/** Declarative spec for the second action in a "X then Y" composite
+ *  (serializable so it can be sent from a multiplayer guest to the host). */
+export interface SecondMatch {
+  code: number;
+  cardIds?: number[];
+}
+
 export interface BotLogEntry {
   turn: number;
   text: string;

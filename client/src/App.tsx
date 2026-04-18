@@ -359,7 +359,7 @@ function GameBoard({
   log: LogEntry[];
   isMyTurn: boolean;
   handleAction: (index: number) => void;
-  playTwoActions: (first: number, findSecond: (actions: GameAction[]) => number | undefined) => void;
+  playTwoActions: (first: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   advanceAllMission: (name: string) => void;
   assignDamage: (targetIndex: number) => unknown;
   resolveSense: (use: boolean) => unknown;
@@ -377,7 +377,7 @@ function GameBoard({
         <div className="left-main">
           <div className="left-top-row">
             <div className="player-info-with-training">
-              <PlayerInfo player={you} actions={actions} onAction={handleAction} onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }} discard={you.discard} marketDiscard={gameState.market.discard} />
+              <PlayerInfo player={you} actions={actions} onAction={handleAction} onCompositeAction={(first, secondMatch) => { if (!loading) playTwoActions(first, secondMatch); }} discard={you.discard} marketDiscard={gameState.market.discard} />
               <TrainingTrack training={you.training} character={you.character} />
               <MetalTokens player={you} actions={actions} onAction={handleAction} />
             </div>
@@ -388,7 +388,7 @@ function GameBoard({
                 actions={actions}
                 player={you}
                 onAction={handleAction}
-                onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }}
+                onCompositeAction={(first, secondMatch) => { if (!loading) playTwoActions(first, secondMatch); }}
                 label="Your Allies"
               />
             </div>
@@ -398,7 +398,7 @@ function GameBoard({
             actions={actions}
             player={you}
             onAction={handleAction}
-            onCompositeAction={(first, findSecond) => { if (!loading) playTwoActions(first, findSecond); }}
+            onCompositeAction={(first, secondMatch) => { if (!loading) playTwoActions(first, secondMatch); }}
             deckSize={you.deckSize}
             discardSize={you.discardSize}
           />

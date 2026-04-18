@@ -167,6 +167,20 @@ export function useMultiplayerGame(
         case "action":
           session.playAction(pi, pending.actionIndex as number);
           break;
+        case "composite": {
+          // Two-step action (e.g. burn_card + use_metal). Play the first,
+          // then match the second by the provided spec.
+          session.playAction(pi, pending.actionIndex as number);
+          const state = session.getState(pi);
+          const actions = state.availableActions as GameAction[];
+          const match = pending.secondMatch as { code: number; cardIds?: number[] } | undefined;
+          if (match) {
+            const second = actions.find((a) => a.code === match.code
+              && (match.cardIds === undefined || (a.cardId !== undefined && match.cardIds.includes(a.cardId))));
+            if (second) session.playAction(pi, second.index);
+          }
+          break;
+        }
         case "prompt":
           session.respondToPrompt(pi, pending.promptType as string, pending.value as number);
           break;
@@ -307,16 +321,18 @@ export function useMultiplayerGame(
   );
 
   const playTwoActions = useCallback(
-    async (firstIndex: number, findSecond: (actions: GameAction[]) => number | undefined) => {
+    async (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => {
       if (myPlayerIndex === null) return;
       if (isHost) {
         const session = sessionRef.current;
         if (!session || !sessionId) return;
         session.playAction(myPlayerIndex, firstIndex);
         const state = session.getState(myPlayerIndex);
-        const secondIndex = findSecond(state.availableActions as GameAction[]);
-        if (secondIndex !== undefined) {
-          session.playAction(myPlayerIndex, secondIndex);
+        const actions = state.availableActions as GameAction[];
+        const second = actions.find((a) => a.code === secondMatch.code
+          && (secondMatch.cardIds === undefined || (a.cardId !== undefined && secondMatch.cardIds.includes(a.cardId))));
+        if (second) {
+          session.playAction(myPlayerIndex, second.index);
         }
         const payload = session.getInstantDBPayload();
         await db.transact(
@@ -327,8 +343,8 @@ export function useMultiplayerGame(
           })
         );
       } else {
-        // Guest: just play the first action, host will process
-        await _guestAction({ actionType: "action", actionIndex: firstIndex });
+        // Guest: send composite request so host plays BOTH actions atomically.
+        await _guestAction({ actionType: "composite", actionIndex: firstIndex, secondMatch });
       }
     },
     [isHost, myPlayerIndex, sessionId, gameRecord, _guestAction]
