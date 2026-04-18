@@ -90,6 +90,8 @@ export interface GameAction {
 export interface BotLogEntry {
   turn: number;
   text: string;
+  card?: CardData;
+  actionType?: string;
 }
 
 export interface PromptOption {

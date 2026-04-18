@@ -126,6 +126,8 @@ function diffToText(before: Snapshot, after: Snapshot): string[] {
 interface LogEntry {
   turn: number;
   text: string;
+  card?: unknown;
+  actionType?: string;
 }
 
 class LoggingBot {
@@ -144,7 +146,8 @@ class LoggingBot {
 
     this.bot.performAction = function (action: GameActionInternal, g: Game) {
       const desc = self.bot.serializeAction(action, g).description;
-      self.session._bot_log.push({ turn: botTurn, text: desc });
+      const card = ("card" in action && action.card) ? action.card.toJSON() : undefined;
+      self.session._bot_log.push({ turn: botTurn, text: desc, card, actionType: action.type });
       return originalPerform(action, g);
     };
 

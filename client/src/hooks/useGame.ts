@@ -1,7 +1,18 @@
 import { useState, useCallback, useRef } from "react";
-import type { GameState, GameAction, BotLogEntry } from "../types/game";
+import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
 import { GameSession } from "../engine/session";
 import { resetCardIds } from "../engine/card";
+
+export interface TurnRecap {
+  trained?: number;
+  mission?: number;
+  healed?: number;
+  damageToPlayer?: { name: string; amount: number };
+  damageToAllies?: { name: string; amount: number }[];
+  boughtCards?: string[];
+}
+
+const BUY_ACTION_TYPES = new Set(["buy", "buy_eliminate", "buy_with_boxings", "buy_elim_boxings"]);
 
 // Session methods return Record<string, unknown>; this helper casts safely
 interface SessionResult {
@@ -49,9 +60,72 @@ export function useGame() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [flashQueue, setFlashQueue] = useState<BotLogEntry[]>([]);
+  const [recap, setRecap] = useState<TurnRecap | null>(null);
   const playerName = useRef("Player");
   const botName = useRef("Bot");
   const sessionRef = useRef<GameSession | null>(null);
+
+  const enqueueFlashes = useCallback((entries: BotLogEntry[] | undefined) => {
+    if (!entries) return;
+    const withCards = entries.filter((e) => e.card);
+    if (withCards.length) setFlashQueue((q) => [...q, ...withCards]);
+  }, []);
+
+  const consumeFlash = useCallback(() => {
+    setFlashQueue((q) => q.slice(1));
+  }, []);
+
+  const consumeRecap = useCallback(() => setRecap(null), []);
+
+  const computeRecap = useCallback((before: GameState, data: SessionResult, turnLog?: BotLogEntry[]): TurnRecap | null => {
+    const after = data as unknown as GameState;
+    if (!after.players || after.players.length < 2) return null;
+    const oldYou = before.players[0];
+    const oldOpp = before.players[1];
+    const newYou = after.players[0];
+    const newOpp = after.players[1];
+    const r: TurnRecap = {};
+    const trained = newOpp.training - oldOpp.training;
+    const healed = Math.max(0, newOpp.health - oldOpp.health);
+
+    const bought = (turnLog ?? [])
+      .filter((e) => e.actionType && BUY_ACTION_TYPES.has(e.actionType) && e.card)
+      .map((e) => e.card!.name);
+    if (bought.length) r.boughtCards = bought;
+
+    // Mission progress lives in missions[].playerRanks[1] for the bot — sum deltas.
+    let missionDelta = 0;
+    const oldMissions = before.missions ?? [];
+    const newMissions = after.missions ?? [];
+    for (let i = 0; i < newMissions.length; i++) {
+      const oldRank = oldMissions[i]?.playerRanks?.[1] ?? 0;
+      const newRank = newMissions[i]?.playerRanks?.[1] ?? 0;
+      if (newRank > oldRank) missionDelta += newRank - oldRank;
+    }
+
+    // Damage to the player (HP loss).
+    const playerHpLoss = Math.max(0, oldYou.health - newYou.health);
+    if (playerHpLoss > 0) r.damageToPlayer = { name: oldYou.name, amount: playerHpLoss };
+
+    // Damage to player's allies: match old→new by id. Killed ones count full remaining HP.
+    const allyDamage: { name: string; amount: number }[] = [];
+    const newAllyById = new Map((newYou.allies ?? []).map((a) => [a.id, a]));
+    for (const oldAlly of oldYou.allies ?? []) {
+      const newAlly = newAllyById.get(oldAlly.id);
+      const oldHp = oldAlly.health ?? 0;
+      const newHp = newAlly?.health ?? 0;
+      const killed = !newAlly;
+      const dmg = killed ? oldHp : Math.max(0, oldHp - newHp);
+      if (dmg > 0) allyDamage.push({ name: oldAlly.name, amount: dmg });
+    }
+    if (allyDamage.length) r.damageToAllies = allyDamage;
+
+    if (trained > 0) r.trained = trained;
+    if (missionDelta > 0) r.mission = missionDelta;
+    if (healed > 0) r.healed = healed;
+    return Object.keys(r).length > 0 ? r : null;
+  }, []);
 
   const createGame = useCallback(
     (
@@ -89,6 +163,21 @@ export function useGame() {
           for (const entry of data.botLog) {
             initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
+          enqueueFlashes(data.botLog);
+          // Bot's very first turn (bot-first): reconstruct starting HP from engine rule
+          // (36 + 2*turnOrder, Prodigy = 40). Training/mission/ranks always start at 0.
+          const startHp = (p: PlayerData) =>
+            p.character === "Prodigy" ? 40 : 36 + 2 * p.turnOrder;
+          const baseline: GameState = {
+            ...data,
+            players: [
+              { ...data.players[0], health: startHp(data.players[0]) },
+              { ...data.players[1], training: 0, health: startHp(data.players[1]) },
+            ],
+            missions: [],
+          };
+          const r = computeRecap(baseline, data as unknown as SessionResult, data.botLog);
+          if (r) setRecap(r);
         }
         if (data.turnCount > 1) {
           initLog.push({ turn: data.turnCount, text: `${pName}'s turn` });
@@ -142,6 +231,9 @@ export function useGame() {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
+          enqueueFlashes(data.botLog);
+          const r = computeRecap(gameState, data, data.botLog);
+          if (r) setRecap(r);
         }
 
         if ((data.turnCount ?? 0) > prevTurn) {
@@ -217,6 +309,9 @@ export function useGame() {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
+          enqueueFlashes(data.botLog);
+          const r = computeRecap(gameState, data, data.botLog);
+          if (r) setRecap(r);
         }
 
         if ((data.turnCount ?? 0) > gameState.turnCount) {
@@ -272,6 +367,9 @@ export function useGame() {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
+          enqueueFlashes(data.botLog);
+          const r = computeRecap(gameState, data, data.botLog);
+          if (r) setRecap(r);
         }
 
         if ((data.turnCount ?? 0) > gameState.turnCount) {
@@ -320,6 +418,9 @@ export function useGame() {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
+          enqueueFlashes(data.botLog);
+          const r = computeRecap(gameState, data, data.botLog);
+          if (r) setRecap(r);
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
           newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
@@ -353,6 +454,9 @@ export function useGame() {
           for (const entry of data.botLog) {
             newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
           }
+          enqueueFlashes(data.botLog);
+          const r = computeRecap(gameState, data, data.botLog);
+          if (r) setRecap(r);
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
           newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
@@ -401,6 +505,10 @@ export function useGame() {
     loading,
     error,
     log,
+    flashQueue,
+    consumeFlash,
+    recap,
+    consumeRecap,
     createGame,
     playAction,
     advanceAllMission,

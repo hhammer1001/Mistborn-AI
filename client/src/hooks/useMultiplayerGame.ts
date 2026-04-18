@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { db } from "../lib/instantdb";
-import type { GameState, GameAction } from "../types/game";
-import type { LogEntry } from "./useGame";
+import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
+import type { LogEntry, TurnRecap } from "./useGame";
 import { MultiplayerGameSession } from "../engine/multiplayerSession";
 
 /**
@@ -51,6 +51,89 @@ export function useMultiplayerGame(
   }, [gameRecord, myPlayerIndex, sessionId]);
 
   const isMyTurn = gameState?.isMyTurn ?? false;
+
+  // ── Flash queue & recap: detect new opponent log entries + turn transitions ──
+  const [flashQueue, setFlashQueue] = useState<BotLogEntry[]>([]);
+  const [recap, setRecap] = useState<TurnRecap | null>(null);
+  const seenBotLogLenRef = useRef(0);
+  const turnStartBotLogLenRef = useRef(0);
+  const prevSnapshotRef = useRef<{ turn: number; isMyTurn: boolean; you: PlayerData; opp: PlayerData; missions: GameState["missions"] } | null>(null);
+
+  const BUY_ACTION_TYPES = useMemo(() => new Set(["buy", "buy_eliminate", "buy_with_boxings", "buy_elim_boxings"]), []);
+
+  const consumeFlash = useCallback(() => setFlashQueue((q) => q.slice(1)), []);
+  const consumeRecap = useCallback(() => setRecap(null), []);
+
+  useEffect(() => {
+    if (!gameState) { seenBotLogLenRef.current = 0; prevSnapshotRef.current = null; return; }
+    const botLog = (gameState.botLog ?? []) as BotLogEntry[];
+    const seen = seenBotLogLenRef.current;
+    if (botLog.length > seen) {
+      const newEntries = botLog.slice(seen).filter((e) => e.card);
+      if (newEntries.length) setFlashQueue((q) => [...q, ...newEntries]);
+      seenBotLogLenRef.current = botLog.length;
+    }
+
+    const prev = prevSnapshotRef.current;
+    const me = myPlayerIndex ?? 0;
+    const opp = 1 - me;
+
+    // Detect "opponent's turn just ended" by transition: prev.isMyTurn=false → current isMyTurn=true.
+    // prev captures state at start of opponent's turn (snapshotted when turn handed off).
+    if (prev && isMyTurn && !prev.isMyTurn) {
+      const newYou = gameState.players[me];
+      const newOpp = gameState.players[opp];
+      const r: TurnRecap = {};
+      const trained = newOpp.training - prev.opp.training;
+      const healed = Math.max(0, newOpp.health - prev.opp.health);
+      const playerHpLoss = Math.max(0, prev.you.health - newYou.health);
+      if (playerHpLoss > 0) r.damageToPlayer = { name: prev.you.name, amount: playerHpLoss };
+
+      // Cards bought during opponent's turn: entries added to botLog since turn start.
+      const turnEntries = botLog.slice(turnStartBotLogLenRef.current);
+      const bought = turnEntries
+        .filter((e) => e.actionType && BUY_ACTION_TYPES.has(e.actionType) && e.card)
+        .map((e) => e.card!.name);
+      if (bought.length) r.boughtCards = bought;
+
+      const allyDamage: { name: string; amount: number }[] = [];
+      const newAllyById = new Map((newYou.allies ?? []).map((a) => [a.id, a]));
+      for (const oldAlly of prev.you.allies ?? []) {
+        const newAlly = newAllyById.get(oldAlly.id);
+        const oldHp = oldAlly.health ?? 0;
+        const newHp = newAlly?.health ?? 0;
+        const killed = !newAlly;
+        const dmg = killed ? oldHp : Math.max(0, oldHp - newHp);
+        if (dmg > 0) allyDamage.push({ name: oldAlly.name, amount: dmg });
+      }
+      if (allyDamage.length) r.damageToAllies = allyDamage;
+
+      let missionDelta = 0;
+      for (let i = 0; i < gameState.missions.length; i++) {
+        const oldRank = prev.missions[i]?.playerRanks?.[opp] ?? 0;
+        const newRank = gameState.missions[i]?.playerRanks?.[opp] ?? 0;
+        if (newRank > oldRank) missionDelta += newRank - oldRank;
+      }
+      if (trained > 0) r.trained = trained;
+      if (missionDelta > 0) r.mission = missionDelta;
+      if (healed > 0) r.healed = healed;
+      if (Object.keys(r).length > 0) setRecap(r);
+    }
+
+    // Only refresh the snapshot on turn-boundary transitions, not every state update.
+    // This preserves the "at start of opponent's turn" snapshot needed for the recap.
+    const isBoundary = !prev || prev.isMyTurn !== isMyTurn;
+    if (isBoundary) {
+      prevSnapshotRef.current = {
+        turn: gameState.turnCount,
+        isMyTurn,
+        you: gameState.players[me],
+        opp: gameState.players[opp],
+        missions: gameState.missions,
+      };
+      turnStartBotLogLenRef.current = botLog.length;
+    }
+  }, [gameState, isMyTurn, myPlayerIndex]);
 
   // Build log
   const log = useMemo<LogEntry[]>(() => {
@@ -313,6 +396,10 @@ export function useMultiplayerGame(
     loading: loading || gameQuery.isLoading,
     error,
     log,
+    flashQueue,
+    consumeFlash,
+    recap,
+    consumeRecap,
     isMyTurn,
     myPlayerIndex,
     playAction,

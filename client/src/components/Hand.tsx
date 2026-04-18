@@ -306,7 +306,18 @@ function getCompositeActions(
 
 export function Hand({ cards, actions, player, onAction, onCompositeAction, deckSize, discardSize }: Props) {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
+  const [pulsingCardId, setPulsingCardId] = useState<number | null>(null);
+  const pulseTimerRef = useRef<number | null>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const triggerPulse = useCallback((cardId: number) => {
+    setPulsingCardId(cardId);
+    if (pulseTimerRef.current) window.clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = window.setTimeout(() => {
+      setPulsingCardId(null);
+      pulseTimerRef.current = null;
+    }, 550);
+  }, []);
 
   const getGroupActions = (ids: number[]) =>
     actions.filter((a) => a.cardId !== undefined && ids.includes(a.cardId));
@@ -335,7 +346,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
           return (
             <div
               key={group.card.id}
-              className="hand-card-wrapper"
+              className={`hand-card-wrapper${pulsingCardId === group.card.id ? " card-playing" : ""}`}
               ref={(el) => { if (el) cardRefs.current.set(group.card.id, el); }}
             >
               <Card
@@ -348,8 +359,8 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
                 <CardActionMenu
                   actions={groupActions}
                   composites={composites}
-                  onAction={onAction}
-                  onCompositeAction={onCompositeAction}
+                  onAction={(idx) => { triggerPulse(group.card.id); onAction(idx); }}
+                  onCompositeAction={(first, findSecond) => { triggerPulse(group.card.id); onCompositeAction(first, findSecond); }}
                   onClose={handleClose}
                   anchorRef={{ current: cardRefs.current.get(group.card.id) ?? null }}
                 />

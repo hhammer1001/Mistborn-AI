@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { PlayerData, GameAction, CardData } from "../types/game";
 import { METAL_ICONS } from "../data/metalIcons";
 import { CardPileOverlay } from "./CardPileOverlay";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 const CHARACTER_METAL: Record<string, number> = {
@@ -103,35 +104,35 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
             <span className="opp-character">{player.character}</span>
           </div>
           <div className="opp-stat health">
-            <span className="opp-stat-value">{player.health}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.health} tone="health" /></span>
             <span className="opp-stat-label">HP</span>
           </div>
           <div className="opp-stat damage">
-            <span className="opp-stat-value">{player.damage}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.damage} tone="damage" /></span>
             <span className="opp-stat-label">Dmg</span>
           </div>
           <div className="opp-stat money">
-            <span className="opp-stat-value">{player.money}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.money} tone="money" /></span>
             <span className="opp-stat-label">Money</span>
           </div>
           <div className="opp-stat mission">
-            <span className="opp-stat-value">{player.mission}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.mission} tone="mission" /></span>
             <span className="opp-stat-label">Mission</span>
           </div>
           <div className="opp-stat">
-            <span className="opp-stat-value">{player.training}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.training} /></span>
             <span className="opp-stat-label">Train</span>
           </div>
           <div className="opp-stat">
-            <span className="opp-stat-value">{player.boxings}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.boxings} tone="money" /></span>
             <span className="opp-stat-label">Box</span>
           </div>
           <div className="opp-stat">
-            <span className="opp-stat-value">{player.handSize}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.handSize} /></span>
             <span className="opp-stat-label">Hand</span>
           </div>
           <div className="opp-stat">
-            <span className="opp-stat-value">{player.deckSize}</span>
+            <span className="opp-stat-value"><AnimatedNumber value={player.deckSize} /></span>
             <span className="opp-stat-label">Deck</span>
           </div>
         </div>
@@ -153,27 +154,27 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
       </div>
       <div className="player-stats-grid">
         <div className="stat-block health">
-          <span className="stat-value">{player.health}</span>
+          <span className="stat-value"><AnimatedNumber value={player.health} tone="health" /></span>
           <span className="stat-label">HP</span>
         </div>
         <div className="stat-block damage">
-          <span className="stat-value">{player.damage}</span>
+          <span className="stat-value"><AnimatedNumber value={player.damage} tone="damage" /></span>
           <span className="stat-label">Damage</span>
         </div>
         <div className="stat-block money">
-          <span className="stat-value">{player.money}</span>
+          <span className="stat-value"><AnimatedNumber value={player.money} tone="money" /></span>
           <span className="stat-label">Money</span>
         </div>
         <div className="stat-block mission">
-          <span className="stat-value">{player.mission}</span>
+          <span className="stat-value"><AnimatedNumber value={player.mission} tone="mission" /></span>
           <span className="stat-label">Mission</span>
         </div>
         <div className="stat-block boxings">
-          <span className="stat-value">{player.boxings}</span>
+          <span className="stat-value"><AnimatedNumber value={player.boxings} tone="money" /></span>
           <span className="stat-label">Boxings</span>
         </div>
         <div className="stat-block burns">
-          <span className="stat-value">{player.burns}</span>
+          <span className="stat-value"><AnimatedNumber value={player.burns} /></span>
           <span className="stat-label">Burns</span>
         </div>
       </div>

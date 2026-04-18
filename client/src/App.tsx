@@ -20,6 +20,8 @@ import { PlayerInfo } from "./components/PlayerInfo";
 import { ActionList } from "./components/ActionList";
 import { TrainingTrack } from "./components/TrainingTrack";
 import { ActivityLog } from "./components/ActivityLog";
+import { CardFlashOverlay } from "./components/CardFlashOverlay";
+import { TurnRecap } from "./components/TurnRecap";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 import type { GameState } from "./types/game";
@@ -202,7 +204,7 @@ function BotGameBoard({
   game: ReturnType<typeof useGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo } = game;
 
   const handleAction = (index: number) => {
     if (!loading) playAction(index);
@@ -229,25 +231,29 @@ function BotGameBoard({
   }
 
   return (
-    <GameBoard
-      gameState={gameState}
-      you={you}
-      opp={opp}
-      actions={actions}
-      loading={loading}
-      log={log}
-      isMyTurn={true}
-      handleAction={handleAction}
-      playTwoActions={playTwoActions}
-      advanceAllMission={advanceAllMission}
-      assignDamage={assignDamage}
-      resolveSense={resolveSense}
-      resolveCloud={resolveCloud}
-      respondToPrompt={respondToPrompt}
-      onMainMenu={onMainMenu}
-      onUndo={undo}
-      canUndo={canUndo}
-    />
+    <>
+      <GameBoard
+        gameState={gameState}
+        you={you}
+        opp={opp}
+        actions={actions}
+        loading={loading}
+        log={log}
+        isMyTurn={true}
+        handleAction={handleAction}
+        playTwoActions={playTwoActions}
+        advanceAllMission={advanceAllMission}
+        assignDamage={assignDamage}
+        resolveSense={resolveSense}
+        resolveCloud={resolveCloud}
+        respondToPrompt={respondToPrompt}
+        onMainMenu={onMainMenu}
+        onUndo={undo}
+        canUndo={canUndo}
+      />
+      <CardFlashOverlay queue={flashQueue} onDone={consumeFlash} />
+      <TurnRecap recap={recap} onDone={consumeRecap} waiting={flashQueue.length > 0} />
+    </>
   );
 }
 
@@ -260,7 +266,7 @@ function MultiplayerGameBoard({
   game: ReturnType<typeof useMultiplayerGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit } = game;
 
   const handleAction = (index: number) => {
     if (!loading && isMyTurn) playAction(index);
@@ -312,6 +318,8 @@ function MultiplayerGameBoard({
       {!isMyTurn && (gameState.phase as string) !== "game_over" && (
         <WaitingOverlay opponentName={opp.name} phase={gameState.phase} />
       )}
+      <CardFlashOverlay queue={flashQueue} onDone={consumeFlash} />
+      <TurnRecap recap={recap} onDone={consumeRecap} waiting={flashQueue.length > 0} />
     </>
   );
 }

@@ -1132,6 +1132,7 @@ h3 {
 .hand-zone .card-row {
   flex-wrap: nowrap;
   overflow-x: auto;
+  padding-top: 2rem;
   padding-bottom: 0.3rem;
   scrollbar-width: thin;
   scrollbar-color: var(--border-light) transparent;
@@ -1149,6 +1150,17 @@ h3 {
   gap: 0.25rem;
   position: relative;
   align-self: flex-start;
+}
+
+.hand-card-wrapper.card-playing {
+  animation: hand-card-play 550ms ease-in-out;
+  z-index: 20;
+}
+
+@keyframes hand-card-play {
+  0%   { transform: translateY(0) scale(1); filter: brightness(1) drop-shadow(0 0 0 transparent); }
+  50%  { transform: translateY(-14px) scale(1.09); filter: brightness(1.35) drop-shadow(0 0 14px rgba(224, 191, 96, 0.75)); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1) drop-shadow(0 0 0 transparent); }
 }
 
 .card-actions {
@@ -1545,6 +1557,166 @@ h3 {
 .stat-block.damage .stat-value { color: var(--red-bright); }
 .stat-block.money .stat-value { color: var(--gold-bright); }
 .stat-block.mission .stat-value { color: var(--blue-bright); }
+
+/* Animated number — pulses on change, spawns floating delta */
+.animated-number {
+  position: relative;
+  display: inline-block;
+  transform-origin: center;
+}
+
+.animated-number.pulse {
+  animation: stat-pulse 400ms ease-out;
+}
+
+@keyframes stat-pulse {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+.float-delta {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.3em;
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.9);
+  z-index: 10;
+  animation: float-delta 900ms ease-out forwards;
+}
+
+.float-delta.pos { color: var(--green-bright); }
+.float-delta.neg { color: var(--red-bright); }
+.float-delta.tone-money.pos    { color: var(--gold-bright); }
+.float-delta.tone-mission.pos  { color: var(--blue-bright); }
+.float-delta.tone-damage.pos   { color: var(--red-bright); }
+
+@keyframes float-delta {
+  0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  25%  { transform: translate(-50%, -70%) scale(1.2); opacity: 1; }
+  70%  { transform: translate(-50%, -110%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -160%) scale(0.95); opacity: 0; }
+}
+
+/* Opponent card flash overlay — plays when the bot performs a card action */
+.card-flash-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 400;
+}
+
+.card-flash-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: card-flash 1100ms ease-out forwards;
+  filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.9))
+          drop-shadow(0 0 22px rgba(224, 191, 96, 0.45));
+}
+
+.card-flash-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1em;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.card-flash-word {
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 800;
+  color: var(--gold-bright);
+  letter-spacing: 0.08em;
+  line-height: 0.95;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 4px rgba(0, 0, 0, 1),
+    0 0 12px rgba(0, 0, 0, 0.95),
+    0 4px 14px rgba(0, 0, 0, 0.95),
+    0 0 28px rgba(224, 191, 96, 0.5);
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.6);
+}
+
+@keyframes card-flash {
+  0%   { opacity: 0; transform: translateY(24px) scale(0.82); }
+  18%  { opacity: 1; transform: translateY(0)    scale(1.06); }
+  30%  { opacity: 1; transform: translateY(0)    scale(1); }
+  70%  { opacity: 1; transform: translateY(-8px) scale(1); }
+  100% { opacity: 0; transform: translateY(-32px) scale(0.95); }
+}
+
+/* End-of-turn recap — shown after card flashes drain */
+.turn-recap-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 400;
+}
+
+.turn-recap-panel {
+  background: rgba(10, 10, 24, 0.92);
+  border: 1px solid var(--gold-bright);
+  border-radius: 10px;
+  padding: 1rem 1.6rem;
+  min-width: 280px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.9),
+              0 0 28px rgba(224, 191, 96, 0.35);
+  animation: turn-recap-in 2000ms ease-out forwards;
+  text-align: center;
+}
+
+.turn-recap-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--gold-bright);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+
+.turn-recap-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.turn-recap-line {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+
+.turn-recap-line.damage  { color: var(--red-bright); }
+.turn-recap-line.mission { color: var(--gold-bright); }
+.turn-recap-line.train   { color: var(--text); }
+.turn-recap-line.heal    { color: var(--green-bright); }
+.turn-recap-line.bought  { color: #ffffff; }
+
+@keyframes turn-recap-in {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.94); }
+  10%  { opacity: 1; transform: translateY(0)    scale(1); }
+  85%  { opacity: 1; transform: translateY(0)    scale(1); }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+}
 
 /* Training track (vertical) */
 .training-track-zone {
