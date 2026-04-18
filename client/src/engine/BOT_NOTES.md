@@ -1,16 +1,16 @@
-# TwonkyV2 — Tuning Notes
+# Squash Bot — Tuning Notes
 
-Notes from iterating on the V2 bot against the original Twonky (V1). Current ceiling: **73.7%** win rate over 5000 games.
+Notes from iterating on Squash Bot (originally named TwonkyV2) against the original Twonky. Current ceiling: **73.7%** win rate over 5000 games.
 
 ## Architecture
 
-- **`bot.ts`** — V1 original: priority-waterfall bot using pre-computed win-rate correlations from V1 self-play (`data/*3.json` files)
-- **`botV2.ts`** — V2: action-scoring bot. Scores every available action, picks the max
-- **`botV2Eval.ts`** — evaluation engine: resource values, context weights, snapshot builder, analytical card ratings, self-play blending
-- **`selfplay.ts`** — mirror-matchup data collector (V2 vs V2, same character both sides)
-- **`data/v2_weights/*.json`** — per-character self-play correlation data
+- **`bot.ts`** — Twonky original: priority-waterfall bot using pre-computed win-rate correlations from Twonky self-play (`data/*3.json` files)
+- **`squashBot.ts`** — Squash: action-scoring bot. Scores every available action, picks the max
+- **`squashBotEval.ts`** — evaluation engine: resource values, context weights, snapshot builder, analytical card ratings, self-play blending
+- **`selfplay.ts`** — mirror-matchup data collector (Squash vs Squash, same character both sides)
+- **`data/squash_weights/*.json`** — per-character self-play correlation data
 
-The V2 rating for a card is:
+The Squash rating for a card is:
 
 ```
 finalRating = analyticalRating                          // formula-based
@@ -24,10 +24,10 @@ Then dynamic adjustments layer on top (heal context, damage context, eliminate c
 
 | Stage | Win rate | Notes |
 |---|---|---|
-| V2 initial | 0.8% | Bot literally refused to burn cards (bug in metalUnlockValue counting the burned card as its own target) |
+| Squash initial | 0.8% | Bot literally refused to burn cards (bug in metalUnlockValue counting the burned card as its own target) |
 | Fixed opportunity-cost formula | 28.5% | Bot started actually activating cards |
-| Tuned missions + buy scoring | 46.2% | Closer to parity with V1 |
-| Added V2 self-play data | 48.2% | Replaced correlation data from bad bot |
+| Tuned missions + buy scoring | 46.2% | Closer to parity with Twonky |
+| Added Squash self-play data | 48.2% | Replaced correlation data from bad bot |
 | Blend=20 | 61.9% | Self-play signal dominates analytical |
 | Defender bonus + heal weight + buy tuning | 70.3% | Major formula fixes |
 | 30k-game self-play + blend=100 | 73.7% | Plateau — tuning saturated |
@@ -36,7 +36,7 @@ Then dynamic adjustments layer on top (heal context, damage context, eliminate c
 
 ### 1. First-principles resource values (biggest foundation)
 
-Instead of learning card values from V1's self-play (which is biased by V1's play style), assign analytical values to effect types based on the game economy:
+Instead of learning card values from Twonky's self-play (which is biased by Twonky's play style), assign analytical values to effect types based on the game economy:
 
 ```
 D (damage)      = 1.0
@@ -88,7 +88,7 @@ defenderBonus = defenseType === "D" ? health * 4.0 : 0
 totalAllyValue += defenderBonus
 ```
 
-A defender with 3 HP blocks roughly 3 damage per turn it's alive — massive equivalent value. V2 now buys Hazekillers/Pewterarm when needed, reducing losses to damage-oriented opponents.
+A defender with 3 HP blocks roughly 3 damage per turn it's alive — massive equivalent value. Squash now buys Hazekillers/Pewterarm when needed, reducing losses to damage-oriented opponents.
 
 ### 5. Heal weight becomes preventive (+1%)
 
@@ -101,7 +101,7 @@ healWeight = basedOnHP (0.2 to 3.0)
 
 ### 6. Buy multiplier lowered from 6 to 2 (+2.5%)
 
-The buy score was over-inflated, causing V2 to buy too many mediocre cards. Lowering `rating * 6` to `rating * 2` made buying less attractive relative to using metals, advancing missions, and activating ally abilities.
+The buy score was over-inflated, causing Squash to buy too many mediocre cards. Lowering `rating * 6` to `rating * 2` made buying less attractive relative to using metals, advancing missions, and activating ally abilities.
 
 ### 7. Seek weight doubled (0.4 → 0.8, +1%)
 
@@ -166,17 +166,17 @@ BASE_BUFFERS = Kelsier 1.5, Marsh 1.8, Shan 1.7, Vin 1.5, Prodigy 1.4
 
 ## Known Weaknesses
 
-1. **Shan vs Marsh**: 48% — structurally hard. Marsh's +1 Mi/turn char ability creates a mission race Shan can't win without damage engine cards, and the V1-Marsh build is already well-tuned for mission.
+1. **Shan vs Marsh**: 48% — structurally hard. Marsh's +1 Mi/turn char ability creates a mission race Shan can't win without damage engine cards, and the Twonky-Marsh build is already well-tuned for mission.
 
-2. **Bots plateau at 74%**: Can't break through without lookahead. V1's rigid "missions first always" priority is genuinely optimal for the scenarios where it applies, and V2's single-step scoring can't plan around it.
+2. **Bots plateau at 74%**: Can't break through without lookahead. Twonky's rigid "missions first always" priority is genuinely optimal for the scenarios where it applies, and Squash's single-step scoring can't plan around it.
 
 3. **Sample-selection bias in self-play**: Cards that start rated below the buy buffer (like Obligator, rated 0.84 analytical) never get bought, so self-play has no data, so the rating never improves. A few cards are stuck in this loop. Could be solved with exploration but exploration hurts data quality.
 
-4. **Damage victories outnumber mission victories** (2790 D / 2149 M at 5000 games). V2 is supposed to default to mission path, but ends up winning by damage more often because it pivots when falling behind in mission races. This is correct (damage is the fallback) but suggests V2 isn't racing missions aggressively enough.
+4. **Damage victories outnumber mission victories** (2790 D / 2149 M at 5000 games). Squash is supposed to default to mission path, but ends up winning by damage more often because it pivots when falling behind in mission races. This is correct (damage is the fallback) but suggests Squash isn't racing missions aggressively enough.
 
 ## Key Tuning Constants
 
-In `botV2Eval.ts`:
+In `squashBotEval.ts`:
 ```
 SELFPLAY_MIN_SAMPLES = 100          // skip weights with < 100 samples
 SELFPLAY_BLEND_STRENGTH = 100.0     // additive blend: winRate × this
@@ -184,7 +184,7 @@ Defender bonus = health * 4.0       // for cards with defenseType="D"
 Mi base weight = 2.2 (* 1.3 in missionWeight)
 ```
 
-In `botV2.ts`:
+In `squashBot.ts`:
 ```
 scoreBuy: rating * 2 * phaseMult + allyBonus - deckPenalty
 deckPenalty: max(0, (deckSize - 10) * 2.5)
@@ -231,10 +231,10 @@ Not attempted — these require actual architectural additions, not just tuning:
 ## Scripts
 
 ```bash
-# Benchmark V2 vs V1 (default 20 games/matchup, 5 chars × 4 opponents = 20 matchups)
+# Benchmark Squash vs Twonky (default 20 games/matchup, 5 chars × 4 opponents = 20 matchups)
 npx tsx client/src/engine/benchmark.ts [gamesPerMatchup]
 
-# Baseline sanity check: V1 vs V1 should be ~50%
+# Baseline sanity check: Twonky vs Twonky should be ~50%
 npx tsx client/src/engine/benchmark.ts baseline 100
 
 # Regenerate self-play data

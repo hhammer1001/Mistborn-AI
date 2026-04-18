@@ -16,7 +16,7 @@ import { Action, Ally, Card, Funding } from "./card";
 import { Player } from "./player";
 import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
-import { TwonkyV2 } from "./botV2";
+import { SquashBot } from "./squashBot";
 import { SynergyBotPrime } from "./synergyBot";
 import { PromptNeeded } from "./prompt";
 import type { GameActionInternal } from "./types";
@@ -24,7 +24,7 @@ import { METAL_NAMES } from "./types";
 
 // ── Player kinds ──
 
-export type PlayerKind = "human" | "bot_twonky" | "bot_twonkyV2" | "bot_synergy";
+export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_synergy";
 
 export interface PlayerConfig {
   kind: PlayerKind;
@@ -36,8 +36,8 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
   switch (kind) {
     case "human":
       return (deck, game, to, name, char) => new WebPlayer(deck, game, to, name, char);
-    case "bot_twonkyV2":
-      return (deck, game, to, name, char) => new TwonkyV2(deck, game, to, name, char);
+    case "bot_squash":
+      return (deck, game, to, name, char) => new SquashBot(deck, game, to, name, char);
     case "bot_synergy":
       return (deck, game, to, name, char) => new SynergyBotPrime(deck, game, to, name, char);
     case "bot_twonky":
@@ -48,7 +48,7 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
 
 /** Map the legacy opponentType strings from the UI to a PlayerKind. */
 export function opponentTypeToKind(opponentType: string): PlayerKind {
-  if (opponentType === "twonkyV2") return "bot_twonkyV2";
+  if (opponentType === "squash") return "bot_squash";
   if (opponentType === "synergy") return "bot_synergy";
   return "bot_twonky";
 }

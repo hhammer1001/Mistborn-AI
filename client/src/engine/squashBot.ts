@@ -1,5 +1,5 @@
 /**
- * TwonkyV2 — State-aware AI using first-principles analytical card ratings
+ * SquashBot — State-aware AI using first-principles analytical card ratings
  * and action scoring instead of a rigid priority waterfall.
  */
 
@@ -18,16 +18,16 @@ import {
   ANALYTICAL_RATINGS,
   MISSION_INTRINSIC,
   type GameStateSnapshot,
-} from "./botV2Eval";
+} from "./squashBotEval";
 
-export class TwonkyV2 extends Player {
+export class SquashBot extends Player {
   private seekCount = 0;
   private actionCount = 0;
   // Exploration rate for self-play data collection — 0 for normal play.
   // When > 0, bot occasionally picks a near-best action instead of the best.
   static explorationRate = 0;
 
-  constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "TwonkyV2", character = "Marsh") {
+  constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Squash Bot", character = "Marsh") {
     super(deck, game, turnOrder, name, character);
   }
 
@@ -66,7 +66,7 @@ export class TwonkyV2 extends Player {
     let picked = scored[0].action;
 
     // Epsilon-greedy exploration (only during self-play data collection)
-    if (TwonkyV2.explorationRate > 0 && scored.length > 1 && Math.random() < TwonkyV2.explorationRate) {
+    if (SquashBot.explorationRate > 0 && scored.length > 1 && Math.random() < SquashBot.explorationRate) {
       // Pick a random action from the top-5 (weighted toward the best)
       const topN = Math.min(5, scored.length);
       const idx = Math.floor(Math.random() * topN);
@@ -593,13 +593,13 @@ export class TwonkyV2 extends Player {
   }
 }
 
-/** Factory function for creating TwonkyV2 bots */
-export function createTwonkyV2(
+/** Factory function for creating Squash bots */
+export function createSquashBot(
   deck: PlayerDeck,
   game: Game,
   turnOrder: number,
   name: string,
   character: string,
 ): Player {
-  return new TwonkyV2(deck, game, turnOrder, name, character);
+  return new SquashBot(deck, game, turnOrder, name, character);
 }

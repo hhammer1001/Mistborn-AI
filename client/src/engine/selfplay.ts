@@ -1,12 +1,13 @@
 /**
- * selfplay.ts — Collect V2-vs-V2 mirror-matchup data to generate character-
- * specific card weights. Mirror matchups (same char both sides) eliminate
- * character-vs-character variance, so card-level differences are the only signal.
+ * selfplay.ts — Collect Squash-vs-Squash mirror-matchup data to generate
+ * character-specific card weights. Mirror matchups (same char both sides)
+ * eliminate character-vs-character variance, so card-level differences are the
+ * only signal.
  *
  * We track BOTH players in each game, since both are playing the same character.
  *
  * Run with: npx tsx client/src/engine/selfplay.ts [gamesPerChar]
- * Output: client/src/engine/data/v2_weights/<Character>.json
+ * Output: client/src/engine/data/squash_weights/<Character>.json
  *
  * Output format (matches existing Kelsier3.json style):
  *   { "CardName": [wins_delta, total_games, winRate], ... }
@@ -15,7 +16,7 @@
  */
 
 import { Game, type PlayerFactory } from "./game";
-import { createTwonkyV2, TwonkyV2 } from "./botV2";
+import { createSquashBot, SquashBot } from "./squashBot";
 import { resetCardIds } from "./card";
 import type { Player } from "./player";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
@@ -43,7 +44,7 @@ function runSelfPlay(gamesPerChar: number, outputDir: string) {
   const stats: Record<string, Record<string, CardStat>> = {};
   for (const c of chars) stats[c] = {};
 
-  console.log(`\nRunning ${gamesPerChar} mirror games per character (${gamesPerChar * chars.length} total V2-vs-V2 games)\n`);
+  console.log(`\nRunning ${gamesPerChar} mirror games per character (${gamesPerChar * chars.length} total Squash-vs-Squash games)\n`);
 
   const startTime = Date.now();
   let gamesPlayed = 0;
@@ -54,7 +55,7 @@ function runSelfPlay(gamesPerChar: number, outputDir: string) {
       try {
         // Mirror matchup: both players are the same character
         const game = new Game({
-          playerFactories: [createTwonkyV2 as PlayerFactory, createTwonkyV2 as PlayerFactory],
+          playerFactories: [createSquashBot as PlayerFactory, createSquashBot as PlayerFactory],
           names: ["P0", "P1"],
           chars: [char, char],
         });
@@ -129,9 +130,9 @@ function runSelfPlay(gamesPerChar: number, outputDir: string) {
 // ── CLI entry point ──
 
 const gamesPerChar = parseInt(process.argv[2] || "500", 10);
-const outputDir = process.argv[3] || "client/src/engine/data/v2_weights";
+const outputDir = process.argv[3] || "client/src/engine/data/squash_weights";
 const explorationRate = parseFloat(process.argv[4] || "0");
-TwonkyV2.explorationRate = explorationRate;
+SquashBot.explorationRate = explorationRate;
 if (explorationRate > 0) {
   console.log(`Exploration rate: ${explorationRate}`);
 }

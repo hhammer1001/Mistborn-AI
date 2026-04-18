@@ -2,19 +2,19 @@
  * benchmark.ts — Bot-vs-bot test harness.
  * Run with: npx tsx client/src/engine/benchmark.ts [numGames]
  *
- * Tests TwonkyV2 vs TwonkyV1 across all character matchups.
+ * Tests Squash Bot vs Twonky V1 across all character matchups.
  */
 
 import { Game, type PlayerFactory } from "./game";
 import { createTwonky } from "./bot";
-import { createTwonkyV2 } from "./botV2";
+import { createSquashBot } from "./squashBot";
 import { createSynergyBotPrime } from "./synergyBot";
 import { resetCardIds } from "./card";
 
-type BotName = "V1" | "V2" | "Synergy";
+type BotName = "V1" | "Squash" | "Synergy";
 const BOT_FACTORIES: Record<BotName, PlayerFactory> = {
   V1: createTwonky as PlayerFactory,
-  V2: createTwonkyV2 as PlayerFactory,
+  Squash: createSquashBot as PlayerFactory,
   Synergy: createSynergyBotPrime as PlayerFactory,
 };
 
@@ -47,7 +47,7 @@ function runMatch(
 }
 
 interface MatchupStats {
-  v2Wins: number;
+  squashWins: number;
   v1Wins: number;
   total: number;
   totalTurns: number;
@@ -58,12 +58,12 @@ function benchmark(numGamesPerMatchup: number) {
   const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
   const results: Record<string, MatchupStats> = {};
 
-  let grandTotalV2 = 0;
+  let grandTotalSquash = 0;
   let grandTotalGames = 0;
 
   console.log(`\nRunning ${numGamesPerMatchup} games per matchup (${numGamesPerMatchup * chars.length * chars.length} total)\n`);
-  console.log("Matchup".padEnd(25) + "V2 Win%".padStart(10) + "V2 Wins".padStart(10) + "Avg Turns".padStart(12) + "  Victory Distribution");
-  console.log("-".repeat(90));
+  console.log("Matchup".padEnd(25) + "Squash Win%".padStart(13) + "Squash Wins".padStart(13) + "Avg Turns".padStart(12) + "  Victory Distribution");
+  console.log("-".repeat(95));
 
   for (const c1 of chars) {
     for (const c2 of chars) {
@@ -71,7 +71,7 @@ function benchmark(numGamesPerMatchup: number) {
 
       const key = `${c1} vs ${c2}`;
       const stats: MatchupStats = {
-        v2Wins: 0,
+        squashWins: 0,
         v1Wins: 0,
         total: 0,
         totalTurns: 0,
@@ -80,17 +80,17 @@ function benchmark(numGamesPerMatchup: number) {
 
       for (let i = 0; i < numGamesPerMatchup; i++) {
         // Alternate who goes first to eliminate turn-order bias
-        const v2First = i % 2 === 0;
-        const [f1, f2, n1, n2, ch1, ch2] = v2First
-          ? [createTwonkyV2, createTwonky, "V2", "V1", c1, c2]
-          : [createTwonky, createTwonkyV2, "V1", "V2", c2, c1];
+        const squashFirst = i % 2 === 0;
+        const [f1, f2, n1, n2, ch1, ch2] = squashFirst
+          ? [createSquashBot, createTwonky, "Squash", "V1", c1, c2]
+          : [createTwonky, createSquashBot, "V1", "Squash", c2, c1];
 
         try {
           const result = runMatch(f1 as PlayerFactory, f2 as PlayerFactory, n1, n2, ch1, ch2);
           stats.total++;
           stats.totalTurns += result.turns;
 
-          if (result.winnerName === "V2") stats.v2Wins++;
+          if (result.winnerName === "Squash") stats.squashWins++;
           else stats.v1Wins++;
 
           if (result.victoryType in stats.victoryTypes) {
@@ -102,10 +102,10 @@ function benchmark(numGamesPerMatchup: number) {
       }
 
       results[key] = stats;
-      grandTotalV2 += stats.v2Wins;
+      grandTotalSquash += stats.squashWins;
       grandTotalGames += stats.total;
 
-      const winPct = stats.total > 0 ? (stats.v2Wins / stats.total * 100).toFixed(1) : "N/A";
+      const winPct = stats.total > 0 ? (stats.squashWins / stats.total * 100).toFixed(1) : "N/A";
       const avgTurns = stats.total > 0 ? (stats.totalTurns / stats.total).toFixed(0) : "N/A";
       const vtDist = Object.entries(stats.victoryTypes)
         .filter(([, v]) => v > 0)
@@ -114,19 +114,19 @@ function benchmark(numGamesPerMatchup: number) {
 
       console.log(
         key.padEnd(25) +
-        `${winPct}%`.padStart(10) +
-        `${stats.v2Wins}/${stats.total}`.padStart(10) +
+        `${winPct}%`.padStart(13) +
+        `${stats.squashWins}/${stats.total}`.padStart(13) +
         `${avgTurns}`.padStart(12) +
         `  ${vtDist}`,
       );
     }
   }
 
-  console.log("-".repeat(90));
+  console.log("-".repeat(95));
   const overallPct = grandTotalGames > 0
-    ? (grandTotalV2 / grandTotalGames * 100).toFixed(1)
+    ? (grandTotalSquash / grandTotalGames * 100).toFixed(1)
     : "N/A";
-  console.log(`\nOverall: V2 wins ${grandTotalV2}/${grandTotalGames} (${overallPct}%)\n`);
+  console.log(`\nOverall: Squash wins ${grandTotalSquash}/${grandTotalGames} (${overallPct}%)\n`);
 
   // Summary by victory type
   const totalVT: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };

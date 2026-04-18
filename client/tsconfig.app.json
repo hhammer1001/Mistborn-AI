@@ -22,5 +22,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "exclude": ["src/engine/test_bot.ts", "src/engine/benchmark.ts", "src/engine/botV2.ts", "src/engine/botV2Eval.ts", "src/engine/selfplay.ts"]
+  "exclude": ["src/engine/test_bot.ts", "src/engine/benchmark.ts", "src/engine/squashBot.ts", "src/engine/squashBotEval.ts", "src/engine/selfplay.ts"]
 }
