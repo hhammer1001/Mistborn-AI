@@ -588,9 +588,15 @@ export class GameSession {
           this._lastLogIndex = log.length;
           log.push({ turn: this.game.turncount, text: `${source}: ${filtered.join(", ")}`, actionType: action.type });
         }
+      } else if (card) {
+        // Any card-bearing action (use_metal, burn_card, refresh_metal, ally_ability_*)
+        // always logs so the opponent's UI can flash it, regardless of measurable effects.
+        this._lastLogIndex = log.length;
+        const text = effects.length > 0 ? `${source}: ${effects.join(", ")}` : source;
+        log.push({ turn: this.game.turncount, text, card, actionType: action.type });
       } else if (effects.length > 0) {
         this._lastLogIndex = log.length;
-        log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}`, card, actionType: action.type });
+        log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}`, actionType: action.type });
       }
     }
 

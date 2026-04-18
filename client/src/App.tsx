@@ -436,7 +436,7 @@ function GameBoard({
           )}
           {onUndo && (
             <button
-              className={`undo-btn${canUndo ? "" : " disabled"}`}
+              className={`undo-btn${canUndo ? "" : " disabled"}${onForfeit ? " undo-btn-beside-forfeit" : ""}`}
               onClick={() => { if (canUndo) onUndo(); }}
               title={canUndo ? "Undo last action" : "Can't undo — new information has been revealed"}
               disabled={!canUndo}
