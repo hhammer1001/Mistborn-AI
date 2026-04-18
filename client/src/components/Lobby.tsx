@@ -95,7 +95,7 @@ function LobbyHome({
           <button onClick={onCreateRoom}>Create Room</button>
           <button onClick={() => setMode("join")}>Join Room</button>
           <button className="view-cards-btn" onClick={onBack}>
-            Back
+            Main Menu
           </button>
         </div>
       ) : (
@@ -142,7 +142,7 @@ function WaitingForOpponent({
         </div>
         <p className="waiting-text">Waiting for someone to join...</p>
         <button className="view-cards-btn" onClick={onLeave}>
-          Cancel
+          Leave Lobby
         </button>
       </div>
     </div>
@@ -214,7 +214,7 @@ function CharacterSelect({
         )}
 
         <button className="view-cards-btn" onClick={onLeave}>
-          Leave Room
+          Leave Lobby
         </button>
       </div>
     </div>

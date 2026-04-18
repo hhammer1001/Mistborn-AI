@@ -185,9 +185,11 @@ function App() {
       <MultiplayerGameBoard
         game={mpGame}
         onMainMenu={() => {
+          // Exit the match and return to the online lobby home, where the
+          // player can create/join another room without re-logging in.
           setMpSessionId(null);
           lobby.leaveRoom();
-          setMode("menu");
+          setMode("lobby");
         }}
       />
     );
@@ -290,7 +292,7 @@ function MultiplayerGameBoard({
         <h2>{iWon ? "You Win!" : `${opp.name} Wins`}</h2>
         <p>Victory: {gameState.victoryType} | Turns: {gameState.turnCount}</p>
         <p>Your HP: {you.health} | Opponent HP: {opp.health}</p>
-        <button onClick={onMainMenu}>Main Menu</button>
+        <button onClick={onMainMenu}>Back to Lobby</button>
       </div>
     );
   }
@@ -447,7 +449,7 @@ function GameBoard({
             </button>
           )}
           <button className="main-menu-btn" onClick={onMainMenu}>
-            Main Menu
+            {isMultiplayer ? "Leave Match" : "Main Menu"}
           </button>
         </div>
       </div>
