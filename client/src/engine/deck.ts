@@ -55,13 +55,16 @@ export class PlayerDeck extends Deck {
     shuffle(this.cards);
   }
 
-  /** Draw cards, auto-playing Allies and Funding as they're drawn */
-  override draw(amount: number, player?: PlayerLike) {
+  /** Draw cards. By default, auto-plays Allies (→ zone) and Funding (→ money)
+   *  as they're drawn — this matches mid-turn draws (C reward, Lookout, etc.).
+   *  With `deferred: true`, allies and funding go into the hand marked as
+   *  `pending`, to be played at the owner's next turn start. Used by cleanUp. */
+  override draw(amount: number, player?: PlayerLike, opts?: { deferred?: boolean }) {
     if (!player) {
-      // Fallback for base Deck compatibility (Market uses this)
       super.draw(amount);
       return;
     }
+    const deferred = opts?.deferred ?? false;
     for (let i = 0; i < amount; i++) {
       if (this.cards.length === 0) {
         this.cards = this.discard;
@@ -70,26 +73,35 @@ export class PlayerDeck extends Deck {
         if (this.cards.length === 0) return;
       }
       const card = this.cards.shift()!;
-      if (card instanceof Ally) {
-        card.play(player);
-        player.allies.push(card);
+      if (deferred) {
+        if (card instanceof Ally || card instanceof Funding) {
+          card.pending = true;
+          this.hand.push(card);
+        } else {
+          this.hand.push(card);
+        }
       } else {
-        this.hand.push(card);
-      }
-      if (card instanceof Funding) {
-        card.play(player);
+        if (card instanceof Ally) {
+          card.play(player);
+          player.allies.push(card);
+        } else {
+          this.hand.push(card);
+        }
+        if (card instanceof Funding) {
+          card.play(player);
+        }
       }
     }
   }
 
-  /** End of turn: discard hand, draw new hand, restore set-aside cards */
+  /** End of turn: discard hand, draw new hand (pending), restore set-aside cards */
   cleanUp(player: PlayerLike, market?: Market) {
     for (const card of this.hand) {
       card.reset();
     }
     this.discard.push(...this.hand);
     this.hand = [];
-    this.draw(player.handSize, player);
+    this.draw(player.handSize, player, { deferred: true });
     this.hand.push(...this.setAside);
     this.setAside = [];
     if (market) {

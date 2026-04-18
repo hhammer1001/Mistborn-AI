@@ -109,7 +109,7 @@ export class Player {
     this.takeActions(game);
     this.assignDamage(game);
     game.attack(this);
-    this.curDamage = this.pDamage;
+    this.curDamage = 0;  // pDamage is applied at the start of the next turn instead
   }
 
   takeActions(game: Game) {
@@ -626,7 +626,7 @@ export class Player {
     switch (action.type) {
       case "end_actions": {
         this.curBoxings += Math.floor(this.curMoney / 2);
-        this.curMoney = this.pMoney;
+        this.curMoney = 0;  // pMoney is applied at the start of the next turn instead
         this.curMission = 0;
         this.metalTokens = this.metalTokens.map((v) => this.resetToken(v));
         this.metalTokens[8] = 0;

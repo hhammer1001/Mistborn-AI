@@ -12,7 +12,7 @@
  */
 
 import { Game, type PlayerFactory } from "./game";
-import { Action, Ally, Card } from "./card";
+import { Action, Ally, Card, Funding } from "./card";
 import { Player } from "./player";
 import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
@@ -86,6 +86,7 @@ interface PlayerSnapshot {
 
 interface CardStateSnap {
   sought: boolean;
+  pending: boolean;
   burned?: boolean;
   metalUsed?: number;
   available1?: boolean;
@@ -207,6 +208,14 @@ export class GameSession {
     const first = opts.firstPlayer ?? 0;
     this.activePlayer = first;
     this.game.turncount = 1;
+
+    // Start-of-turn routine for the first player: apply permanent bonuses,
+    // play the allies/funding drawn into their initial hand (now pending),
+    // then resolve training.
+    const p = this.players[first];
+    p.curMoney = p.pMoney;
+    p.curDamage = p.pDamage;
+    this._playPending(first);
     this._resolveTraining(first);
 
     // If the first player is a bot, run their turn right away.
@@ -242,7 +251,7 @@ export class GameSession {
     }));
     const cardStates = new Map<number, CardStateSnap>();
     for (const c of this._allCards()) {
-      const s: CardStateSnap = { sought: c.sought };
+      const s: CardStateSnap = { sought: c.sought, pending: c.pending };
       if (c instanceof Action) { s.burned = c.burned; s.metalUsed = c.metalUsed; }
       else if (c instanceof Ally) {
         s.available1 = c.available1;
@@ -302,6 +311,7 @@ export class GameSession {
       const c = byId.get(id);
       if (!c) continue;
       c.sought = s.sought;
+      c.pending = s.pending;
       if (c instanceof Action) { c.burned = s.burned ?? false; c.metalUsed = s.metalUsed ?? 0; }
       else if (c instanceof Ally) {
         c.available1 = s.available1 ?? false;
@@ -493,7 +503,7 @@ export class GameSession {
     // so the player can still see their hand during damage assignment).
     if (action.type === "end_actions") {
       p.curBoxings += Math.floor(p.curMoney / 2);
-      p.curMoney = p.pMoney;
+      p.curMoney = 0;  // pMoney is applied at the start of the next turn instead
       p.curMission = 0;
       p.metalTokens = p.metalTokens.map((v) => p.resetToken(v));
       p.metalTokens[8] = 0;
@@ -732,7 +742,7 @@ export class GameSession {
 
     const oppHpBefore = this._defender_hp_at_turn_start ?? opp.curHealth;
     this.game.attack(p);
-    p.curDamage = p.pDamage;
+    p.curDamage = 0;  // pDamage is applied at the start of the next turn instead
     const hpLost = oppHpBefore - opp.curHealth;
 
     if (hpLost > 0) {
@@ -798,6 +808,16 @@ export class GameSession {
       this.phase = "game_over";
       return;
     }
+
+    // Start-of-turn effects: arrive BEFORE training.
+    // 1. Apply permanent bonuses (curMoney = pMoney, curDamage = pDamage)
+    // 2. Play pending allies/funding drawn at end of last turn (they move to
+    //    zone / give money now).
+    const p = this.players[nextPi];
+    p.curMoney = p.pMoney;
+    p.curDamage = p.pDamage;
+    this._playPending(nextPi);
+
     this._resolveTraining(nextPi);
     this.phase = "actions";
     this._cached_raw = null;
@@ -810,6 +830,32 @@ export class GameSession {
 
     if (this._isBot(nextPi)) {
       this._runBotTurn(nextPi);
+    }
+  }
+
+  /** Play any allies/funding sitting in hand with pending=true. Allies move
+   *  to the zone + run play(); funding runs play() for money. Clears flag. */
+  private _playPending(playerIndex: number) {
+    const p = this.players[playerIndex];
+    const hand = p.deck.hand;
+    // Allies: move to zone, run play(), remove from hand
+    const remaining: Card[] = [];
+    for (const c of hand) {
+      if (c.pending && c instanceof Ally) {
+        c.pending = false;
+        c.play(p);
+        p.allies.push(c);
+      } else {
+        remaining.push(c);
+      }
+    }
+    p.deck.hand = remaining;
+    // Funding: play() for money but keep in hand
+    for (const c of p.deck.hand) {
+      if (c.pending && c instanceof Funding) {
+        c.pending = false;
+        c.play(p);
+      }
     }
   }
 

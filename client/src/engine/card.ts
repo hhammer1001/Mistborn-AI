@@ -17,6 +17,11 @@ export class Card {
   cost: number;
   metal: number;
   sought: boolean = false;
+  /** True if this card was drawn at end of the previous turn and hasn't been
+   *  "played" yet (for allies: moved to zone + play() effect; for funding:
+   *  play() to give money). Cleared when played at the start of its owner's
+   *  next turn. Only meaningful for Ally and Funding cards. */
+  pending: boolean = false;
 
   constructor(def: CardDef) {
     this.id = _nextCardId++;
@@ -26,11 +31,12 @@ export class Card {
     this.metal = def.metal;
   }
 
-  toJSON(): { id: number; name: string; type: string; cost: number; metal: number; metalName: string; sought: boolean; [key: string]: unknown } {
+  toJSON(): { id: number; name: string; type: string; cost: number; metal: number; metalName: string; sought: boolean; pending: boolean; [key: string]: unknown } {
     return {
       id: this.id,
       name: this.name,
       type: "card",
+      pending: this.pending,
       cost: this.cost,
       metal: this.metal,
       metalName: this.metal >= 0 && this.metal < METAL_NAMES.length
