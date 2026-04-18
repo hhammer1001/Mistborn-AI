@@ -1298,9 +1298,9 @@ h3 {
 }
 
 .undo-btn {
-  /* Sit just above the fixed Main Menu button, matching its size */
+  /* Sit above the fixed Main Menu button, matching its size */
   position: fixed;
-  bottom: 2.6rem;
+  bottom: 3.1rem;
   right: 0.5rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;

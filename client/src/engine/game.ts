@@ -46,9 +46,15 @@ export class Game {
     this.market = new Market(testDeck);
     this.characters = [...chars];
 
-    // Pick 3 random missions from the 8 available
-    const sortedIndices = this._pickRandomIndices(ALL_MISSION_NAMES.length, 3);
-    this.missionNames = sortedIndices.map((i) => ALL_MISSION_NAMES[i]);
+    // Pick 3 missions. In test-deck mode, restrict to the 3 missions whose
+    // top tier grants a permanent reward (Pd/Pm/Pc) — convenient for testing
+    // permanent-reward visuals and mechanics.
+    if (testDeck) {
+      this.missionNames = ["Luthadel Garrison", "Keep Venture", "Kredik Shaw"];
+    } else {
+      const sortedIndices = this._pickRandomIndices(ALL_MISSION_NAMES.length, 3);
+      this.missionNames = sortedIndices.map((i) => ALL_MISSION_NAMES[i]);
+    }
     this.missions = this.missionNames.map(
       (name) => new Mission(name, this, MISSION_TIERS[name])
     );
