@@ -34,7 +34,7 @@ const SELFPLAY_WEIGHTS: Record<string, SelfPlayWeights> = {
 // Minimum sample size before we trust a self-play weight
 const SELFPLAY_MIN_SAMPLES = 100;
 // How strongly to weight self-play vs analytical (additive blend)
-const SELFPLAY_BLEND_STRENGTH = 150.0;
+const SELFPLAY_BLEND_STRENGTH = 100.0;
 
 // ── Resource Base Values ──
 // These are the "exchange rates" of the game economy.
@@ -298,9 +298,12 @@ export function drawWeight(snap: GameStateSnapshot): number {
 }
 
 export function eliminateWeight(snap: GameStateSnapshot): number {
+  // Elimination has compounding value: every Funding removed makes all future
+  // draws better. Stays useful at mid-lean deck sizes (8-10).
   if (snap.deckSize >= 15) return 3.0;
-  if (snap.deckSize <= 8) return 0.5;
-  return 1.5;
+  if (snap.deckSize >= 10) return 2.0;
+  if (snap.deckSize >= 8) return 1.5;
+  return 0.5;
 }
 
 export function killAllyWeight(snap: GameStateSnapshot): number {

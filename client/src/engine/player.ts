@@ -105,11 +105,39 @@ export class Player {
   // ── Turn flow (used by bots, overridden for web play) ──
 
   playTurn(game: Game) {
+    // Start-of-turn: apply permanent bonuses, play pending allies/funding drawn
+    // at the end of the previous turn. (session.ts does this separately for
+    // its unified flow; here we handle it for bot-vs-bot Game.play().)
+    this.curMoney = this.pMoney;
+    this.curDamage = this.pDamage;
+    this.playPending();
     this.resolve("T", "1");
     this.takeActions(game);
     this.assignDamage(game);
     game.attack(this);
     this.curDamage = 0;  // pDamage is applied at the start of the next turn instead
+  }
+
+  /** Play allies (→ zone + run play()) and funding (→ money) that were drawn
+   *  as pending at the end of the previous turn. */
+  playPending() {
+    const remaining: Card[] = [];
+    for (const c of this.deck.hand) {
+      if (c.pending && c instanceof Ally) {
+        c.pending = false;
+        c.play(this);
+        this.allies.push(c);
+      } else {
+        remaining.push(c);
+      }
+    }
+    this.deck.hand = remaining;
+    for (const c of this.deck.hand) {
+      if (c.pending && c instanceof Funding) {
+        c.pending = false;
+        c.play(this);
+      }
+    }
   }
 
   takeActions(game: Game) {

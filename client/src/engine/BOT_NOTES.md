@@ -107,7 +107,15 @@ The buy score was over-inflated, causing Squash to buy too many mediocre cards. 
 
 Seek lets you use a market card's tier-1 ability for free — this was undervalued in analytical ratings. Self-play confirmed by strongly rating Pierce and Unveil (both have seek).
 
-### 8. Dynamic buy buffer (per-character base + game-phase adjustments)
+### 8a. Eliminate weak allies when deck is bloated (+1%)
+
+Previously `eliminateIn` had a blanket `!(c.card instanceof Ally)` filter — allies were never candidates. But weak allies (Keeper -16.8%, Rebel for Shan -47.1%, etc.) cycle uselessly through hand→discard→deck. Now allies below buffer rating are eliminable IFF deck size ≥ 12 (so we clear Funding first, only trim weak allies when we can spare the slot).
+
+### 8b. Keep eliminate valuable at mid-lean deck sizes (+0.5%)
+
+Previous tiering dropped eliminate weight to 0.5 at deck ≤ 8. This stopped the bot from pushing decks from 9→8 even when Funding was still present. Tightened the curve: 3.0 at ≥15, 2.0 at ≥10, 1.5 at ≥8, 0.5 below.
+
+### 9. Dynamic buy buffer (per-character base + game-phase adjustments)
 
 ```
 BASE_BUFFERS = Kelsier 1.5, Marsh 1.8, Shan 1.7, Vin 1.5, Prodigy 1.4
@@ -195,6 +203,25 @@ scoreAllyAbility: 40 + effectValue
 scoreCharAbility1/3: 35 + effectValue
 scoreMissionAdvance: 70 base + proximity/race/victory-path modifiers
 ```
+
+## Bot-vs-Bot Flow
+
+**Important**: `Game.play()` calls `Player.playTurn()` which must mirror the per-turn setup that `session.ts` does via `_startNextTurn` + `_playPending`. If they drift, benchmarks will silently disagree with real play.
+
+Per-turn sequence (must match between `Player.playTurn` and `session._startNextTurn` + `_runBotTurn`):
+
+1. `curMoney = pMoney` (permanent money bonus)
+2. `curDamage = pDamage` (permanent damage bonus)
+3. `playPending()` — allies pending in hand move to zone + run `play()` (Noble → +burn, Crewleader → +handSize, Smoker → smoking); funding pending in hand runs `play()` for +1 money
+4. `resolve("T", "1")` — training +1
+5. `takeActions` — bot's action loop
+6. `assignDamage` — allocate `curDamage` to kill opp allies
+7. `game.attack` — send leftover `curDamage` to opp
+8. `curDamage = 0` (pDamage re-applies at start of next turn)
+
+`end_actions` triggers `cleanUp` which draws the next hand with `{ deferred: true }`. Allies and funding drawn this way are marked `pending: true` and stay in the hand until the owner's next turn start processes them via step 3 above.
+
+**Historical gotcha**: commit `8ea376a` deferred ally/funding play from end-of-turn to start-of-next-turn but only updated `session.ts`. `Player.playTurn` was missed, so bot-vs-bot games silently had allies stuck in hand forever (never entering the ally zone, never running `play()`). Squash's win rate dropped ~20% until this was noticed and fixed.
 
 ## Self-Play Pipeline
 

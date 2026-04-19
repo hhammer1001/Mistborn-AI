@@ -441,12 +441,16 @@ export class SquashBot extends Player {
       if (this.deck.discard[i] instanceof Funding) return i + h;
     }
 
-    // Eliminate lowest dynamicRating card below buffer
+    // Eliminate lowest dynamicRating card below buffer.
+    // Allies eligible only when deck is bloated (>=12 cards) — weak allies
+    // cycle uselessly through hand→discard→deck, so remove them when we can
+    // afford to without thinning the engine.
     const allCards = [...this.deck.hand, ...this.deck.discard];
     const buffer = dynamicBuffer(this.character, snap);
+    const deckBloated = (this.deck.hand.length + this.deck.discard.length + this.deck.cards.length) >= 12;
     const candidates = allCards
       .map((card, idx) => ({ idx, card, score: this.cardRating(card, snap) }))
-      .filter((c) => c.score < buffer && !(c.card instanceof Ally));
+      .filter((c) => c.score < buffer && (deckBloated || !(c.card instanceof Ally)));
 
     if (candidates.length === 0) return -1;
     const worst = candidates.reduce((a, b) => (a.score < b.score ? a : b));
