@@ -198,3 +198,6 @@ oldData
 
 # Node
 node_modules/Images/originals/
+
+# Claude Code local notes
+CLAUDE.md
