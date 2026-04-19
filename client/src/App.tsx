@@ -22,6 +22,7 @@ import { TrainingTrack } from "./components/TrainingTrack";
 import { ActivityLog } from "./components/ActivityLog";
 import { CardFlashOverlay } from "./components/CardFlashOverlay";
 import { TurnRecap } from "./components/TurnRecap";
+import { TurnBanner } from "./components/TurnBanner";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 import type { GameState } from "./types/game";
@@ -222,7 +223,7 @@ function BotGameBoard({
   game: ReturnType<typeof useGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo } = game;
 
   const handleAction = (index: number) => {
     if (!loading) playAction(index);
@@ -271,6 +272,7 @@ function BotGameBoard({
       />
       <CardFlashOverlay queue={flashQueue} onDone={consumeFlash} />
       <TurnRecap recap={recap} onDone={consumeRecap} waiting={flashQueue.length > 0} />
+      <TurnBanner banner={banner} onDone={consumeBanner} />
     </>
   );
 }
@@ -284,7 +286,7 @@ function MultiplayerGameBoard({
   game: ReturnType<typeof useMultiplayerGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit, undo, canUndo } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit, undo, canUndo } = game;
 
   const handleAction = (index: number) => {
     if (!loading && isMyTurn) playAction(index);
@@ -340,6 +342,7 @@ function MultiplayerGameBoard({
       )}
       <CardFlashOverlay queue={flashQueue} onDone={consumeFlash} />
       <TurnRecap recap={recap} onDone={consumeRecap} waiting={flashQueue.length > 0} />
+      <TurnBanner banner={banner} onDone={consumeBanner} />
     </>
   );
 }

@@ -1,18 +1,12 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
 import { GameSession, opponentTypeToKind } from "../engine/session";
 import { resetCardIds } from "../engine/card";
+import { useTurnSideEffects, computeRecap, type TurnRecap } from "./useTurnSideEffects";
 
-export interface TurnRecap {
-  trained?: number;
-  mission?: number;
-  healed?: number;
-  damageToPlayer?: { name: string; amount: number };
-  damageToAllies?: { name: string; amount: number }[];
-  boughtCards?: string[];
-}
-
-const BUY_ACTION_TYPES = new Set(["buy", "buy_eliminate", "buy_with_boxings", "buy_elim_boxings"]);
+// Re-export TurnRecap so existing consumers (LogEntry shape, components)
+// keep working without changing imports.
+export type { TurnRecap };
 
 // Session methods return Record<string, unknown>; this helper casts safely
 interface SessionResult {
@@ -29,6 +23,18 @@ export interface LogEntry {
   turn: number;
   text: string;
   isBot?: boolean;
+  card?: import("../types/game").CardData;
+  actionType?: string;
+  metalIndex?: number;
+  recap?: TurnRecap;
+}
+
+/** A reactive entry is a defense (Sense / Cloud) that fires during the
+ *  other player's action, not a turn-taking action. Used to suppress the
+ *  "bot's turn" header when the delta contains only reactive entries. */
+function isRealBotTurnEntry(e: BotLogEntry): boolean {
+  if (!e.actionType) return false;
+  return e.actionType !== "sense_block" && e.actionType !== "cloud_block";
 }
 
 /** Strip trailing " (×N)" to get the base text for comparison */
@@ -59,73 +65,40 @@ export function useGame() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [log, setLog] = useState<LogEntry[]>([]);
-  const [flashQueue, setFlashQueue] = useState<BotLogEntry[]>([]);
-  const [recap, setRecap] = useState<TurnRecap | null>(null);
+  const [rawLog, setRawLog] = useState<LogEntry[]>([]);
   const playerName = useRef("Player");
   const botName = useRef("Bot");
   const sessionRef = useRef<GameSession | null>(null);
 
-  const enqueueFlashes = useCallback((entries: BotLogEntry[] | undefined) => {
-    if (!entries) return;
-    const withCards = entries.filter((e) => e.card && e.actionType !== "refresh_metal" && e.actionType !== "burn_card");
-    if (withCards.length) setFlashQueue((q) => [...q, ...withCards]);
-  }, []);
+  // Single-player perspective is always 0 and isMyTurn is conceptually always
+  // true (bot turns run synchronously inside our action calls). The shared
+  // hook still detects new bot-log entries → flashes and uses prev/next state
+  // diffs → recap. End-turn fires the "opponent" banner imperatively below
+  // because there is no isMyTurn=false interval for it to observe.
+  const sideEffects = useTurnSideEffects({ gameState, perspective: 0, isMyTurn: true });
+  const { flashQueue, recap, banner, recapEntries, consumeFlash, consumeRecap, consumeBanner, clearRecapEntries, setBanner, pushRecap, flagExpectYourBanner } = sideEffects;
 
-  const consumeFlash = useCallback(() => {
-    setFlashQueue((q) => q.slice(1));
-  }, []);
-
-  const consumeRecap = useCallback(() => setRecap(null), []);
-
-  const computeRecap = useCallback((before: GameState, data: SessionResult, turnLog?: BotLogEntry[]): TurnRecap | null => {
-    const after = data as unknown as GameState;
-    if (!after.players || after.players.length < 2) return null;
-    const oldYou = before.players[0];
-    const oldOpp = before.players[1];
-    const newYou = after.players[0];
-    const newOpp = after.players[1];
-    const r: TurnRecap = {};
-    const trained = newOpp.training - oldOpp.training;
-    const healed = Math.max(0, newOpp.health - oldOpp.health);
-
-    const bought = (turnLog ?? [])
-      .filter((e) => e.actionType && BUY_ACTION_TYPES.has(e.actionType) && e.card)
-      .map((e) => e.card!.name);
-    if (bought.length) r.boughtCards = bought;
-
-    // Mission progress lives in missions[].playerRanks[1] for the bot — sum deltas.
-    let missionDelta = 0;
-    const oldMissions = before.missions ?? [];
-    const newMissions = after.missions ?? [];
-    for (let i = 0; i < newMissions.length; i++) {
-      const oldRank = oldMissions[i]?.playerRanks?.[1] ?? 0;
-      const newRank = newMissions[i]?.playerRanks?.[1] ?? 0;
-      if (newRank > oldRank) missionDelta += newRank - oldRank;
+  /** Commit a state update either immediately or behind the opponent-turn
+   *  banner. Used whenever a session call may have run the bot's turn inline. */
+  const applyBehindBanner = useCallback((botPlayed: boolean, commit: () => void) => {
+    if (botPlayed) {
+      setBanner("opponent");
+      window.setTimeout(commit, 600);
+    } else {
+      commit();
     }
+  }, [setBanner]);
 
-    // Damage to the player (HP loss).
-    const playerHpLoss = Math.max(0, oldYou.health - newYou.health);
-    if (playerHpLoss > 0) r.damageToPlayer = { name: oldYou.name, amount: playerHpLoss };
-
-    // Damage to player's allies: match old→new by id. Killed ones count full remaining HP.
-    const allyDamage: { name: string; amount: number }[] = [];
-    const newAllyById = new Map((newYou.allies ?? []).map((a) => [a.id, a]));
-    for (const oldAlly of oldYou.allies ?? []) {
-      const newAlly = newAllyById.get(oldAlly.id);
-      const oldHp = oldAlly.health ?? 0;
-      const newHp = newAlly?.health ?? 0;
-      const killed = !newAlly;
-      const dmg = killed ? oldHp : Math.max(0, oldHp - newHp);
-      if (dmg > 0) allyDamage.push({ name: oldAlly.name, amount: dmg });
-    }
-    if (allyDamage.length) r.damageToAllies = allyDamage;
-
-    if (trained > 0) r.trained = trained;
-    if (missionDelta > 0) r.mission = missionDelta;
-    if (healed > 0) r.healed = healed;
-    return Object.keys(r).length > 0 ? r : null;
-  }, []);
+  // Visible log = incrementally-built entries (action descriptions, "→ effect"
+  // lines, turn headers) merged with the recap entries materialized by the
+  // shared side-effects hook. Stable sort by turn keeps the recap line
+  // grouped right after the bot's actions for that turn.
+  const log = useMemo<LogEntry[]>(() => {
+    if (recapEntries.length === 0) return rawLog;
+    const merged = [...rawLog, ...recapEntries];
+    merged.sort((a, b) => a.turn - b.turn);
+    return consolidateLog(merged);
+  }, [rawLog, recapEntries]);
 
   const createGame = useCallback(
     (
@@ -138,7 +111,8 @@ export function useGame() {
     ) => {
       setLoading(true);
       setError(null);
-      setLog([]);
+      setRawLog([]);
+      clearRecapEntries();
       playerName.current = pName;
       botName.current = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
 
@@ -163,30 +137,43 @@ export function useGame() {
         const initLog: LogEntry[] = [{ turn: 1, text: "Game started" }];
         const bName = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
         if (botLogDelta.length > 0) {
-          initLog.push({ turn: 1, text: `${bName}'s turn`, isBot: true });
-          for (const entry of botLogDelta) {
-            initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          if (botLogDelta.some(isRealBotTurnEntry)) {
+            initLog.push({ turn: 1, text: `${bName}'s turn`, isBot: true });
           }
-          enqueueFlashes(botLogDelta);
-          // Bot's very first turn (bot-first): reconstruct starting HP from engine rule
-          // (36 + 2*turnOrder, Prodigy = 40). Training/mission/ranks always start at 0.
-          const startHp = (p: PlayerData) =>
-            p.character === "Prodigy" ? 40 : 36 + 2 * p.turnOrder;
+          for (const entry of botLogDelta) {
+            initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+          }
+          // Flashes are derived declaratively by useTurnSideEffects from the
+          // initial gameState. Recap has no prior snapshot to diff against, so
+          // synthesize one from the engine's starting-HP rule (player.ts:54,
+          // `36 + 2 * turnOrder`, uniform across characters) + zero training /
+          // mission ranks / allies, then push imperatively.
+          const startHp = (p: PlayerData) => 36 + 2 * p.turnOrder;
           const baseline: GameState = {
             ...data,
-            players: [
-              { ...data.players[0], health: startHp(data.players[0]) },
-              { ...data.players[1], training: 0, health: startHp(data.players[1]) },
-            ],
-            missions: [],
+            players: data.players.map((p, i) =>
+              i === 0
+                ? { ...p, health: startHp(p) }
+                : { ...p, health: startHp(p), training: 0, allies: [] }
+            ) as PlayerData[],
+            missions: data.missions.map((m) => ({
+              ...m,
+              playerRanks: m.playerRanks.map(() => 0),
+            })),
           };
-          const r = computeRecap(baseline, data as unknown as SessionResult, botLogDelta);
-          if (r) setRecap(r);
+          const r = computeRecap(baseline, data, botLogDelta, 0, 1);
+          if (r) {
+            const lastEntry = botLogDelta[botLogDelta.length - 1];
+            pushRecap(r, lastEntry?.turn ?? 1, bName);
+          } else {
+            // Ensure "your turn" banner still fires at the end of bot-first.
+            flagExpectYourBanner();
+          }
         }
         if (data.turnCount > 1) {
           initLog.push({ turn: data.turnCount, text: `${pName}'s turn` });
         }
-        setLog(initLog);
+        setRawLog(initLog);
         return data;
       } catch (e) {
         setError(String(e));
@@ -209,10 +196,10 @@ export function useGame() {
       const bName = botName.current;
 
       setError(null);
+
       try {
         const data = session.playAction(0, actionIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as unknown as GameState);
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [
@@ -223,22 +210,21 @@ export function useGame() {
         if (playerLogDelta.length > 0) {
           for (const entry of playerLogDelta) {
             if (entry.turn > prevTurn) {
-              newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}` });
+              newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
             } else {
-              newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+              newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
             }
           }
         }
 
         if (botLogDelta.length > 0) {
           const botTurn = botLogDelta[0]?.turn ?? prevTurn + 1;
-          newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          if (botLogDelta.some(isRealBotTurnEntry)) {
+            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
-          enqueueFlashes(botLogDelta);
-          const r = computeRecap(gameState, data, botLogDelta);
-          if (r) setRecap(r);
+          for (const entry of botLogDelta) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+          }
         }
 
         if ((data.turnCount ?? 0) > prevTurn) {
@@ -246,7 +232,13 @@ export function useGame() {
         }
         newEntries.push(...newTurnPlayerLogs);
 
-        setLog((prev) => consolidateLog([...prev, ...newEntries]));
+        // If the bot actually played, defer the gameState update behind the
+        // "opponent's turn" banner so the transition feels like a hand-off.
+        // End-actions that just enter damage phase (no bot entries) skip this.
+        applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
+          setGameState(data as unknown as GameState);
+          setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+        });
         return data;
       } catch (e) {
         setError(String(e));
@@ -306,7 +298,6 @@ export function useGame() {
       try {
         const data = session.respondToPrompt(0, promptType, value) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as unknown as GameState);
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
@@ -315,28 +306,28 @@ export function useGame() {
 
         if (playerLogDelta.length > 0) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
         if (botLogDelta.length > 0) {
           const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount + 1;
-          newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          if (botLogDelta.some(isRealBotTurnEntry)) {
+            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
-          enqueueFlashes(botLogDelta);
-          const r = computeRecap(gameState, data, botLogDelta);
-          if (r) setRecap(r);
+          for (const entry of botLogDelta) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+          }
         }
 
         if ((data.turnCount ?? 0) > gameState.turnCount) {
           newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
 
-        if (newEntries.length > 0) {
-          setLog((prev) => consolidateLog([...prev, ...newEntries]));
-        }
+        applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
+          setGameState(data as unknown as GameState);
+          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+        });
 
         return data;
       } catch (e) {
@@ -344,7 +335,7 @@ export function useGame() {
         return null;
       }
     },
-    [gameState]
+    [gameState, applyBehindBanner]
   );
 
   const assignDamage = useCallback(
@@ -355,7 +346,6 @@ export function useGame() {
       try {
         const data = session.assignDamage(0, targetIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as unknown as GameState);
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
@@ -374,28 +364,28 @@ export function useGame() {
 
         if (playerLogDelta.length > 0) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
         if (botLogDelta.length > 0) {
           const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount + 1;
-          newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          if (botLogDelta.some(isRealBotTurnEntry)) {
+            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
-          enqueueFlashes(botLogDelta);
-          const r = computeRecap(gameState, data, botLogDelta);
-          if (r) setRecap(r);
+          for (const entry of botLogDelta) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+          }
         }
 
         if ((data.turnCount ?? 0) > gameState.turnCount) {
           newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
 
-        if (newEntries.length > 0) {
-          setLog((prev) => consolidateLog([...prev, ...newEntries]));
-        }
+        applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
+          setGameState(data as unknown as GameState);
+          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+        });
 
         return data;
       } catch (e) {
@@ -403,7 +393,7 @@ export function useGame() {
         return null;
       }
     },
-    [gameState]
+    [gameState, applyBehindBanner]
   );
 
   const resolveSense = useCallback(
@@ -414,7 +404,6 @@ export function useGame() {
       try {
         const data = session.resolveSense(0, use) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as unknown as GameState);
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
@@ -427,26 +416,28 @@ export function useGame() {
 
         if (playerLogDelta.length) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
         if (botLogDelta.length) {
           const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount;
-          newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+          if (botLogDelta.some(isRealBotTurnEntry)) {
+            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
-          enqueueFlashes(botLogDelta);
-          const r = computeRecap(gameState, data, botLogDelta);
-          if (r) setRecap(r);
+          for (const entry of botLogDelta) {
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+          }
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
           newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
-        if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
+        applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
+          setGameState(data as unknown as GameState);
+          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+        });
         return data;
       } catch (e) { setError(String(e)); return null; }
-    }, [gameState]
+    }, [gameState, applyBehindBanner]
   );
 
   const resolveCloud = useCallback(
@@ -457,7 +448,6 @@ export function useGame() {
       try {
         const data = session.resolveCloud(0, cardId) as SessionResult;
         if (data.error) { setError(data.error); return null; }
-        setGameState(data as unknown as GameState);
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const newEntries: LogEntry[] = [];
@@ -466,24 +456,24 @@ export function useGame() {
 
         if (playerLogDelta.length) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}` });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
         if (botLogDelta.length) {
           for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true });
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
-          enqueueFlashes(botLogDelta);
-          const r = computeRecap(gameState, data, botLogDelta);
-          if (r) setRecap(r);
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
           newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
         }
-        if (newEntries.length > 0) setLog((prev) => consolidateLog([...prev, ...newEntries]));
+        applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
+          setGameState(data as unknown as GameState);
+          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+        });
         return data;
       } catch (e) { setError(String(e)); return null; }
-    }, [gameState]
+    }, [gameState, applyBehindBanner]
   );
 
   const undo = useCallback(() => {
@@ -501,7 +491,7 @@ export function useGame() {
 
     // Session's own log entry was removed by undo() — also remove the matching
     // "Player — <action description>" line from the hook-side log.
-    setLog((prev) => {
+    setRawLog((prev) => {
       const result = [...prev];
       for (let i = result.length - 1; i >= 0; i--) {
         if (!result[i].isBot && result[i].text.startsWith(`${pName} — `)) {
@@ -528,6 +518,8 @@ export function useGame() {
     consumeFlash,
     recap,
     consumeRecap,
+    banner,
+    consumeBanner,
     createGame,
     playAction,
     advanceAllMission,

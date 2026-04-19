@@ -21,6 +21,10 @@ function labelFor(actionType?: string): string[] {
       return ["BURNED"];
     case "refresh_metal":
       return ["REFRESHED"];
+    case "sense_block":
+      return ["SENSED"];
+    case "cloud_block":
+      return ["CLOUDED"];
     default:
       return ["PLAYED"];
   }

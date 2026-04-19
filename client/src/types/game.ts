@@ -99,6 +99,7 @@ export interface BotLogEntry {
   text: string;
   card?: CardData;
   actionType?: string;
+  metalIndex?: number;
 }
 
 export interface PromptOption {

@@ -25,7 +25,7 @@ interface Props {
 export function GameSetup({ onStart, onViewCards, onPlayOnline }: Props) {
   const [playerName, setPlayerName] = useState("Player");
   const [character, setCharacter] = useState("Random");
-  const [opponentType, setOpponentType] = useState("twonky");
+  const [opponentType, setOpponentType] = useState("squash");
   const [opponentCharacter, setOpponentCharacter] = useState("Random");
   const [botFirst, setBotFirst] = useState(true);
   const [testDeck, setTestDeck] = useState(false);

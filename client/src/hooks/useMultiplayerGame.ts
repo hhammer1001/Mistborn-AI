@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { db } from "../lib/instantdb";
-import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
-import type { LogEntry, TurnRecap } from "./useGame";
+import type { GameState, GameAction } from "../types/game";
+import type { LogEntry } from "./useGame";
+import { useTurnSideEffects } from "./useTurnSideEffects";
 import { GameSession } from "../engine/session";
 
 /**
@@ -52,102 +53,33 @@ export function useMultiplayerGame(
 
   const isMyTurn = gameState?.isMyTurn ?? false;
 
-  // ── Flash queue & recap: detect new opponent log entries + turn transitions ──
-  const [flashQueue, setFlashQueue] = useState<BotLogEntry[]>([]);
-  const [recap, setRecap] = useState<TurnRecap | null>(null);
-  const seenBotLogLenRef = useRef(0);
-  const turnStartBotLogLenRef = useRef(0);
-  const prevSnapshotRef = useRef<{ turn: number; isMyTurn: boolean; you: PlayerData; opp: PlayerData; missions: GameState["missions"] } | null>(null);
+  // Flash queue / recap / banner state machine — declarative, derived from
+  // gameState changes (new bot-log entries → flashes; isMyTurn transitions →
+  // banner; before/after state diff on turn boundary → recap).
+  const {
+    flashQueue, recap, banner, recapEntries,
+    consumeFlash, consumeRecap, consumeBanner,
+  } = useTurnSideEffects({
+    gameState,
+    perspective: myPlayerIndex ?? 0,
+    isMyTurn,
+  });
 
-  const BUY_ACTION_TYPES = useMemo(() => new Set(["buy", "buy_eliminate", "buy_with_boxings", "buy_elim_boxings"]), []);
-
-  const consumeFlash = useCallback(() => setFlashQueue((q) => q.slice(1)), []);
-  const consumeRecap = useCallback(() => setRecap(null), []);
-
-  useEffect(() => {
-    if (!gameState) { seenBotLogLenRef.current = 0; prevSnapshotRef.current = null; return; }
-    const botLog = (gameState.botLog ?? []) as BotLogEntry[];
-    const seen = seenBotLogLenRef.current;
-    if (botLog.length > seen) {
-      const newEntries = botLog.slice(seen).filter((e) => e.card && e.actionType !== "refresh_metal" && e.actionType !== "burn_card");
-      if (newEntries.length) setFlashQueue((q) => [...q, ...newEntries]);
-      seenBotLogLenRef.current = botLog.length;
-    }
-
-    const prev = prevSnapshotRef.current;
-    const me = myPlayerIndex ?? 0;
-    const opp = 1 - me;
-
-    // Detect "opponent's turn just ended" by transition: prev.isMyTurn=false → current isMyTurn=true.
-    // prev captures state at start of opponent's turn (snapshotted when turn handed off).
-    if (prev && isMyTurn && !prev.isMyTurn) {
-      const newYou = gameState.players[me];
-      const newOpp = gameState.players[opp];
-      const r: TurnRecap = {};
-      const trained = newOpp.training - prev.opp.training;
-      const healed = Math.max(0, newOpp.health - prev.opp.health);
-      const playerHpLoss = Math.max(0, prev.you.health - newYou.health);
-      if (playerHpLoss > 0) r.damageToPlayer = { name: prev.you.name, amount: playerHpLoss };
-
-      // Cards bought during opponent's turn: entries added to botLog since turn start.
-      const turnEntries = botLog.slice(turnStartBotLogLenRef.current);
-      const bought = turnEntries
-        .filter((e) => e.actionType && BUY_ACTION_TYPES.has(e.actionType) && e.card)
-        .map((e) => e.card!.name);
-      if (bought.length) r.boughtCards = bought;
-
-      const allyDamage: { name: string; amount: number }[] = [];
-      const newAllyById = new Map((newYou.allies ?? []).map((a) => [a.id, a]));
-      for (const oldAlly of prev.you.allies ?? []) {
-        const newAlly = newAllyById.get(oldAlly.id);
-        const oldHp = oldAlly.health ?? 0;
-        const newHp = newAlly?.health ?? 0;
-        const killed = !newAlly;
-        const dmg = killed ? oldHp : Math.max(0, oldHp - newHp);
-        if (dmg > 0) allyDamage.push({ name: oldAlly.name, amount: dmg });
-      }
-      if (allyDamage.length) r.damageToAllies = allyDamage;
-
-      let missionDelta = 0;
-      for (let i = 0; i < gameState.missions.length; i++) {
-        const oldRank = prev.missions[i]?.playerRanks?.[opp] ?? 0;
-        const newRank = gameState.missions[i]?.playerRanks?.[opp] ?? 0;
-        if (newRank > oldRank) missionDelta += newRank - oldRank;
-      }
-      if (trained > 0) r.trained = trained;
-      if (missionDelta > 0) r.mission = missionDelta;
-      if (healed > 0) r.healed = healed;
-      if (Object.keys(r).length > 0) setRecap(r);
-    }
-
-    // Only refresh the snapshot on turn-boundary transitions, not every state update.
-    // This preserves the "at start of opponent's turn" snapshot needed for the recap.
-    const isBoundary = !prev || prev.isMyTurn !== isMyTurn;
-    if (isBoundary) {
-      prevSnapshotRef.current = {
-        turn: gameState.turnCount,
-        isMyTurn,
-        you: gameState.players[me],
-        opp: gameState.players[opp],
-        missions: gameState.missions,
-      };
-      turnStartBotLogLenRef.current = botLog.length;
-    }
-  }, [gameState, isMyTurn, myPlayerIndex]);
-
-  // Build log
+  // Build log: cumulative engine logs from gameState + materialized recap
+  // entries from the side-effects hook, sorted by turn.
   const log = useMemo<LogEntry[]>(() => {
     if (!gameState) return [];
     const entries: LogEntry[] = [];
     for (const entry of gameState.playerLog ?? []) {
-      entries.push({ turn: entry.turn, text: entry.text, isBot: false });
+      entries.push({ turn: entry.turn, text: entry.text, isBot: false, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
     }
     for (const entry of gameState.botLog ?? []) {
-      entries.push({ turn: entry.turn, text: entry.text, isBot: true });
+      entries.push({ turn: entry.turn, text: entry.text, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
     }
+    entries.push(...recapEntries);
     entries.sort((a, b) => a.turn - b.turn);
     return entries;
-  }, [gameState]);
+  }, [gameState, recapEntries]);
 
   // ── Host: process pending guest actions ──
 
@@ -424,6 +356,8 @@ export function useMultiplayerGame(
     consumeFlash,
     recap,
     consumeRecap,
+    banner,
+    consumeBanner,
     isMyTurn,
     myPlayerIndex,
     playAction,

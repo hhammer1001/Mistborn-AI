@@ -593,12 +593,221 @@ h3 {
   padding: 0.05rem 0;
   padding-left: 0.4rem;
   line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .log-entry.log-bot {
   color: var(--red-bright);
   font-style: italic;
 }
+
+.log-entry.log-recap {
+  color: var(--gold-bright);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.log-eye {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  transition: color 120ms ease, filter 120ms ease, transform 120ms ease;
+}
+
+.log-eye:not(.disabled):hover {
+  color: var(--gold-bright);
+  filter: drop-shadow(0 0 6px var(--gold-bright)) drop-shadow(0 0 3px var(--gold-bright));
+  transform: scale(1.15);
+}
+
+.log-eye.disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.log-entry-text {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Log detail popup */
+.log-popup-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 600;
+  backdrop-filter: blur(2px);
+  animation: log-popup-fade 140ms ease-out;
+}
+
+@keyframes log-popup-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.log-popup-panel {
+  background: rgba(10, 10, 24, 0.96);
+  border: 1px solid var(--gold-bright);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  min-width: 240px;
+  max-width: 90vw;
+  max-height: 90vh;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.9),
+              0 0 28px rgba(224, 191, 96, 0.35);
+  animation: log-popup-pop 180ms ease-out;
+}
+
+@keyframes log-popup-pop {
+  from { transform: scale(0.94); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.log-popup-card-wrap,
+.log-popup-metal-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.log-popup-tag {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--gold-bright);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.log-popup-metal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.log-popup-metal-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.log-popup-metal-icon-large {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.8));
+}
+
+.log-popup-metal-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+
+.log-popup-text {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--text);
+  text-align: center;
+  max-width: 400px;
+}
+
+.log-popup-recap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.log-popup-recap-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--gold-bright);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.log-popup-recap-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.log-popup-recap-line {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.log-popup-recap-line.damage  { color: var(--red-bright); }
+.log-popup-recap-line.mission { color: var(--gold-bright); }
+.log-popup-recap-line.train   { color: var(--text); }
+.log-popup-recap-line.heal    { color: var(--green-bright); }
+.log-popup-recap-line.bought  { color: #ffffff; }
+
+/* Combined popup: source → arrow → target */
+.log-popup-composite {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.log-popup-source,
+.log-popup-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.log-popup-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 0.2rem;
+}
+
+.log-popup-arrow.arrow-burn  { color: var(--green-bright); filter: drop-shadow(0 0 8px currentColor); }
+.log-popup-arrow.arrow-flare { color: var(--red-bright);   filter: drop-shadow(0 0 8px currentColor); }
+
+/* Inline arrow inside combined log rows */
+.log-entry.log-combined {
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+}
+
+.log-arrow {
+  font-weight: 700;
+  font-style: normal;
+  padding: 0 0.15rem;
+}
+
+.log-arrow-burn  { color: var(--green-bright); }
+.log-arrow-flare { color: var(--red-bright); }
 
 /* Prompt dialog */
 /* ─── Generic modal overlay/dialog ──────────────────────────────────── */
@@ -1717,6 +1926,42 @@ h3 {
   10%  { opacity: 1; transform: translateY(0)    scale(1); }
   85%  { opacity: 1; transform: translateY(0)    scale(1); }
   100% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+}
+
+/* Turn start banner — "YOUR TURN" / "OPPONENT'S TURN" */
+.turn-banner-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 500;
+}
+
+.turn-banner {
+  font-family: var(--font-display);
+  font-size: 4.2rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 6px rgba(0, 0, 0, 1),
+    0 4px 18px rgba(0, 0, 0, 0.95),
+    0 0 32px currentColor;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.7);
+  animation: turn-banner-in 600ms ease-out forwards;
+  white-space: nowrap;
+}
+
+.turn-banner.your      { color: var(--gold-bright); }
+.turn-banner.opponent  { color: var(--red-bright); }
+
+@keyframes turn-banner-in {
+  0%   { opacity: 0; transform: translateX(-60px) scale(0.9); letter-spacing: 0.3em; }
+  25%  { opacity: 1; transform: translateX(0)     scale(1.04); letter-spacing: 0.14em; }
+  70%  { opacity: 1; transform: translateX(0)     scale(1); letter-spacing: 0.14em; }
+  100% { opacity: 0; transform: translateX(40px)  scale(0.98); letter-spacing: 0.1em; }
 }
 
 /* Training track (vertical) */

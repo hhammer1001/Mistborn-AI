@@ -150,7 +150,7 @@ function diffToText(before: PSnap, after: PSnap): string[] {
 }
 
 import type { CardData } from "../types/game";
-interface LogEntry { turn: number; text: string; card?: CardData; actionType?: string }
+interface LogEntry { turn: number; text: string; card?: CardData; actionType?: string; metalIndex?: number }
 
 // ── GameSession ──
 
@@ -185,6 +185,8 @@ export class GameSession {
   private _dirty = false;
   private _playerSnapBefore: PSnap | null = null;
   private _missionBefore = 0;
+  // For detecting which opponent Sense card was auto-used to block a mission advance.
+  private _oppDiscardIdsBefore: Set<number> | null = null;
   // Undo-batch: while open, multiple playAction calls collapse to one undo entry.
   private _batchStart: { snapshot: GameSnapshot; stackLen: number; dirtyBefore: boolean } | null = null;
 
@@ -560,6 +562,12 @@ export class GameSession {
     this._preActionSnapshot = this._takeSnapshot();
     this._playerSnapBefore = psnap(p);
     this._missionBefore = p.curMission;
+    // Snapshot opponent's discard pile before advance_mission so we can
+    // identify which Sense card (if any) got auto-used to block.
+    if (action.type === "advance_mission") {
+      const opp = this.players[1 - playerIndex];
+      this._oppDiscardIdsBefore = new Set(opp.deck.discard.map((c) => c.id));
+    }
     this._pending_action_index = actionIndex;
     this._accumulated_responses = [];
 
@@ -640,16 +648,19 @@ export class GameSession {
     const missionBefore = this._missionBefore;
 
     const card = ("card" in action && action.card) ? action.card.toJSON() as CardData : undefined;
+    const metalIndex = ("metalIndex" in action && typeof (action as { metalIndex?: number }).metalIndex === "number")
+      ? (action as { metalIndex: number }).metalIndex
+      : undefined;
     if (source) {
       const log = this._logs[playerIndex];
       if (action.type === "buy" || action.type === "buy_with_boxings") {
-        log.push({ turn: this.game.turncount, text: source, card, actionType: action.type });
+        log.push({ turn: this.game.turncount, text: source, card, actionType: action.type, metalIndex });
       } else if (action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
         const filtered = effects.filter((e) => !e.includes("money"));
         log.push({
           turn: this.game.turncount,
           text: filtered.length > 0 ? `${source}: ${filtered.join(", ")}` : source,
-          card, actionType: action.type,
+          card, actionType: action.type, metalIndex,
         });
       } else if (action.type === "advance_mission") {
         const filtered = effects.filter((e) => e !== "-1 mission");
@@ -660,20 +671,38 @@ export class GameSession {
         // Any card-bearing action (use_metal, burn_card, refresh_metal, ally_ability_*)
         // always logs so the opponent's UI can flash it, regardless of measurable effects.
         const text = effects.length > 0 ? `${source}: ${effects.join(", ")}` : source;
-        log.push({ turn: this.game.turncount, text, card, actionType: action.type });
+        log.push({ turn: this.game.turncount, text, card, actionType: action.type, metalIndex });
+      } else if (metalIndex !== undefined) {
+        // Metal-only actions (burn_metal, flare_metal, use_atium). diffToText doesn't
+        // track token state, so always log these so the activity log + combiner can see them.
+        const text = effects.length > 0 ? `${source}: ${effects.join(", ")}` : source;
+        log.push({ turn: this.game.turncount, text, actionType: action.type, metalIndex });
       } else if (effects.length > 0) {
-        log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}`, actionType: action.type });
+        log.push({ turn: this.game.turncount, text: `${source}: ${effects.join(", ")}`, actionType: action.type, metalIndex });
       }
     }
 
     if (action.type === "advance_mission") {
       const missionSpent = missionBefore - p.curMission;
       if (missionSpent !== 1) {
+        // Identify which opponent Sense card was auto-used (newly appeared in discard).
+        const opp = this.players[1 - playerIndex];
+        const before = this._oppDiscardIdsBefore;
+        let senseCard: CardData | undefined = undefined;
+        for (const c of opp.deck.discard) {
+          if (before && !before.has(c.id) && c instanceof Action && c.data[9] === "sense") {
+            senseCard = c.toJSON() as CardData;
+            break;
+          }
+        }
         this._logs[1 - playerIndex].push({
           turn: this.game.turncount,
-          text: `Opponent used Sense to block mission advance! (−${missionSpent} mission)`,
+          text: `Used ${senseCard?.name ?? "Sense"} to block mission advance (−${missionSpent} mission)`,
+          card: senseCard,
+          actionType: "sense_block",
         });
       }
+      this._oppDiscardIdsBefore = null;
     }
 
     if (!this._dirty && this._preActionSnapshot) {
@@ -777,8 +806,19 @@ export class GameSession {
     if (idx !== -1) p.deck.hand.splice(idx, 1);
     p.deck.discard.push(card);
 
-    this._logs[playerIndex].push({ turn: this.game.turncount, text: `Your ${card.name} blocked ${reduction} damage` });
-    this._logs[attackerIndex].push({ turn: this.game.turncount, text: `Opponent's ${card.name} blocked ${reduction} damage` });
+    const cloudCardData = card.toJSON() as CardData;
+    this._logs[playerIndex].push({
+      turn: this.game.turncount,
+      text: `${card.name} blocked ${reduction} damage`,
+      card: cloudCardData,
+      actionType: "cloud_block",
+    });
+    this._logs[attackerIndex].push({
+      turn: this.game.turncount,
+      text: `Opponent's ${card.name} blocked ${reduction} damage`,
+      card: cloudCardData,
+      actionType: "cloud_block",
+    });
 
     if (p.curHealth > 0) {
       p.alive = true;
@@ -963,7 +1003,10 @@ export class GameSession {
     bot.performAction = (action: GameActionInternal, g: Game) => {
       const desc = bot.serializeAction(action, g).description;
       const card = ("card" in action && action.card) ? action.card.toJSON() as CardData : undefined;
-      this._logs[bi_captured].push({ turn: botTurn, text: desc, card, actionType: action.type });
+      const mi = ("metalIndex" in action && typeof (action as { metalIndex?: number }).metalIndex === "number")
+        ? (action as { metalIndex: number }).metalIndex
+        : undefined;
+      this._logs[bi_captured].push({ turn: botTurn, text: desc, card, actionType: action.type, metalIndex: mi });
       return originalPerform(action, g);
     };
 
@@ -988,7 +1031,12 @@ export class GameSession {
     const usedIds = [...oppHandBefore].filter((id) => !oppHandAfter.has(id));
     for (const card of opp.deck.discard) {
       if (usedIds.includes(card.id) && card instanceof Action && card.data[9] === "sense") {
-        this._logs[oi].push({ turn: botTurn, text: `Your ${card.name} blocked a mission advance` });
+        this._logs[oi].push({
+          turn: botTurn,
+          text: `${card.name} blocked a mission advance`,
+          card: card.toJSON() as CardData,
+          actionType: "sense_block",
+        });
       }
     }
 
