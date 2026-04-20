@@ -127,10 +127,9 @@ export class SquashBot extends Player {
     }
     if (snap.completedMissions === 2) score += 20;
 
-    // Mild bonus for starting an unprogressed mission.
-    if (mSnap.myRank === 0) {
-      score += 10;
-    }
+    // (Tested a +10 bonus for starting an unprogressed mission; cost 3% win
+    // rate at 4000 games. Focused serial mission push beats early dual-tracking
+    // now that defender bonus and self-play weights push engine efficiency.)
 
     // Mission intrinsic quality
     score += (MISSION_INTRINSIC[mission.name] ?? 0.5) * 10;
