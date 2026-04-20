@@ -41,14 +41,6 @@ export class SquashBot extends Player {
     return ANALYTICAL_RATINGS[this.character]?.[card.name] ?? 0;
   }
 
-  // Guard against rare engine bug where undefined enters a deck pile
-  override playTurn(game: Game) {
-    this.deck.hand = this.deck.hand.filter((c) => c != null);
-    this.deck.discard = this.deck.discard.filter((c) => c != null);
-    this.deck.cards = this.deck.cards.filter((c) => c != null);
-    super.playTurn(game);
-  }
-
   // ── Action selection: score everything, pick the best ──
 
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {

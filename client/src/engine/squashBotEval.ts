@@ -176,10 +176,7 @@ export function buildSnapshot(player: Player, game: Game): GameStateSnapshot {
   // Hybrid for characters without natural mission generation (Shan, Prodigy) —
   // they can go either way based on mid-game state.
   const DAMAGE_ENGINE_CARDS = new Set(["House War", "Crushing Blow", "Maelstrom", "Ruin"]);
-  // Defensive: filter out any undefined entries from a rare engine bug that can
-  // introduce holes into deck piles during a turn. Keeps the benchmark robust.
-  const ownedCards = [...player.deck.hand, ...player.deck.discard, ...player.deck.cards]
-    .filter((c) => c != null);
+  const ownedCards = [...player.deck.hand, ...player.deck.discard, ...player.deck.cards];
   const hasDamageEngine = ownedCards.some((c) => DAMAGE_ENGINE_CARDS.has(c.name));
   const isKelsier = player.character === "Kelsier";
 

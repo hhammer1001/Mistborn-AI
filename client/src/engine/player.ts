@@ -6,6 +6,44 @@ import { CHARACTER_DEFS } from "./data/characters";
 import type { GameActionInternal, SerializedGameAction } from "./types";
 import { METAL_NAMES, TRAINING_REWARDS, ACTION_TYPE_TO_CODE } from "./types";
 
+/** Copy all mutable state from `src` into `dest`. Used by Player.clone and
+ *  by callers that want to construct a Player subclass (e.g. a simulation
+ *  player) with the same state as an existing player. */
+export function copyPlayerState(dest: Player, src: Player, cardMap: Map<number, Card>): void {
+  dest.curHealth = src.curHealth;
+  dest.smoking = src.smoking;
+  dest.pDamage = src.pDamage;
+  dest.pMoney = src.pMoney;
+  dest.handSize = src.handSize;
+  dest.atium = src.atium;
+  dest.metalTokens = [...src.metalTokens];
+  dest.metalAvailable = [...src.metalAvailable];
+  dest.metalBurned = [...src.metalBurned];
+  dest.burns = src.burns;
+  dest.training = src.training;
+  dest.charAbility1 = src.charAbility1;
+  dest.charAbility2 = src.charAbility2;
+  dest.charAbility3 = src.charAbility3;
+  dest.alive = src.alive;
+  dest.curDamage = src.curDamage;
+  dest.curMoney = src.curMoney;
+  dest.curMission = src.curMission;
+  dest.curBoxings = src.curBoxings;
+  dest.ability1metal = src.ability1metal;
+  dest.ability1effect = src.ability1effect;
+  dest.ability1amount = src.ability1amount;
+
+  // Allies are always-in-play — not in any deck collection, so clone fresh
+  // and add to the cardMap for cross-reference lookups.
+  dest.allies = src.allies.map((a) => {
+    const cloned = a.clone() as Ally;
+    cardMap.set(a.id, cloned);
+    return cloned;
+  });
+
+  dest._active_card = src._active_card ? (cardMap.get(src._active_card.id) ?? null) : null;
+}
+
 export class Player {
   name: string;
   allies: Ally[] = [];
@@ -141,11 +179,11 @@ export class Player {
   }
 
   takeActions(game: Game) {
-    const actions = this.availableActions(game);
-    const action = this.selectAction(actions, game);
-    this.performAction(action, game);
-    if (action.type !== "end_actions") {
-      this.takeActions(game);
+    for (;;) {
+      const actions = this.availableActions(game);
+      const action = this.selectAction(actions, game);
+      this.performAction(action, game);
+      if (action.type === "end_actions") return;
     }
   }
 
@@ -155,12 +193,13 @@ export class Player {
   }
 
   assignDamage(game: Game) {
-    const [targets, opp] = game.validTargets(this);
-    const choice = this.assignDamageIn(targets);
-    if (choice === -1) return;
-    this.curDamage -= targets[choice].health;
-    opp.killAlly(targets[choice]);
-    this.assignDamage(game);
+    for (;;) {
+      const [targets, opp] = game.validTargets(this);
+      const choice = this.assignDamageIn(targets);
+      if (choice === -1) return;
+      this.curDamage -= targets[choice].health;
+      opp.killAlly(targets[choice]);
+    }
   }
 
   assignDamageIn(_targets: Ally[]): number {
@@ -489,6 +528,8 @@ export class Player {
     }
     if (choices.length === 0) return;
     const choice = this.keeperIn(choices);
+    // keeperIn may return -1 (decline to set aside) or an out-of-range index
+    if (choice < 0 || choice >= choices.length) return;
     const card = choices[choice];
     if (card instanceof Funding) this.curMoney -= 1;
     this.deck.setAside.push(card);
@@ -793,6 +834,19 @@ export class Player {
         break;
       }
     }
+  }
+
+  // ── Clone ──
+
+  /** Deep-clone this player for lookahead simulation. Caller must pass the
+   *  cloned game, the cloned deck, and a cardMap populated by prior clones
+   *  (market + other players' decks) so ally references resolve correctly. */
+  clone(newGame: Game, newDeck: PlayerDeck, cardMap: Map<number, Card>): Player {
+    const p = new (this.constructor as new (
+      deck: PlayerDeck, game: Game, turnOrder: number, name?: string, character?: string
+    ) => Player)(newDeck, newGame, this.turnOrder, this.name, this.character);
+    copyPlayerState(p, this, cardMap);
+    return p;
   }
 
   // ── Serialization ──
