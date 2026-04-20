@@ -1451,6 +1451,13 @@ h3 {
   flex-shrink: 0;
 }
 
+.hand-action-suffix {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  font-weight: 500;
+  margin-left: 0.15rem;
+}
+
 /* ─── Buttons ───────────────────────────────────────────────────────────── */
 
 .action-btn {

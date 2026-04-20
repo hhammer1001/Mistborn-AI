@@ -57,6 +57,14 @@ export class Card {
   applySnapshot(s: Record<string, unknown>): void {
     this.sought = s.sought as boolean;
   }
+
+  clone(): Card {
+    const c = new (this.constructor as new (def: CardDef) => Card)(this.def);
+    c.id = this.id;
+    c.sought = this.sought;
+    c.pending = this.pending;
+    return c;
+  }
 }
 
 // ── Action Card ──
@@ -163,9 +171,19 @@ export class Action extends Card {
       metalUsed: this.metalUsed,
       burned: this.burned,
       abilities: this._getAbilities(),
+      abilitySlots: this._getAbilitySlots(),
       ...(this._activeEff ? { activeAbility: { effect: this._activeEff, amount: this._activeAmt } } : {}),
       ...(this._burnEff ? { burnAbility: { effect: this._burnEff, amount: this._burnAmt } } : {}),
     };
+  }
+
+  private _getAbilitySlots(): ({ effect: string; amount: string } | null)[] {
+    const pairs: [string, string][] = [
+      [this._ab1Eff, this._ab1Amt],
+      [this._ab2Eff, this._ab2Amt],
+      [this._ab3Eff, this._ab3Amt],
+    ];
+    return pairs.map(([eff, amt]) => (eff ? { effect: eff, amount: amt } : null));
   }
 
   private _getAbilities() {
@@ -179,6 +197,13 @@ export class Action extends Card {
       if (eff) abilities.push({ effect: eff, amount: amt });
     }
     return abilities;
+  }
+
+  override clone(): Action {
+    const c = super.clone() as Action;
+    c.metalUsed = this.metalUsed;
+    c.burned = this.burned;
+    return c;
   }
 }
 
@@ -270,6 +295,14 @@ export class Ally extends Card {
       available2: this.available2,
       abilities,
     };
+  }
+
+  override clone(): Ally {
+    const c = super.clone() as Ally;
+    c.available1 = this.available1;
+    c.available2 = this.available2;
+    c.availableRiot = this.availableRiot;
+    return c;
   }
 }
 

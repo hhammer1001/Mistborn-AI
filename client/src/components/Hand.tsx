@@ -83,7 +83,37 @@ function groupCards(cards: CardData[]): CardGroup[] {
   return groups;
 }
 
-function actionLabel(a: GameAction): { text: string; metalIcon?: string } {
+/** Given an Action card's raw slots + current metalUsed, describe what the
+ *  NEXT metal addition will do. Examples:
+ *    "Ability"          — single-ability card, metal triggers
+ *    "Ability 2"        — multi-ability card, metal triggers ability 2
+ *    "Ability (1/2)"    — single ability card with gap progress
+ *    "+1 toward Ability 2 (1/2)" — multi-ability, gap progress
+ *  Returns null if the card has no defined abilities at all. */
+function nextAbilityLabel(card: CardData): string | null {
+  const slots = card.abilitySlots ?? [];
+  const activeSlotPositions: number[] = [];
+  for (let i = 0; i < slots.length; i++) {
+    if (slots[i]) activeSlotPositions.push(i + 1); // 1-indexed
+  }
+  if (activeSlotPositions.length === 0) return null;
+
+  const used = card.metalUsed ?? 0;
+  const nextPos = used + 1;
+  const nextIdx = activeSlotPositions.findIndex((s) => s >= nextPos);
+  if (nextIdx === -1) return null;
+  const targetSlot = activeSlotPositions[nextIdx];
+  const abilityName = activeSlotPositions.length === 1 ? "Ability" : `Ability ${nextIdx + 1}`;
+
+  if (targetSlot === nextPos) return abilityName;
+
+  const prevTrigger = nextIdx > 0 ? activeSlotPositions[nextIdx - 1] : 0;
+  const total = targetSlot - prevTrigger;
+  const progress = nextPos - prevTrigger;
+  return `+1 toward ${abilityName} (${progress}/${total})`;
+}
+
+function actionLabel(a: GameAction, card?: CardData): { text: string; metalIcon?: string; suffix?: string } {
   switch (a.code) {
     case 2: {
       const metalName = a.metalIndex !== undefined ? METAL_NAMES[a.metalIndex] : undefined;
@@ -95,14 +125,17 @@ function actionLabel(a: GameAction): { text: string; metalIcon?: string } {
       const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
       return { text: "Refresh", metalIcon: icon };
     }
-    case 4:
-      return { text: "Use Metal" };
+    case 4: {
+      const suffix = card ? nextAbilityLabel(card) : null;
+      return { text: "Use Metal", suffix: suffix ? `→ ${suffix}` : undefined };
+    }
     default:
       return { text: a.description.split(" ").slice(0, 3).join(" ") };
   }
 }
 
-function CardActionMenu({ actions, composites, onAction, onCompositeAction, onClose, anchorRef }: {
+function CardActionMenu({ card, actions, composites, onAction, onCompositeAction, onClose, anchorRef }: {
+  card: CardData;
   actions: GameAction[];
   composites: CompositeAction[];
   onAction: (index: number) => void;
@@ -196,7 +229,7 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
               </button>
             )}
             {normalActions.map((a) => {
-              const label = actionLabel(a);
+              const label = actionLabel(a, card);
               return (
                 <button
                   key={a.index}
@@ -208,6 +241,7 @@ function CardActionMenu({ actions, composites, onAction, onCompositeAction, onCl
                   {label.metalIcon && (
                     <img className="hand-action-metal-icon" src={label.metalIcon} alt="" draggable={false} />
                   )}
+                  {label.suffix && <span className="hand-action-suffix">{label.suffix}</span>}
                 </button>
               );
             })}
@@ -261,7 +295,7 @@ function getCompositeActions(
     const icon = metalIcon(cardMetal);
     composites.push({
       textBefore: verb,
-      textAfter: "+ add",
+      textAfter: nextAbilityLabel(card) ? `→ ${nextAbilityLabel(card)}` : "+ add",
       metalIcon: icon,
       isFlare,
       title: `${verb} ${metalName} token and add to ${card.name}`,
@@ -288,7 +322,7 @@ function getCompositeActions(
     const icon = metalIcon(cardMetal);
     composites.push({
       textBefore: `Burn ${sourceCard?.name ?? "card"}`,
-      textAfter: "+ add",
+      textAfter: nextAbilityLabel(card) ? `→ ${nextAbilityLabel(card)}` : "+ add",
       metalIcon: icon,
       title: `Burn ${sourceCard?.name ?? "card"} for ${metalName} and add to ${card.name}`,
       firstActionIndex: burnAction.index,
@@ -352,6 +386,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
               />
               {isSelected && hasActions && (
                 <CardActionMenu
+                  card={group.card}
                   actions={groupActions}
                   composites={composites}
                   onAction={(idx) => { triggerPulse(group.card.id); onAction(idx); }}

@@ -11,6 +11,9 @@ export interface CardData {
   metalUsed?: number;
   burned?: boolean;
   abilities?: { effect: string; amount: string }[];
+  /** Raw slots preserving empty positions (null). Length 3; a card with
+   *  ability at slot 1 and slot 3 looks like [obj, null, obj]. */
+  abilitySlots?: ({ effect: string; amount: string } | null)[];
   activeAbility?: { effect: string; amount: string };
   burnAbility?: { effect: string; amount: string };
   // Ally-specific

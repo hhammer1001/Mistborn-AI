@@ -767,7 +767,11 @@ export class GameSession {
     this._logs[1 - playerIndex].push({ turn: this.game.turncount, text: `Opponent killed your ${target.name}` });
 
     const [newTargets] = this.game.validTargets(p);
-    if (newTargets.length === 0) {
+    // Only auto-transition when there's no leftover damage to deal. If the
+    // kill used all the damage, hand off to the opponent silently; otherwise
+    // keep the damage phase open so the player can see remaining damage and
+    // explicitly confirm the face-hit (avoids the "turn ended too fast" feel).
+    if (newTargets.length === 0 && p.curDamage === 0) {
       this._executeAttackAndTransition(playerIndex);
     }
     return this.getState(playerIndex);
