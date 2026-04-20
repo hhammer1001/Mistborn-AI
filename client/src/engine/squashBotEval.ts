@@ -743,12 +743,12 @@ export function metalUnlockValue(
 
 export const MISSION_INTRINSIC: Record<string, number> = {
   "Luthadel Rooftops": 0.9,
-  "Kredik Shaw": 0.85,
-  "Luthadel Garrison": 0.75,
-  "Keep Venture": 0.7,
-  "Skaa Caverns": 0.65,
-  "Canton Of Orthodoxy": 0.6,
-  "Pits Of Hathsin": 0.55,
+  "Kredik Shaw": 1.05,
+  "Luthadel Garrison": 0.95,
+  "Keep Venture": 0.5,
+  "Skaa Caverns": 0.45,
+  "Canton Of Orthodoxy": 0.4,
+  "Pits Of Hathsin": 0.75,
   "Crew Hideout": 0.3,
 };
 
