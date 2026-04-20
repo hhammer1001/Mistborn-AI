@@ -286,7 +286,7 @@ export class SquashBot extends Player {
     // Deck size penalty — every card added dilutes future draws
     const deckPenalty = Math.max(0, (snap.deckSize - 10) * 2.5);
 
-    return rating * 2 * phaseMultiplier + allyBonus - deckPenalty;
+    return rating * 1.5 * phaseMultiplier + allyBonus - deckPenalty;
   }
 
   private scoreBuyEliminate(

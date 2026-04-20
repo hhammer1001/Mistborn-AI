@@ -34,7 +34,7 @@ const SELFPLAY_WEIGHTS: Record<string, SelfPlayWeights> = {
 // Minimum sample size before we trust a self-play weight
 const SELFPLAY_MIN_SAMPLES = 100;
 // How strongly to weight self-play vs analytical (additive blend)
-const SELFPLAY_BLEND_STRENGTH = 100.0;
+const SELFPLAY_BLEND_STRENGTH = 80.0;
 
 // ── Resource Base Values ──
 // These are the "exchange rates" of the game economy.
@@ -560,7 +560,7 @@ function computeAllRatings(): {
 
       // Defenders block direct damage every turn they're alive — roughly
       // equivalent to +damage_reduction per turn. Value ~= health * turns_alive.
-      const defenderBonus = def.defenseType === "D" ? health * 4.0 : 0;
+      const defenderBonus = def.defenseType === 'D' ? health * 4.0 : 0;
 
       let onPlayValue = 0;
       if (def.name === "Noble") onPlayValue = 3.5;
