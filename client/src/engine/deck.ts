@@ -143,21 +143,12 @@ export class Market extends Deck {
   }
 
   private _buildTestDeck() {
-    // Test deck for reproducing the Seeker + riot + seek bug.
-    // Only Seekers (ally with seek-5 / special16) and Enrage (riotable action).
-    const seekerDef: CardDef = {
-      cardType: 3, name: "Seeker", cost: 5, metal: 2,
-      ability1Effect: "seek", ability1Amount: "-5",
-      ability2Effect: "special16", ability2Amount: "0",
-      health: 3,
+    const hazekillerDef: CardDef = {
+      cardType: 3, name: "Hazekillers", cost: 4, metal: -1,
+      health: 3, defenseType: "D",
     };
-    const enrageDef: CardDef = {
-      cardType: 2, name: "Enrage", cost: 2, metal: 4,
-      ability1Effect: "D.M.riot", ability1Amount: "1.2.0",
-    };
-    for (let i = 0; i < 15; i++) {
-      this.cards.push(createCard(seekerDef));
-      this.cards.push(createCard(enrageDef));
+    for (let i = 0; i < 20; i++) {
+      this.cards.push(createCard(hazekillerDef));
     }
   }
 
