@@ -129,7 +129,8 @@ export class SquashBot extends Player {
 
     // (Tested a +10 bonus for starting an unprogressed mission; cost 3% win
     // rate at 4000 games. Focused serial mission push beats early dual-tracking
-    // now that defender bonus and self-play weights push engine efficiency.)
+    // now that defender bonus and self-play weights push engine efficiency.
+    // Confirmed in mirror: no-bonus wins head-to-head 56-44 vs +10-bonus.)
 
     // Mission intrinsic quality
     score += (MISSION_INTRINSIC[mission.name] ?? 0.5) * 10;
