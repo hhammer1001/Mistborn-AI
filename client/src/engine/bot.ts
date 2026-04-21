@@ -15,9 +15,9 @@ import {
  * Port of Python engine/robot.py class Twonky (lines 1768-2143).
  */
 export class Twonky extends Player {
-  private cardData: Record<string, number> = {};
-  private missionLookup: Record<string, number>;
-  private buffer: number;
+  protected cardData: Record<string, number> = {};
+  protected missionLookup: Record<string, number>;
+  protected buffer: number;
   private seekCount = 0;
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Twonky", character = "Marsh") {
@@ -40,11 +40,11 @@ export class Twonky extends Player {
 
   // ── Card evaluation ──
 
-  private cardLookup(card: Card): number {
+  protected cardLookup(card: Card): number {
     return this.cardData[card.name] ?? 0.5;
   }
 
-  private sortingAlgo(card: Card): number {
+  protected sortingAlgo(card: Card): number {
     return this.cardLookup(card);
   }
 

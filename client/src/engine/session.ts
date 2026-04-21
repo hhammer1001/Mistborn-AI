@@ -18,13 +18,14 @@ import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
 import { SquashBot } from "./squashBot";
 import { SynergyBotPrime } from "./synergyBot";
+import { RandomBot } from "./randomBot";
 import { PromptNeeded } from "./prompt";
 import type { GameActionInternal } from "./types";
 import { METAL_NAMES } from "./types";
 
 // ── Player kinds ──
 
-export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_synergy";
+export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_synergy" | "bot_random";
 
 export interface PlayerConfig {
   kind: PlayerKind;
@@ -40,6 +41,8 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
       return (deck, game, to, name, char) => new SquashBot(deck, game, to, name, char);
     case "bot_synergy":
       return (deck, game, to, name, char) => new SynergyBotPrime(deck, game, to, name, char);
+    case "bot_random":
+      return (deck, game, to, name, char) => new RandomBot(deck, game, to, name, char);
     case "bot_twonky":
     default:
       return (deck, game, to, name, char) => new Twonky(deck, game, to, name, char);
@@ -50,6 +53,7 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
 export function opponentTypeToKind(opponentType: string): PlayerKind {
   if (opponentType === "squash") return "bot_squash";
   if (opponentType === "synergy") return "bot_synergy";
+  if (opponentType === "random") return "bot_random";
   return "bot_twonky";
 }
 
