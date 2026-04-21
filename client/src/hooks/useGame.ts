@@ -357,6 +357,8 @@ export function useGame() {
           if (dmg > 0) {
             newEntries.push({ turn: gameState.turnCount, text: `${pName} dealt ${dmg} damage to ${bName}` });
           }
+        } else if (targetIndex === -2) {
+          // Skip: explicitly dealt no damage this turn. No log entry needed.
         } else {
           const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
           newEntries.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });

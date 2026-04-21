@@ -458,6 +458,8 @@ export class GameSession {
 
     if (this.phase === "damage" && this.activePlayer === perspective) {
       state["damageTargets"] = this._getDamageTargets(perspective);
+      const opp = this.players[1 - perspective];
+      state["faceHitBlocked"] = opp.allies.some((a) => a.defender);
     }
 
     if (this.phase === "sense_defense" && this.activePlayer === perspective) {
@@ -756,6 +758,13 @@ export class GameSession {
 
     const p = this.players[playerIndex];
     if (targetIndex === -1) {
+      this._executeAttackAndTransition(playerIndex);
+      return this.getState(playerIndex);
+    }
+    if (targetIndex === -2) {
+      // Skip face-hit: zero damage and transition. Used when the opponent has
+      // a defender (face-hit blocked) or when the attacker chooses not to.
+      p.curDamage = 0;
       this._executeAttackAndTransition(playerIndex);
       return this.getState(playerIndex);
     }

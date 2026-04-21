@@ -154,6 +154,7 @@ export interface GameState {
   players: PlayerData[];
   availableActions: GameAction[];
   damageTargets?: DamageTarget[];
+  faceHitBlocked?: boolean;
   senseCards?: SenseCard[];
   cloudCards?: CloudCard[];
   incomingDamage?: number;

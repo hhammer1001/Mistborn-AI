@@ -1065,9 +1065,28 @@ h3 {
   align-self: flex-start;
 }
 
-.damage-done-btn:hover {
+.damage-done-btn:hover:not(:disabled) {
   background: var(--gold);
   color: #000;
+}
+
+.damage-done-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.damage-skip-btn {
+  border-color: var(--text-dim);
+  font-size: 0.6rem;
+  margin-top: 0.2rem;
+  align-self: flex-start;
+  opacity: 0.8;
+}
+
+.damage-skip-btn:hover {
+  background: var(--text-dim);
+  color: #000;
+  opacity: 1;
 }
 
 .forfeit-btn {

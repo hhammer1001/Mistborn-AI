@@ -436,6 +436,7 @@ function GameBoard({
             <DamagePhase
               damage={you.damage}
               targets={gameState.damageTargets ?? []}
+              faceHitBlocked={gameState.faceHitBlocked ?? false}
               onAssign={(idx) => { if (!loading) assignDamage(idx); }}
             />
           ) : (
