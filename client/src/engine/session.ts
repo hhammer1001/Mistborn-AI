@@ -424,6 +424,7 @@ export class GameSession {
       case "buy_eliminate": return `Buy+eliminate ${action.card.name}`;
       case "buy_with_boxings": return `Bought ${action.card.name} for ${action.card.cost} (${action.boxingsCost} boxings)`;
       case "buy_elim_boxings": return `Buy+eliminate ${action.card.name} (${action.boxingsCost} boxings)`;
+      case "buy_boxing": return "Bought Boxing (2 money → 1 boxing)";
       case "advance_mission": return `Mission ${action.mission.name}`;
       case "refresh_metal": return `Refresh ${METAL_NAMES[action.metalIndex]} with ${action.card.name}`;
       default: return null;
@@ -537,7 +538,15 @@ export class GameSession {
     // end_actions: session-managed flow (defer cleanUp until after damage phase
     // so the player can still see their hand during damage assignment).
     if (action.type === "end_actions") {
-      p.curBoxings += Math.floor(p.curMoney / 2);
+      const autoBoxings = Math.floor(p.curMoney / 2);
+      if (autoBoxings > 0) {
+        this._logs[playerIndex].push({
+          turn: this.game.turncount,
+          text: `Traded ${autoBoxings * 2} money → ${autoBoxings} boxing${autoBoxings > 1 ? "s" : ""}`,
+          actionType: "auto_boxing",
+        });
+      }
+      p.curBoxings += autoBoxings;
       p.curMoney = 0;  // pMoney is applied at the start of the next turn instead
       p.curMission = 0;
       p.metalTokens = p.metalTokens.map((v) => p.resetToken(v));
@@ -626,6 +635,30 @@ export class GameSession {
     return second;
   }
 
+  /**
+   * Advance the given mission as many times as the player can afford in a
+   * single atomic dispatch. Used by the "+All" button; guest MP clients
+   * invoke this via a pending action so the host applies the full sequence
+   * rather than just one advance.
+   */
+  advanceAllMission(playerIndex: number, missionName: string): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
+    if (this.phase !== "actions") return { error: `Cannot play action in phase: ${this.phase}` };
+    while (true) {
+      if (this.phase !== "actions") break;
+      this.getState(playerIndex);
+      const raw = this._cached_raw;
+      if (!raw) break;
+      const actionIdx = raw.findIndex(
+        (a) => a.type === "advance_mission" && a.mission.name === missionName,
+      );
+      if (actionIdx < 0) break;
+      const result = this.playAction(playerIndex, actionIdx);
+      if (result && (result as { error?: string }).error) break;
+    }
+    return this.getState(playerIndex);
+  }
+
   private _attemptAction(action: GameActionInternal, playerIndex: number): Record<string, unknown> {
     const p = this.players[playerIndex] as WebPlayer;
     try {
@@ -661,6 +694,8 @@ export class GameSession {
       const log = this._logs[playerIndex];
       if (action.type === "buy" || action.type === "buy_with_boxings") {
         log.push({ turn: this.game.turncount, text: source, card, actionType: action.type, metalIndex });
+      } else if (action.type === "buy_boxing") {
+        log.push({ turn: this.game.turncount, text: source, actionType: action.type });
       } else if (action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
         const filtered = effects.filter((e) => !e.includes("money"));
         log.push({

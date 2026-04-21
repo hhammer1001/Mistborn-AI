@@ -4,6 +4,7 @@ import type { PlayerData, GameAction, CardData } from "../types/game";
 import { METAL_ICONS } from "../data/metalIcons";
 import { CardPileOverlay } from "./CardPileOverlay";
 import { AnimatedNumber } from "./AnimatedNumber";
+import { OpponentDetailPopup, CharacterCardPopup } from "./OpponentDetailPopup";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 const CHARACTER_METAL: Record<string, number> = {
@@ -86,12 +87,15 @@ interface Props {
   onCompositeAction?: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   discard?: CardData[];
   marketDiscard?: CardData[];
+  hideCharacterCard?: boolean;
 }
 
 
-export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeAction, discard, marketDiscard }: Props) {
+export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeAction, discard, marketDiscard, hideCharacterCard }: Props) {
   const [showDiscard, setShowDiscard] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
+  const [showCharCard, setShowCharCard] = useState(false);
   const charAbilityAction = actions?.find((a) => a.code === 10);
   const thirdAbilityAction = actions?.find((a) => a.code === 11);
 
@@ -101,7 +105,25 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
         <div className="opp-row">
           <div className="opp-identity">
             <strong>{player.name}</strong>
-            <span className="opp-character">{player.character}</span>
+            <div className="opp-identity-char-row">
+              <button
+                type="button"
+                className="opp-character-btn"
+                onClick={(e) => { e.stopPropagation(); setShowCharCard(true); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setShowCharCard(true); }}
+              >
+                {player.character}
+              </button>
+              <button
+                type="button"
+                className="opp-detail-eye"
+                aria-label="Show opponent detail"
+                onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setShowDetail(true); }}
+              >
+                <EyeIcon />
+              </button>
+            </div>
           </div>
           <div className="opp-stat health">
             <span className="opp-stat-value"><AnimatedNumber value={player.health} tone="health" /></span>
@@ -136,13 +158,23 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
             <span className="opp-stat-label">Deck</span>
           </div>
         </div>
+        {showDetail && (
+          <OpponentDetailPopup
+            player={player}
+            onClose={() => setShowDetail(false)}
+            onOpenCharacter={() => setShowCharCard(true)}
+          />
+        )}
+        {showCharCard && (
+          <CharacterCardPopup character={player.character} onClose={() => setShowCharCard(false)} />
+        )}
       </div>
     );
   }
 
   return (
     <div className="player-info you">
-      <CharacterCard character={player.character} />
+      {!hideCharacterCard && <CharacterCard character={player.character} />}
       <div className="player-header">
         <strong>{player.name}</strong>
         {(() => {
@@ -294,5 +326,14 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
         <CardPileOverlay title="Eliminated Cards" cards={marketDiscard} onClose={() => setShowTrash(false)} />
       )}
     </div>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   );
 }

@@ -30,6 +30,7 @@ export interface TurnRecap {
   damageToPlayer?: { name: string; amount: number };
   damageToAllies?: { name: string; amount: number }[];
   boughtCards?: string[];
+  boxingsGained?: number;
 }
 
 /** Log entry shape understood by the activity log component. */
@@ -74,6 +75,9 @@ export function computeRecap(
     .filter((e) => e.actionType && BUY_ACTION_TYPES.has(e.actionType) && e.card)
     .map((e) => e.card!.name);
   if (bought.length) r.boughtCards = bought;
+
+  const boxingsGained = Math.max(0, nextOpp.boxings - prevOpp.boxings);
+  if (boxingsGained > 0) r.boxingsGained = boxingsGained;
 
   let missionDelta = 0;
   const oldMissions = prev.missions ?? [];
@@ -161,6 +165,11 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
       seenBotLogLenRef.current = 0;
       turnStartStateRef.current = null;
       turnStartBotLogLenRef.current = 0;
+      expectYourBannerRef.current = false;
+      setFlashQueue([]);
+      setRecap(null);
+      setBanner(null);
+      setRecapEntries([]);
       return;
     }
 

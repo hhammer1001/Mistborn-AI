@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { db } from "../lib/instantdb";
-import type { GameState, GameAction } from "../types/game";
+import type { GameState } from "../types/game";
 import type { LogEntry } from "./useGame";
 import { useTurnSideEffects } from "./useTurnSideEffects";
 import { GameSession } from "../engine/session";
@@ -114,6 +114,9 @@ export function useMultiplayerGame(
           }
           break;
         }
+        case "advance_all":
+          session.advanceAllMission(pi, pending.missionName as string);
+          break;
         case "prompt":
           session.respondToPrompt(pi, pending.promptType as string, pending.value as number);
           break;
@@ -218,18 +221,7 @@ export function useMultiplayerGame(
       if (isHost) {
         const session = sessionRef.current;
         if (!session || !sessionId) return;
-        // Advance repeatedly
-        let state = session.getState(myPlayerIndex);
-        let actions = state.availableActions as GameAction[];
-        while (true) {
-          const action = actions?.find((a: any) => a.code === 1 && a.missionName === missionName);
-          if (!action) break;
-          const result = session.playAction(myPlayerIndex, action.index);
-          if (result?.error) break;
-          state = session.getState(myPlayerIndex);
-          actions = state.availableActions as GameAction[];
-          if (state.phase === "game_over") break;
-        }
+        session.advanceAllMission(myPlayerIndex, missionName);
         const payload = session.getInstantDBPayload();
         await db.transact(
           db.tx.games[sessionId].update({
@@ -239,18 +231,10 @@ export function useMultiplayerGame(
           })
         );
       } else {
-        // Guest: advance one at a time via pending actions
-        // (the host will process each one)
-        if (!gameState) return;
-        const action = gameState.availableActions.find(
-          (a) => a.code === 1 && a.missionName === missionName
-        );
-        if (action) {
-          await _guestAction({ actionType: "action", actionIndex: action.index });
-        }
+        await _guestAction({ actionType: "advance_all", missionName });
       }
     },
-    [isHost, myPlayerIndex, sessionId, gameRecord, gameState, _guestAction]
+    [isHost, myPlayerIndex, sessionId, gameRecord, _guestAction]
   );
 
   const playTwoActions = useCallback(

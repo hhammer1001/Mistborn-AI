@@ -184,7 +184,7 @@ export const MISSION_TIERS: Record<string, MissionTierDef[]> = {
   "Kredik Shaw": [
     { threshold: 4, reward: "C", rewardAmount: 1, firstReward: "C", firstRewardAmount: 1 },
     { threshold: 8, reward: "C", rewardAmount: 1, firstReward: "C", firstRewardAmount: 1 },
-    { threshold: 12, reward: "Pc", rewardAmount: 2, firstReward: "C", firstRewardAmount: 2 },
+    { threshold: 12, reward: "Pc", rewardAmount: 1, firstReward: "C", firstRewardAmount: 2 },
   ],
   "Crew Hideout": [
     { threshold: 6, reward: "H", rewardAmount: 4, firstReward: "H", firstRewardAmount: 2 },

@@ -122,7 +122,9 @@ export function LogDetailPopup({ entry, source, onClose }: Props) {
     }
     if (r.trained) lines.push({ label: `${r.trained} trained`, cls: "train" });
     if (r.healed) lines.push({ label: `${r.healed} heal`, cls: "heal" });
-    if (r.boughtCards?.length) lines.push({ label: `Bought ${r.boughtCards.join(", ")}`, cls: "bought" });
+    const boughtParts: string[] = [...(r.boughtCards ?? [])];
+    if (r.boxingsGained) boughtParts.push(`${r.boxingsGained} Boxing${r.boxingsGained > 1 ? "s" : ""}`);
+    if (boughtParts.length) lines.push({ label: `Bought ${boughtParts.join(", ")}`, cls: "bought" });
     body = (
       <div className="log-popup-recap">
         <div className="log-popup-recap-title">Turn recap</div>

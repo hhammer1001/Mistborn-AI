@@ -501,7 +501,8 @@ export class Player {
   special12() { // Confrontation 1: play first ability of an eliminated action
     const choices: Action[] = [];
     for (const card of this.game.market.discard) {
-      if (card instanceof Action) choices.push(card);
+      // Skip Confrontation itself — its ability1 is special12, which would recurse
+      if (card instanceof Action && card.name !== "Confrontation") choices.push(card);
     }
     if (choices.length === 0) return;
     const choice = this.confrontationIn(choices);
@@ -728,7 +729,9 @@ export class Player {
         break;
       }
       case "refresh_metal": {
-        action.card.burned = true;
+        const idx = this.deck.hand.indexOf(action.card);
+        if (idx !== -1) this.deck.hand.splice(idx, 1);
+        this.deck.discard.push(action.card);
         if (this.metalTokens[action.metalIndex] === 4) {
           this.metalTokens[action.metalIndex] = 3;
         } else {
