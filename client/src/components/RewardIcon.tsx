@@ -95,12 +95,18 @@ export function RewardIcon({ code, amount, size = 24, className }: Props) {
     && !(code === "B" && amount === 1);
   const isPermanent = code.startsWith("P") && code.length === 2;
   const overlayText = showOverlay ? `${amount}` : null;
+  const n = amount ?? 1;
+  const permTitle =
+    code === "Pm" ? `Gain ${n} money at the start of each turn` :
+    code === "Pd" ? `Deal ${n} damage at the start of each turn` :
+    code === "Pc" ? `Draw ${n === 1 ? "an extra card" : `${n} extra cards`} when drawing your hand` :
+    null;
 
   return (
     <span
       className={`reward-icon ${className ?? ""}`}
       style={{ width: size, height: size }}
-      title={`${entry.label}${amount ? ` ${amount}` : ""}`}
+      title={permTitle ?? `${entry.label}${amount ? ` ${amount}` : ""}`}
     >
       <img
         src={src}
