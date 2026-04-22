@@ -80,7 +80,7 @@ interface PlayerSnapshot {
   metalAvailable: number[];
   metalBurned: number[];
   activeCardId: number | null;
-  senseFlag: boolean;
+  senseFlag: boolean | null;
   allyIds: number[];
   handIds: number[];
   deckIds: number[];
@@ -182,6 +182,10 @@ export class GameSession {
   private _cloud_damage = 0;
   private _defender_hp_at_turn_start: number | null = null;
   private _next_player_after_sense: 0 | 1 = 0;
+  /** Set when an advance_mission is paused mid-dispatch for the defender's
+   *  sense decision. resolveSense uses this to resume the original action
+   *  after the defender chooses. */
+  private _pending_advance_action: GameActionInternal | null = null;
 
   // Snapshot-based prompt rollback and undo
   private _preActionSnapshot: GameSnapshot | null = null;
@@ -253,7 +257,7 @@ export class GameSession {
       metalAvailable: [...p.metalAvailable],
       metalBurned: [...p.metalBurned],
       activeCardId: p._active_card?.id ?? null,
-      senseFlag: (p as WebPlayer)._sense_flag ?? false,
+      senseFlag: (p as WebPlayer)._sense_flag ?? null,
       allyIds: p.allies.map((a) => a.id),
       handIds: p.deck.hand.map((c) => c.id),
       deckIds: p.deck.cards.map((c) => c.id),
@@ -416,6 +420,7 @@ export class GameSession {
       case "use_metal": return action.card.name;
       case "burn_metal": return `Burn ${METAL_NAMES[action.metalIndex]}`;
       case "flare_metal": return `Flare ${METAL_NAMES[action.metalIndex]}`;
+      case "use_atium": return `Burn atium as ${METAL_NAMES[action.metalIndex]}`;
       case "ally_ability_1": return `${action.card.name} ability 1`;
       case "ally_ability_2": return `${action.card.name} ability 2`;
       case "char_ability_1": return `${p.character} ability I`;
@@ -471,6 +476,9 @@ export class GameSession {
       state["senseCards"] = p.deck.hand
         .filter((c): c is Action => c instanceof Action && c.data[9] === "sense")
         .map((c) => ({ cardId: c.id, name: c.name, amount: parseInt(c.data[10], 10) }));
+      if (this._pending_advance_action && this._pending_advance_action.type === "advance_mission") {
+        state["senseMissionName"] = this._pending_advance_action.mission.name;
+      }
     }
 
     if (this.phase === "cloud_defense" && this.activePlayer === perspective) {
@@ -585,6 +593,23 @@ export class GameSession {
     if (action.type === "advance_mission") {
       const opp = this.players[1 - playerIndex];
       this._oppDiscardIdsBefore = new Set(opp.deck.discard.map((c) => c.id));
+
+      // Pause for the defender's sense decision at the moment of the advance
+      // (rather than pre-empting it at the end of their previous turn). Only
+      // prompts human defenders with unused sense cards who haven't yet
+      // answered for this specific advance.
+      const oppIndex = (1 - playerIndex) as 0 | 1;
+      const oppWeb = opp as WebPlayer;
+      if (
+        !this._isBot(oppIndex) &&
+        oppWeb._sense_flag === null &&
+        opp.deck.hand.some((c) => c instanceof Action && c.data[9] === "sense")
+      ) {
+        this._pending_advance_action = action;
+        this.phase = "sense_defense";
+        this.activePlayer = oppIndex;
+        return this.getState(playerIndex);
+      }
     }
     this._pending_action_index = actionIndex;
     this._accumulated_responses = [];
@@ -831,7 +856,23 @@ export class GameSession {
   resolveSense(playerIndex: number, use: boolean): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "sense_defense") return { error: `Cannot resolve sense in phase: ${this.phase}` };
-    (this.players[playerIndex] as WebPlayer)._sense_flag = use;
+
+    const defender = this.players[playerIndex] as WebPlayer;
+    defender._sense_flag = use;
+
+    const pending = this._pending_advance_action;
+    if (pending) {
+      this._pending_advance_action = null;
+      const attackerIndex = (1 - playerIndex) as 0 | 1;
+      this.phase = "actions";
+      this.activePlayer = attackerIndex;
+      const result = this._attemptAction(pending, attackerIndex);
+      // Reset so the next advance_mission this turn prompts again.
+      defender._sense_flag = null;
+      return result;
+    }
+
+    // Fallback for callers still using the legacy pre-turn prompt path.
     this._startNextTurn(this._next_player_after_sense);
     return this.getState(playerIndex);
   }
@@ -949,17 +990,10 @@ export class GameSession {
 
     if (this.game.winner) { this.phase = "game_over"; return; }
 
-    // Only humans need the sense_defense phase to choose whether to activate
-    // sense. Bots' senseCheckIn already returns true automatically.
+    // Sense defense is now prompted at the moment of each advance_mission
+    // (see playAction) rather than pre-empted at the end of the prior turn.
     if (!this._isBot(pi)) {
-      const senseCards = p.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "sense");
-      if (senseCards.length > 0) {
-        this.phase = "sense_defense";
-        this.activePlayer = pi;
-        this._next_player_after_sense = oi;
-        return;
-      }
-      (p as WebPlayer)._sense_flag = false;
+      (p as WebPlayer)._sense_flag = null;
     }
 
     this._startNextTurn(oi);
