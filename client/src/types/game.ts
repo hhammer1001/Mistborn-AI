@@ -157,6 +157,7 @@ export interface GameState {
   damageTargets?: DamageTarget[];
   faceHitBlocked?: boolean;
   senseCards?: SenseCard[];
+  senseMissionName?: string;
   cloudCards?: CloudCard[];
   incomingDamage?: number;
   botLog?: BotLogEntry[];

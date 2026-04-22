@@ -491,12 +491,16 @@ function GameBoard({
         <div className="modal-overlay">
           <div className="modal-dialog">
             <h3>Sense Defense</h3>
+            <p className="modal-note">
+              {gameState.senseMissionName
+                ? <>Opponent is advancing <strong>{gameState.senseMissionName}</strong>. Block it with a Sense card?</>
+                : <>Opponent is advancing a mission. Block it with a Sense card?</>}
+            </p>
             {gameState.senseCards.map(c => (
               <p key={c.cardId}>
-                <strong>{c.name}</strong> — blocks <strong>{c.amount}</strong> mission per advance (can go negative)
+                <strong>{c.name}</strong> — blocks <strong>{c.amount}</strong> mission
               </p>
             ))}
-            <p className="modal-note">If the opponent advances a mission, your card will be discarded to block it.</p>
             <div className="modal-actions">
               <button className="action-btn" style={{borderColor: "var(--blue-bright)"}}
                 onClick={() => { if (!loading) resolveSense(true); }}>

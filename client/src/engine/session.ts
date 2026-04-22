@@ -1010,8 +1010,19 @@ export class GameSession {
 
     if (this.game.winner) { this.phase = "game_over"; return; }
 
-    // Sense defense is now prompted at the moment of each advance_mission
-    // (see playAction) rather than pre-empted at the end of the prior turn.
+    // For human-vs-human, sense defense is prompted at the moment of each
+    // advance_mission (see playAction). For human-vs-bot, the bot's turn
+    // runs synchronously and can't pause mid-advance, so keep the legacy
+    // pre-turn prompt in that specific case only.
+    if (!this._isBot(pi) && this._isBot(oi)) {
+      const senseCards = p.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "sense");
+      if (senseCards.length > 0) {
+        this.phase = "sense_defense";
+        this.activePlayer = pi;
+        this._next_player_after_sense = oi;
+        return;
+      }
+    }
     if (!this._isBot(pi)) {
       (p as WebPlayer)._sense_flag = null;
     }

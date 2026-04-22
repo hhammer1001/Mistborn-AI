@@ -17,7 +17,10 @@ import type { GameActionInternal } from "./types";
 export class WebPlayer extends Player {
   _promptResponses: Record<string, number | boolean> = {};
   _promptQueues: Record<string, (number | boolean)[]> = {};
-  _sense_flag = false;
+  /** Null until the defender has been prompted for the current advance_mission.
+   *  Set by resolveSense before the advance is re-executed, then reset to null
+   *  so the next advance in the same turn prompts again. */
+  _sense_flag: boolean | null = null;
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Player", character = "Kelsier") {
     super(deck, game, turnOrder, name, character);
@@ -63,7 +66,7 @@ export class WebPlayer extends Player {
   }
 
   override senseCheckIn(_card: Action): boolean {
-    return this._sense_flag;
+    return this._sense_flag === true;
   }
 
   override killEnemyAllyIn(allies: Ally[]): number {
