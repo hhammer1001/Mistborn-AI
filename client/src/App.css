@@ -462,14 +462,14 @@ h3 {
   position: relative;
   display: grid;
   grid-template-columns: minmax(320px, 420px) 1fr;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     "header    header"
     "inscr     chronicle"
     ".         chronicle"
     "actions   chronicle";
   gap: 1.5rem 3rem;
-  min-height: 100vh;
+  height: 100vh;
   padding: 3rem clamp(1.5rem, 4vw, 4rem) 2rem;
   background:
     radial-gradient(ellipse 80% 55% at 30% 25%, rgba(201, 164, 74, 0.08), transparent 60%),
@@ -1558,8 +1558,11 @@ h3 {
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
-  /* Reserve space for the stacked fixed undo + main-menu buttons */
-  padding-bottom: 5rem;
+  /* Reserve just enough room so the activity log above lands a touch
+     above the fixed Undo (bottom: 3.1rem) button — matching the ~0.8rem
+     gap between Undo and Main Menu. When the footer's own content is
+     taller, this min-height doesn't add anything. */
+  min-height: 5.3rem;
 }
 
 /* ─── Damage Phase ────────────────────────────────────────────────── */
