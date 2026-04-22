@@ -16,8 +16,10 @@ interface Props {
 
 const VICTORY_LABEL: Record<string, string> = {
   M: "by Mission",
-  H: "by Combat",
-  T: "by Time",
+  D: "by Combat",
+  T: "as Time Ran Out",
+  C: "by Confrontation",
+  F: "by Forfeit",
 };
 
 export function GameOverScreen({ gameState, you, opp, log, youWon, backLabel, onBack }: Props) {

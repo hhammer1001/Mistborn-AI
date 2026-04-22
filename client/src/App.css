@@ -1802,7 +1802,7 @@ h3 {
 }
 
 .card-detail-popup {
-  z-index: 500;
+  z-index: 900;
   display: flex;
   gap: 0;
   pointer-events: auto;
