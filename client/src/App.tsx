@@ -25,6 +25,7 @@ import { TurnRecap } from "./components/TurnRecap";
 import { TurnBanner } from "./components/TurnBanner";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
+import { GameOverScreen } from "./components/GameOverScreen";
 import type { GameState } from "./types/game";
 
 type AppMode = "menu" | "gallery" | "bot_game" | "auth" | "lobby" | "mp_game";
@@ -239,13 +240,15 @@ function BotGameBoard({
 
   if (gameState.phase === "game_over") {
     return (
-      <div className="game-over">
-        <h1>Game Over</h1>
-        <h2>{gameState.winner === you.name ? "You Win!" : `${gameState.winner} Wins`}</h2>
-        <p>Victory: {gameState.victoryType} | Turns: {gameState.turnCount}</p>
-        <p>Your HP: {you.health} | Opponent HP: {opp.health}</p>
-        <button onClick={onMainMenu}>New Game</button>
-      </div>
+      <GameOverScreen
+        gameState={gameState}
+        you={you}
+        opp={opp}
+        log={log}
+        youWon={gameState.winner === you.name}
+        backLabel="New Game"
+        onBack={onMainMenu}
+      />
     );
   }
 
@@ -304,13 +307,15 @@ function MultiplayerGameBoard({
   if (gameState.phase === "game_over") {
     const iWon = gameState.isWinner ?? (gameState.winner === you.name);
     return (
-      <div className="game-over">
-        <h1>Game Over</h1>
-        <h2>{iWon ? "You Win!" : `${opp.name} Wins`}</h2>
-        <p>Victory: {gameState.victoryType} | Turns: {gameState.turnCount}</p>
-        <p>Your HP: {you.health} | Opponent HP: {opp.health}</p>
-        <button onClick={onMainMenu}>Back to Lobby</button>
-      </div>
+      <GameOverScreen
+        gameState={gameState}
+        you={you}
+        opp={opp}
+        log={log}
+        youWon={iWon}
+        backLabel="Back to Lobby"
+        onBack={onMainMenu}
+      />
     );
   }
 

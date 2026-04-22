@@ -153,7 +153,7 @@ export class Game {
       },
       missions: this.missions.map((m) => m.toJSON()),
       players: this.players.map((p) =>
-        p.toJSON(perspective === null || p.turnOrder === perspective)
+        p.toJSON(perspective === null || p.turnOrder === perspective, perspective === null)
       ),
     };
   }

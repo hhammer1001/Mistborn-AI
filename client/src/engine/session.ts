@@ -434,7 +434,10 @@ export class GameSession {
   // ── State for clients ──
 
   getState(perspective: number = this.activePlayer): Record<string, unknown> {
-    const state: Record<string, unknown> = this.game.toJSON(perspective);
+    // Reveal both hands + discards once the game is over so the postgame
+    // screen can show each player's full final state.
+    const serializePerspective = this.phase === "game_over" ? null : perspective;
+    const state: Record<string, unknown> = this.game.toJSON(serializePerspective);
     state["sessionId"] = this.id;
     state["phase"] = this.phase;
     state["activePlayer"] = this.activePlayer;

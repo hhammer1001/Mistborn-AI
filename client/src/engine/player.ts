@@ -910,7 +910,7 @@ export class Player {
 
   // ── State serialization ──
 
-  toJSON(revealHand = true) {
+  toJSON(revealHand = true, revealDeck = false) {
     return {
       name: this.name,
       character: this.character,
@@ -926,6 +926,7 @@ export class Player {
       deckSize: this.deck.cards.length,
       discardSize: this.deck.discard.length,
       discard: revealHand ? this.deck.discard.map((c) => c.toJSON()) : [],
+      deck: revealDeck ? this.deck.cards.map((c) => c.toJSON()) : [],
       allies: this.allies.map((a) => a.toJSON()),
       metalTokens: [...this.metalTokens],
       metalAvailable: [...this.metalAvailable],

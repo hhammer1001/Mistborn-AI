@@ -53,6 +53,7 @@ export interface PlayerData {
   deckSize: number;
   discardSize: number;
   discard: CardData[];
+  deck?: CardData[];
   allies: CardData[];
   metalTokens: number[];
   metalAvailable: number[];
