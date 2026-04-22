@@ -195,6 +195,8 @@ export class GameSession {
   private _missionBefore = 0;
   // For detecting which opponent Sense card was auto-used to block a mission advance.
   private _oppDiscardIdsBefore: Set<number> | null = null;
+  // For detecting cards that got eliminated (moved to market trash) during an action.
+  private _marketTrashIdsBefore: Set<number> | null = null;
   // Undo-batch: while open, multiple playAction calls collapse to one undo entry.
   private _batchStart: { snapshot: GameSnapshot; stackLen: number; dirtyBefore: boolean } | null = null;
 
@@ -588,6 +590,7 @@ export class GameSession {
     this._preActionSnapshot = this._takeSnapshot();
     this._playerSnapBefore = psnap(p);
     this._missionBefore = p.curMission;
+    this._marketTrashIdsBefore = new Set(this.game.market.discard.map((c) => c.id));
     // Snapshot opponent's discard pile before advance_mission so we can
     // identify which Sense card (if any) got auto-used to block.
     if (action.type === "advance_mission") {
@@ -718,6 +721,22 @@ export class GameSession {
     const metalIndex = ("metalIndex" in action && typeof (action as { metalIndex?: number }).metalIndex === "number")
       ? (action as { metalIndex: number }).metalIndex
       : undefined;
+
+    // Detect cards eliminated during this action (newly appeared in market trash).
+    // For buy_eliminate/buy_elim_boxings, the bought card itself enters the trash
+    // as part of the action semantics — exclude it so it's not double-reported.
+    const trashBefore = this._marketTrashIdsBefore;
+    const excludeId = (action.type === "buy_eliminate" || action.type === "buy_elim_boxings")
+      ? action.card.id : null;
+    const eliminatedNames: string[] = [];
+    if (trashBefore) {
+      for (const c of this.game.market.discard) {
+        if (!trashBefore.has(c.id) && c.id !== excludeId) eliminatedNames.push(c.name);
+      }
+    }
+    if (eliminatedNames.length > 0) {
+      effects.push(`eliminated ${eliminatedNames.join(", ")}`);
+    }
     if (source) {
       const log = this._logs[playerIndex];
       if (action.type === "buy" || action.type === "buy_with_boxings") {
@@ -781,6 +800,7 @@ export class GameSession {
 
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
+    this._marketTrashIdsBefore = null;
 
     if (this.game.winner) {
       this.phase = "game_over";
