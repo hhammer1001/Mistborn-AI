@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BOT_TYPES, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
 import type { BotSetupConfig } from "../hooks/useMinistryPrefs";
+import type { Room } from "../hooks/useLobby";
 
 // ── Main menu (4 buttons) ──────────────────────────────
 
@@ -109,23 +110,59 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
 
 interface OnlineSetupProps {
   isAuthed: boolean;
+  room: Room | null;
   onBack: () => void;
   onOpenAuth: () => void;
-  onCreateRoom: () => void;
-  onJoinRoom: (code: string) => void;
+  onCreateRoom: () => void | Promise<void>;
+  onJoinRoom: (code: string) => void | Promise<void>;
+  onLeaveRoom: () => void | Promise<void>;
   error?: string | null;
 }
 
 export function OnlineSetupView({
-  isAuthed, onBack, onOpenAuth, onCreateRoom, onJoinRoom, error,
+  isAuthed, room, onBack, onOpenAuth,
+  onCreateRoom, onJoinRoom, onLeaveRoom, error,
 }: OnlineSetupProps) {
   const [code, setCode] = useState("");
+  const [copied, setCopied] = useState(false);
+  const creatingRef = useRef(false);
+
+  // Auto-create a waiting room on entry so the code is ready to share.
+  useEffect(() => {
+    if (!isAuthed) return;
+    if (room) { creatingRef.current = true; return; }
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    void onCreateRoom();
+  }, [isAuthed, room, onCreateRoom]);
+
+  const handleBack = async () => {
+    if (room) await onLeaveRoom();
+    onBack();
+  };
+
+  const handleCopy = async () => {
+    if (!room) return;
+    try {
+      await navigator.clipboard.writeText(room.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable — no-op.
+    }
+  };
+
+  const handleJoin = async () => {
+    if (code.length < 4) return;
+    if (room) await onLeaveRoom();
+    await onJoinRoom(code);
+  };
 
   return (
     <div className="ms-stage-view">
       <div className="ms-setup-card">
         <div className="ms-setup-header">
-          <button className="ms-back-link" onClick={onBack}>← Back</button>
+          <button className="ms-back-link" onClick={handleBack}>← Back</button>
           <div className="ms-setup-title">Play Online</div>
         </div>
 
@@ -139,8 +176,23 @@ export function OnlineSetupView({
         ) : (
           <div className="ms-online-authed">
             {error && <p className="ms-online-error">{error}</p>}
-            <button className="ms-primary-cta" onClick={onCreateRoom}>Create Room</button>
-            <div className="ms-or-row"><span>or join with a code</span></div>
+
+            {room ? (
+              <div className="ms-room-code-block">
+                <p className="ms-online-note">Share this code with a friend:</p>
+                <div className="ms-room-code-row">
+                  <span className="ms-room-code">{room.code}</span>
+                  <button className="ms-copy-code-btn" onClick={handleCopy}>
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+                <p className="ms-waiting-text">Waiting for someone to join...</p>
+              </div>
+            ) : (
+              <p className="ms-online-note">Creating room...</p>
+            )}
+
+            <div className="ms-or-row"><span>or join a different lobby</span></div>
             <div className="ms-join-row">
               <input
                 type="text"
@@ -151,7 +203,7 @@ export function OnlineSetupView({
               />
               <button
                 disabled={code.length < 4}
-                onClick={() => onJoinRoom(code)}
+                onClick={handleJoin}
               >
                 Join
               </button>

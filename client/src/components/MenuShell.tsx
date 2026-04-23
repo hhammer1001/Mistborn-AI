@@ -6,6 +6,7 @@ import { SettingsPopover } from "./SettingsPopover";
 import { FeedbackModal } from "./FeedbackModal";
 import { MainMenuView, BotSetupView, OnlineSetupView } from "./MenuStages";
 import { useMinistryPrefs, type BotSetupConfig } from "../hooks/useMinistryPrefs";
+import type { Room } from "../hooks/useLobby";
 
 type StageView = "menu" | "bot" | "online";
 
@@ -25,8 +26,10 @@ interface Props {
   onViewCards: () => void;
   onViewMinistryLog: () => void;
   // Lobby actions
-  onCreateRoom: () => void;
-  onJoinRoom: (code: string) => void;
+  room: Room | null;
+  onCreateRoom: () => void | Promise<void>;
+  onJoinRoom: (code: string) => void | Promise<void>;
+  onLeaveRoom: () => void | Promise<void>;
   lobbyError?: string | null;
 }
 
@@ -42,8 +45,10 @@ export function MenuShell({
   onStartBot,
   onViewCards,
   onViewMinistryLog,
+  room,
   onCreateRoom,
   onJoinRoom,
+  onLeaveRoom,
   lobbyError,
 }: Props) {
   const prefs = useMinistryPrefs();
@@ -134,10 +139,12 @@ export function MenuShell({
         {view === "online" && (
           <OnlineSetupView
             isAuthed={isAuthed}
+            room={room}
             onBack={() => setView("menu")}
             onOpenAuth={() => setAuthOpen(true)}
             onCreateRoom={onCreateRoom}
             onJoinRoom={onJoinRoom}
+            onLeaveRoom={onLeaveRoom}
             error={lobbyError ?? null}
           />
         )}

@@ -53,10 +53,11 @@ function App() {
   const lobby   = useLobby(auth.user?.id, auth.profile?.name);
   const mpGame  = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
 
-  // Transition menu → lobby when a room appears, and lobby → menu when it clears.
+  // Waiting rooms live inside the menu shell (OnlineSetupView shows the code).
+  // Only promote to the dedicated Lobby view once a guest joins and we hit character select.
   useEffect(() => {
-    if (mode === "menu" && lobby.room) setMode("lobby");
-    else if (mode === "lobby" && !lobby.room) setMode("menu");
+    if (mode === "menu" && lobby.room?.status === "character_select") setMode("lobby");
+    else if (mode === "lobby" && (!lobby.room || lobby.room.status === "waiting")) setMode("menu");
   }, [mode, lobby.room]);
 
   // Transition lobby → mp_game when the room's game starts.
@@ -189,8 +190,10 @@ function App() {
       onStartBot={startBot}
       onViewCards={() => setMode("gallery")}
       onViewMinistryLog={() => { /* not implemented yet */ }}
+      room={lobby.room}
       onCreateRoom={lobby.createRoom}
       onJoinRoom={lobby.joinRoom}
+      onLeaveRoom={lobby.leaveRoom}
       lobbyError={lobby.error}
     />
   );
