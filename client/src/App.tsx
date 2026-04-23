@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 import { useGame } from "./hooks/useGame";
 import { useAuth } from "./hooks/useAuth";
@@ -6,10 +6,9 @@ import { useLobby } from "./hooks/useLobby";
 import { useMultiplayerGame } from "./hooks/useMultiplayerGame";
 import { GameSession } from "./engine/session";
 import { db, id as instantId } from "./lib/instantdb";
-import { GameSetup } from "./components/GameSetup";
 import { CardGallery } from "./components/CardGallery";
-import { AuthScreen } from "./components/AuthScreen";
 import { Lobby } from "./components/Lobby";
+import { MenuShell } from "./components/MenuShell";
 import { WaitingOverlay } from "./components/WaitingOverlay";
 import { Hand } from "./components/Hand";
 import { Market } from "./components/Market";
@@ -26,164 +25,110 @@ import { TurnBanner } from "./components/TurnBanner";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 import { GameOverScreen } from "./components/GameOverScreen";
+import { CHARACTERS } from "./data/ministrySigils";
+import type { BotSetupConfig } from "./hooks/useMinistryPrefs";
 import type { GameState } from "./types/game";
 
-type AppMode = "menu" | "gallery" | "bot_game" | "auth" | "lobby" | "mp_game";
+type AppMode = "menu" | "gallery" | "bot_game" | "lobby" | "mp_game";
+
+function pickRandomChar(): string {
+  return CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+}
+function resolveChar(c: string, avoid?: string): string {
+  if (c !== "Random" && c) return c;
+  let pick = pickRandomChar();
+  if (avoid) {
+    let guard = 0;
+    while (pick === avoid && guard++ < 16) pick = pickRandomChar();
+  }
+  return pick;
+}
 
 function App() {
   const [mode, setMode] = useState<AppMode>("menu");
   const [mpSessionId, setMpSessionId] = useState<string | null>(null);
 
-  // Bot game hook (always active for simplicity, only used in bot_game mode)
   const botGame = useGame();
+  const auth    = useAuth();
+  const lobby   = useLobby(auth.user?.id, auth.profile?.name);
+  const mpGame  = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
 
-  // Auth
-  const auth = useAuth();
+  // Transition menu → lobby when a room appears, and lobby → menu when it clears.
+  useEffect(() => {
+    if (mode === "menu" && lobby.room) setMode("lobby");
+    else if (mode === "lobby" && !lobby.room) setMode("menu");
+  }, [mode, lobby.room]);
 
-  // Lobby (only meaningful when authed)
-  const lobby = useLobby(auth.user?.id, auth.profile?.name);
+  // Transition lobby → mp_game when the room's game starts.
+  useEffect(() => {
+    if (mode === "lobby" && lobby.room?.status === "in_game" && lobby.room.sessionId) {
+      if (mpSessionId !== lobby.room.sessionId) {
+        setMpSessionId(lobby.room.sessionId);
+        setMode("mp_game");
+      }
+    }
+  }, [mode, lobby.room?.status, lobby.room?.sessionId, mpSessionId]);
 
-  // Multiplayer game
-  const mpGame = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
+  const startBot = (cfg: BotSetupConfig, displayName: string) => {
+    const myChar  = resolveChar(cfg.myChar);
+    const oppChar = resolveChar(cfg.oppChar, myChar);
+    botGame.createGame(displayName, myChar, cfg.botType, oppChar, !cfg.youFirst, false);
+    setMode("bot_game");
+  };
 
-  // ── Menu / Gallery ──
-  if (mode === "menu") {
-    return (
-      <GameSetup
-        onStart={(name, char, oppType, oppChar, botFirst, testDeck) => {
-          botGame.createGame(name, char, oppType, oppChar, botFirst, testDeck);
-          setMode("bot_game");
-        }}
-        onViewCards={() => setMode("gallery")}
-        onPlayOnline={() => {
-          if (auth.user) {
-            setMode("lobby");
-          } else {
-            setMode("auth");
-          }
-        }}
-      />
-    );
-  }
+  const handleStartMatchFromLobby = async () => {
+    if (!lobby.room || !auth.user) return;
+    try {
+      const choice = lobby.room.firstPlayer ?? "random";
+      const firstPlayer: 0 | 1 =
+        choice === "host" ? 0
+        : choice === "guest" ? 1
+        : Math.random() < 0.5 ? 0 : 1;
 
+      const hostChar  = resolveChar(lobby.room.hostCharacter);
+      const guestChar = resolveChar(lobby.room.guestCharacter);
+
+      const session = new GameSession({
+        players: [
+          { kind: "human", name: lobby.room.hostName,  character: hostChar },
+          { kind: "human", name: lobby.room.guestName, character: guestChar },
+        ],
+        firstPlayer,
+      });
+
+      const gameId = instantId();
+      const payload = session.getInstantDBPayload();
+
+      await db.transact(
+        db.tx.games[gameId].update({
+          roomId: lobby.room.id,
+          ...payload,
+          p0Id: lobby.room.hostId,
+          p1Id: lobby.room.guestId,
+          stateVersion: 0,
+        })
+      );
+      await db.transact(
+        db.tx.rooms[lobby.room.id].update({
+          status: "in_game",
+          sessionId: gameId,
+        })
+      );
+
+      mpGame.sessionRef.current = session;
+      setMpSessionId(gameId);
+      setMode("mp_game");
+    } catch (e) {
+      console.error("Failed to start game:", e);
+    }
+  };
+
+  // ── Gallery ──
   if (mode === "gallery") {
     return <CardGallery onBack={() => setMode("menu")} />;
   }
 
-  // ── Auth ──
-  if (mode === "auth") {
-    if (auth.isLoading) {
-      return <div className="game-setup"><h1>Loading...</h1></div>;
-    }
-    if (auth.user) {
-      // Already authed, go to lobby
-      setMode("lobby");
-      return null;
-    }
-    return (
-      <AuthScreen
-        onSendCode={async (email) => { await auth.sendMagicCode(email); }}
-        onLogin={async (email, code) => {
-          await auth.verifyMagicCode(email, code);
-          // After login, ensure profile exists — use email prefix as default name
-          const defaultName = email.split("@")[0];
-          auth.ensureProfile(defaultName);
-          setMode("lobby");
-        }}
-        error={auth.error}
-      />
-    );
-  }
-
-  // ── Lobby ──
-  if (mode === "lobby") {
-    // Check if room transitioned to in_game
-    if (lobby.room?.status === "in_game" && lobby.room.sessionId) {
-      if (mpSessionId !== lobby.room.sessionId) {
-        setMpSessionId(lobby.room.sessionId);
-        setMode("mp_game");
-        return null;
-      }
-    }
-
-    const handleStartGame = async () => {
-      if (!lobby.room || !auth.user) return;
-      try {
-        // Resolve first-player choice: "random" rolls at start time.
-        const choice = lobby.room.firstPlayer ?? "random";
-        const firstPlayer: 0 | 1 =
-          choice === "host" ? 0
-          : choice === "guest" ? 1
-          : Math.random() < 0.5 ? 0 : 1;
-
-        // Resolve "Random" characters independently at start time.
-        const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
-        const pickRandom = () => CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
-        const resolveChar = (c: string) => (c === "Random" || !c ? pickRandom() : c);
-        const hostChar = resolveChar(lobby.room.hostCharacter);
-        const guestChar = resolveChar(lobby.room.guestCharacter);
-
-        // Create game session locally
-        const session = new GameSession({
-          players: [
-            { kind: "human", name: lobby.room.hostName, character: hostChar },
-            { kind: "human", name: lobby.room.guestName, character: guestChar },
-          ],
-          firstPlayer,
-        });
-
-        const gameId = instantId();
-        const payload = session.getInstantDBPayload();
-
-        // Write initial state to InstantDB
-        await db.transact(
-          db.tx.games[gameId].update({
-            roomId: lobby.room.id,
-            ...payload,
-            p0Id: lobby.room.hostId,
-            p1Id: lobby.room.guestId,
-            stateVersion: 0,
-          })
-        );
-
-        // Update room status
-        await db.transact(
-          db.tx.rooms[lobby.room.id].update({
-            status: "in_game",
-            sessionId: gameId,
-          })
-        );
-
-        // Store session ref for the active player
-        mpGame.sessionRef.current = session;
-        setMpSessionId(gameId);
-        setMode("mp_game");
-      } catch (e) {
-        console.error("Failed to start game:", e);
-      }
-    };
-
-    return (
-      <Lobby
-        room={lobby.room}
-        myRole={lobby.myRole as "host" | "guest" | null}
-        error={lobby.error}
-        isLoading={lobby.isLoading}
-        onCreateRoom={lobby.createRoom}
-        onJoinRoom={lobby.joinRoom}
-        onSelectCharacter={lobby.selectCharacter}
-        onReady={lobby.setReady}
-        onLeave={() => {
-          lobby.leaveRoom();
-        }}
-        onStartGame={handleStartGame}
-        onBack={() => setMode("menu")}
-        onSetFirstPlayer={lobby.setFirstPlayer}
-      />
-    );
-  }
-
-  // ── Bot Game ──
+  // ── Bot game ──
   if (mode === "bot_game") {
     return (
       <BotGameBoard
@@ -196,23 +141,60 @@ function App() {
     );
   }
 
-  // ── Multiplayer Game ──
+  // ── Multiplayer game ──
   if (mode === "mp_game") {
     return (
       <MultiplayerGameBoard
         game={mpGame}
         onMainMenu={() => {
-          // Exit the match and return to the online lobby home, where the
-          // player can create/join another room without re-logging in.
           setMpSessionId(null);
           lobby.leaveRoom();
-          setMode("lobby");
+          setMode("menu");
         }}
       />
     );
   }
 
-  return null;
+  // ── In-room lobby (waiting / character select) ──
+  if (mode === "lobby" && lobby.room) {
+    return (
+      <Lobby
+        room={lobby.room}
+        myRole={lobby.myRole as "host" | "guest" | null}
+        error={lobby.error}
+        isLoading={lobby.isLoading}
+        onCreateRoom={lobby.createRoom}
+        onJoinRoom={lobby.joinRoom}
+        onSelectCharacter={lobby.selectCharacter}
+        onReady={lobby.setReady}
+        onLeave={() => lobby.leaveRoom()}
+        onStartGame={handleStartMatchFromLobby}
+        onBack={() => setMode("menu")}
+        onSetFirstPlayer={lobby.setFirstPlayer}
+      />
+    );
+  }
+
+  // ── Menu shell (default) ──
+  return (
+    <MenuShell
+      isAuthed={!!auth.user}
+      displayName={auth.profile?.name ?? auth.user?.email?.split("@")[0] ?? null}
+      profileCreatedAt={auth.profile?.createdAt ?? null}
+      authError={auth.error}
+      sendMagicCode={async (email) => { await auth.sendMagicCode(email); }}
+      verifyMagicCode={async (email, code) => { await auth.verifyMagicCode(email, code); }}
+      ensureProfile={auth.ensureProfile}
+      signOut={auth.signOut}
+      onStartBot={startBot}
+      onViewCards={() => setMode("gallery")}
+      onViewMinistryLog={() => { /* not implemented yet */ }}
+      onCreateRoom={lobby.createRoom}
+      onJoinRoom={lobby.joinRoom}
+      lobbyBusy={lobby.isLoading}
+      lobbyError={lobby.error}
+    />
+  );
 }
 
 // ── Bot Game Board (existing behavior, extracted) ──
