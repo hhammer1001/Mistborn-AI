@@ -182,6 +182,7 @@ function matchup(botA: BotName, botB: BotName, numGamesPerMatchup: number) {
           if (game.victoryType in mVt) mVt[game.victoryType]++;
         } catch (e) {
           console.error(`  Error in ${c1} vs ${c2} game ${i}: ${e}`);
+          if (e instanceof Error && e.stack) console.error(e.stack.split("\n").slice(0, 15).join("\n"));
         }
       }
 

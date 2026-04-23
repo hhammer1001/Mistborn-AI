@@ -1,5 +1,5 @@
 import { Player } from "./player";
-import { Ally } from "./card";
+import { Ally, Card } from "./card";
 import { PlayerDeck, Market } from "./deck";
 import { Mission } from "./mission";
 import { MISSION_TIERS, ALL_MISSION_NAMES, METAL_NAMES } from "./types";
@@ -156,6 +156,43 @@ export class Game {
         p.toJSON(perspective === null || p.turnOrder === perspective, perspective === null)
       ),
     };
+  }
+
+  /** Deep-clone for lookahead simulation. All cards, decks, missions, and
+   *  players are new instances; mutations on the clone don't affect the
+   *  original. Card `id`s are preserved to allow cross-reference lookups.
+   *  Optional `playerFactory` lets callers swap Player subclasses (e.g. to
+   *  use a scripted decision player during simulation). The factory must
+   *  populate the new player's state — `copyPlayerState` from player.ts is
+   *  the intended helper. */
+  clone(playerFactory?: (original: Player, deck: PlayerDeck, newGame: Game, cardMap: Map<number, Card>) => Player): Game {
+    const g = Object.create(Game.prototype) as Game;
+    g.victoryType = this.victoryType;
+    g.testDeck = this.testDeck;
+    g.metalCodes = [...this.metalCodes];
+    g.numPlayers = this.numPlayers;
+    g.turncount = this.turncount;
+    g.winner = null;
+    g.characters = [...this.characters];
+    g.missionNames = [...this.missionNames];
+
+    const cardMap = new Map<number, Card>();
+    g.market = this.market.clone(cardMap);
+    g.missions = this.missions.map((m) => m.clone(g));
+
+    g.decks = this.decks.map((d) => d.clone(cardMap));
+    g.players = this.players.map((p, i) => {
+      const clonedDeck = g.decks[i];
+      if (playerFactory) return playerFactory(p, clonedDeck, g, cardMap);
+      return p.clone(g, clonedDeck, cardMap);
+    });
+
+    // Rewire winner reference if the game was already won.
+    if (this.winner) {
+      g.winner = g.players[this.winner.turnOrder];
+    }
+
+    return g;
   }
 
   // ── Helpers ──

@@ -13,6 +13,14 @@ function shuffle<T>(arr: T[]): T[] {
 
 // ── Base Deck ──
 
+function cloneThrough(original: Card, cardMap: Map<number, Card>): Card {
+  const existing = cardMap.get(original.id);
+  if (existing) return existing;
+  const cloned = original.clone();
+  cardMap.set(original.id, cloned);
+  return cloned;
+}
+
 export class Deck {
   hand: Card[] = [];
   cards: Card[] = [];
@@ -124,6 +132,15 @@ export class PlayerDeck extends Deck {
   add(card: Card) {
     this.discard.push(card);
   }
+
+  clone(cardMap: Map<number, Card>): PlayerDeck {
+    const d = Object.create(PlayerDeck.prototype) as PlayerDeck;
+    d.hand = this.hand.map((c) => cloneThrough(c, cardMap));
+    d.cards = this.cards.map((c) => cloneThrough(c, cardMap));
+    d.discard = this.discard.map((c) => cloneThrough(c, cardMap));
+    d.setAside = this.setAside.map((c) => cloneThrough(c, cardMap));
+    return d;
+  }
 }
 
 // ── Market ──
@@ -158,5 +175,14 @@ export class Market extends Deck {
       this.hand.splice(idx, 1);
     }
     this.draw(1);
+  }
+
+  clone(cardMap: Map<number, Card>): Market {
+    const m = Object.create(Market.prototype) as Market;
+    m.hand = this.hand.map((c) => cloneThrough(c, cardMap));
+    m.cards = this.cards.map((c) => cloneThrough(c, cardMap));
+    m.discard = this.discard.map((c) => cloneThrough(c, cardMap));
+    m.setAside = this.setAside.map((c) => cloneThrough(c, cardMap));
+    return m;
   }
 }

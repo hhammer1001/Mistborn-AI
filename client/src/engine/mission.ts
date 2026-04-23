@@ -39,6 +39,15 @@ export class Mission {
     this.game.missionVictoryCheck(playerNum);
   }
 
+  clone(newGame: Game): Mission {
+    const m = Object.create(Mission.prototype) as Mission;
+    m.name = this.name;
+    m.tiers = this.tiers;
+    m.playerRanks = [...this.playerRanks];
+    (m as unknown as { game: Game }).game = newGame;
+    return m;
+  }
+
   toJSON() {
     return {
       name: this.name,
