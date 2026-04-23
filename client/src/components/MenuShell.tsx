@@ -27,7 +27,6 @@ interface Props {
   // Lobby actions
   onCreateRoom: () => void;
   onJoinRoom: (code: string) => void;
-  lobbyBusy?: boolean;
   lobbyError?: string | null;
 }
 
@@ -45,7 +44,6 @@ export function MenuShell({
   onViewMinistryLog,
   onCreateRoom,
   onJoinRoom,
-  lobbyBusy,
   lobbyError,
 }: Props) {
   const prefs = useMinistryPrefs();
@@ -140,7 +138,6 @@ export function MenuShell({
             onOpenAuth={() => setAuthOpen(true)}
             onCreateRoom={onCreateRoom}
             onJoinRoom={onJoinRoom}
-            busy={lobbyBusy}
             error={lobbyError ?? null}
           />
         )}

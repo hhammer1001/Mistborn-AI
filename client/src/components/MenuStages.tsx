@@ -113,12 +113,11 @@ interface OnlineSetupProps {
   onOpenAuth: () => void;
   onCreateRoom: () => void;
   onJoinRoom: (code: string) => void;
-  busy?: boolean;
   error?: string | null;
 }
 
 export function OnlineSetupView({
-  isAuthed, onBack, onOpenAuth, onCreateRoom, onJoinRoom, busy, error,
+  isAuthed, onBack, onOpenAuth, onCreateRoom, onJoinRoom, error,
 }: OnlineSetupProps) {
   const [code, setCode] = useState("");
 
@@ -140,9 +139,7 @@ export function OnlineSetupView({
         ) : (
           <div className="ms-online-authed">
             {error && <p className="ms-online-error">{error}</p>}
-            <button className="ms-primary-cta" onClick={onCreateRoom} disabled={busy}>
-              {busy ? "Creating…" : "Create Room"}
-            </button>
+            <button className="ms-primary-cta" onClick={onCreateRoom}>Create Room</button>
             <div className="ms-or-row"><span>or join with a code</span></div>
             <div className="ms-join-row">
               <input
@@ -153,7 +150,7 @@ export function OnlineSetupView({
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
               />
               <button
-                disabled={busy || code.length < 4}
+                disabled={code.length < 4}
                 onClick={() => onJoinRoom(code)}
               >
                 Join

@@ -191,7 +191,6 @@ function App() {
       onViewMinistryLog={() => { /* not implemented yet */ }}
       onCreateRoom={lobby.createRoom}
       onJoinRoom={lobby.joinRoom}
-      lobbyBusy={lobby.isLoading}
       lobbyError={lobby.error}
     />
   );
