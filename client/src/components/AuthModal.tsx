@@ -70,8 +70,10 @@ export function AuthModal({ open, onClose, onSendCode, onVerify, onContinueAsGue
 
   const errMsg = localError ?? error?.message ?? null;
 
+  if (!open) return null;
+
   return (
-    <div className={`ms-modal-backdrop${open ? " open" : ""}`} onClick={handleBackdropClick}>
+    <div className="ms-modal-backdrop open" onClick={handleBackdropClick}>
       <div className="ms-modal" onClick={(e) => e.stopPropagation()}>
         <h2>Open a File</h2>
         <p className="sub">The Ministry keeps record of every match, victory, and defeat.</p>
