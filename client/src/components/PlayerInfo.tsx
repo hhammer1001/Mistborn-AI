@@ -5,6 +5,7 @@ import { METAL_ICONS } from "../data/metalIcons";
 import { CardPileOverlay } from "./CardPileOverlay";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { OpponentDetailPopup, CharacterCardPopup } from "./OpponentDetailPopup";
+import { MetalChoicePopup } from "./MetalChoicePopup";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 const CHARACTER_METAL: Record<string, number> = {
@@ -96,6 +97,8 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
   const [showTrash, setShowTrash] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showCharCard, setShowCharCard] = useState(false);
+  const [showAbility3Choice, setShowAbility3Choice] = useState(false);
+  const ability3BtnRef = useRef<HTMLButtonElement>(null);
   const charAbilityAction = actions?.find((a) => a.code === 10);
   const thirdAbilityAction = actions?.find((a) => a.code === 11);
 
@@ -293,8 +296,9 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                 {showAbility3 && (() => {
                   const ready = thirdAbilityAction; // code 11 exists
                   const used = !player.charAbility3;
-                  const burnAction = actions?.find((a) => a.code === 5 && a.metalIndex === 8);
-                  const canBurn = !!burnAction;
+                  const burnAtiumAction = actions?.find((a) => a.code === 5 && a.metalIndex === 8);
+                  const atiumAsActions = actions?.filter((a) => a.code === 12) ?? [];
+                  const canBurn = !!burnAtiumAction;
 
                   if (used) {
                     return <button className="action-btn disabled" disabled>Ability III (used)</button>;
@@ -303,16 +307,34 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                     return <button className="action-btn" onClick={() => onAction!(ready.index)}>Use Ability III</button>;
                   }
                   if (canBurn && onCompositeAction) {
+                    const handleChoose = (metalIndex: number) => {
+                      const act = metalIndex === 8
+                        ? burnAtiumAction
+                        : atiumAsActions.find((a) => a.metalIndex === metalIndex);
+                      if (act) onCompositeAction(act.index, { code: 11 });
+                    };
                     return (
-                      <button
-                        className="action-btn"
-                        onClick={() => onCompositeAction(burnAction!.index, { code: 11 })}
-                      >
-                        Burn + Ability III
-                      </button>
+                      <>
+                        <button
+                          ref={ability3BtnRef}
+                          className="action-btn"
+                          onClick={() => setShowAbility3Choice(true)}
+                        >
+                          Burn atium + Ability III
+                        </button>
+                        {showAbility3Choice && (
+                          <MetalChoicePopup
+                            title="Burn atium as..."
+                            anchorRef={ability3BtnRef}
+                            onChoose={handleChoose}
+                            onClose={() => setShowAbility3Choice(false)}
+                          />
+                        )}
+                      </>
                     );
                   }
-                  return <button className="action-btn disabled" disabled>Ability III (no atium)</button>;
+                  const reason = player.atium === 0 ? "no atium token" : "no burns";
+                  return <button className="action-btn disabled" disabled>Ability III ({reason})</button>;
                 })()}
               </div>
             );
