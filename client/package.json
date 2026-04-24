@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "schema:pull": "instant-cli pull schema --app \"$(grep '^VITE_INSTANTDB_APP_ID=' .env | cut -d= -f2)\"",
+    "schema:push": "instant-cli push schema --app \"$(grep '^VITE_INSTANTDB_APP_ID=' .env | cut -d= -f2)\"",
+    "schema:login": "instant-cli login"
   },
   "dependencies": {
     "@instantdb/react": "^1.0.1",
@@ -24,6 +27,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "instant-cli": "^1.0.17",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4"
