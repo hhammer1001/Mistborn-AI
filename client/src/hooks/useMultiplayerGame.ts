@@ -4,6 +4,7 @@ import type { GameState } from "../types/game";
 import type { LogEntry } from "./useGame";
 import { useTurnSideEffects } from "./useTurnSideEffects";
 import { GameSession } from "../engine/session";
+import { saveMatchRecord, type MatchIdentity } from "../lib/matchLog";
 
 /**
  * Multiplayer game hook.
@@ -24,6 +25,16 @@ export function useMultiplayerGame(
 
   // The HOST holds the session in memory
   const sessionRef = useRef<GameSession | null>(null);
+
+  // Match-log: host writes exactly once at game_over.
+  const matchWrittenRef = useRef(false);
+  const startedAtRef = useRef<number | null>(null);
+
+  // Reset match-write state when the session changes (new game).
+  useEffect(() => {
+    matchWrittenRef.current = false;
+    startedAtRef.current = null;
+  }, [sessionId]);
 
   // Subscribe to the game record in InstantDB
   const gameQuery = db.useQuery(
@@ -308,14 +319,31 @@ export function useMultiplayerGame(
     [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
-  const forfeit = useCallback(() => {
+  const forfeit = useCallback(async () => {
     if (myPlayerIndex === null) return;
     if (isHost) {
-      _hostAction((s) => { s.forfeit(myPlayerIndex); return null; });
+      // Host path: apply locally, write the match-log record synchronously
+      // (before any unmount), then push state so the guest sees game_over.
+      const session = sessionRef.current;
+      if (!session || !sessionId) return;
+      session.forfeit(myPlayerIndex);
+      await writeMatchAsHost();
+      try {
+        const payload = session.getInstantDBPayload();
+        await db.transact(
+          db.tx.games[sessionId].update({
+            ...payload,
+            pendingAction: null,
+            stateVersion: ((gameRecord?.stateVersion as number) ?? 0) + 1,
+          })
+        );
+      } catch (e) {
+        console.error("Forfeit state push failed:", e);
+      }
     } else {
-      _guestAction({ actionType: "forfeit" });
+      await _guestAction({ actionType: "forfeit" });
     }
-  }, [isHost, myPlayerIndex, _hostAction, _guestAction]);
+  }, [isHost, myPlayerIndex, sessionId, gameRecord, _guestAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const undo = useCallback(() => {
     if (myPlayerIndex === null) return;
@@ -330,6 +358,59 @@ export function useMultiplayerGame(
   // it's the active player's turn AND the session's undo preconditions pass
   // (snapshot stack non-empty, not dirty, phase=actions).
   const canUndo = gameState?.canUndo ?? false;
+
+  // Capture start timestamp on first gameRecord load.
+  useEffect(() => {
+    if (gameRecord && startedAtRef.current === null) {
+      startedAtRef.current = Date.now();
+    }
+  }, [gameRecord]);
+
+  /** Host-only: write the finished-match record exactly once. Safe to call
+   *  from both the natural game-over effect and the forfeit() path. */
+  const writeMatchAsHost = useCallback(async () => {
+    if (!isHost) return;
+    if (matchWrittenRef.current) return;
+    const session = sessionRef.current;
+    if (!session || !session.game.winner) return;
+    if (!gameRecord) return;
+
+    matchWrittenRef.current = true;
+    const hostUserId  = String(gameRecord.p0Id ?? "");
+    const guestUserId = String(gameRecord.p1Id ?? "");
+
+    let hostProfileId  = "";
+    let guestProfileId = "";
+    try {
+      const result = await db.queryOnce({
+        profiles: { $: { where: { odib: { $in: [hostUserId, guestUserId] } } } },
+      });
+      const profiles = (result.data?.profiles ?? []) as Array<{ id: string; odib: string }>;
+      hostProfileId  = profiles.find((p) => p.odib === hostUserId)?.id  ?? "";
+      guestProfileId = profiles.find((p) => p.odib === guestUserId)?.id ?? "";
+    } catch (e) {
+      console.error("Profile lookup failed for match log; continuing without profileIds:", e);
+    }
+
+    const identities: [MatchIdentity, MatchIdentity] = [
+      { profileId: hostProfileId,  userId: hostUserId,  name: session.players[0].name },
+      { profileId: guestProfileId, userId: guestUserId, name: session.players[1].name },
+    ];
+
+    await saveMatchRecord({
+      session,
+      kind: "mp",
+      botStrategy: "",
+      startedAt: startedAtRef.current ?? Date.now(),
+      testDeck: false,
+      identities,
+    });
+  }, [isHost, gameRecord]);
+
+  // Host writes the match-log record once the game phase is game_over.
+  useEffect(() => {
+    if (gameState?.phase === "game_over") void writeMatchAsHost();
+  }, [gameState?.phase, writeMatchAsHost]);
 
   return {
     gameState,

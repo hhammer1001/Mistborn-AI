@@ -73,7 +73,12 @@ function App() {
   const startBot = (cfg: BotSetupConfig, displayName: string) => {
     const myChar  = resolveChar(cfg.myChar);
     const oppChar = resolveChar(cfg.oppChar, myChar);
-    botGame.createGame(displayName, myChar, cfg.botType, oppChar, !cfg.youFirst, false);
+    const humanIdentity = {
+      profileId: auth.profile?.id ?? "",
+      userId:    auth.user?.id ?? "",
+      name:      displayName,
+    };
+    botGame.createGame(displayName, myChar, cfg.botType, oppChar, !cfg.youFirst, false, humanIdentity);
     setMode("bot_game");
   };
 
@@ -208,7 +213,7 @@ function BotGameBoard({
   game: ReturnType<typeof useGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo, forfeit } = game;
 
   const handleAction = (index: number) => {
     if (!loading) playAction(index);
@@ -254,6 +259,7 @@ function BotGameBoard({
         resolveCloud={resolveCloud}
         respondToPrompt={respondToPrompt}
         onMainMenu={onMainMenu}
+        onForfeit={forfeit}
         onUndo={undo}
         canUndo={canUndo}
       />
@@ -377,7 +383,7 @@ function GameBoard({
   resolveCloud: (cardId: number) => unknown;
   respondToPrompt: (type: string, value: number) => unknown;
   onMainMenu: () => void;
-  onForfeit?: () => void;
+  onForfeit?: () => void | Promise<void>;
   isMultiplayer?: boolean;
   onUndo?: () => void;
   canUndo?: boolean;
@@ -451,12 +457,11 @@ function GameBoard({
               ↶ Undo
             </button>
           )}
-          <button className="main-menu-btn" onClick={() => {
-            // In multiplayer, leaving an in-progress match = forfeit. The
-            // Leave Match button doubles as the forfeit trigger (prior
-            // separate Forfeit button removed for redundancy).
-            if (isMultiplayer && onForfeit && gameState.phase !== "game_over") {
-              onForfeit();
+          <button className="main-menu-btn" onClick={async () => {
+            // Leaving an in-progress match = forfeit. Await so the match-log
+            // write lands before the component unmounts.
+            if (onForfeit && gameState.phase !== "game_over") {
+              await onForfeit();
             }
             onMainMenu();
           }}>

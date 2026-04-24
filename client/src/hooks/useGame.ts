@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
 import { GameSession, opponentTypeToKind } from "../engine/session";
 import { resetCardIds } from "../engine/card";
 import { useTurnSideEffects, computeRecap, type TurnRecap } from "./useTurnSideEffects";
+import { saveMatchRecord, botIdentity, type MatchIdentity } from "../lib/matchLog";
 
 // Re-export TurnRecap so existing consumers (LogEntry shape, components)
 // keep working without changing imports.
@@ -70,6 +71,15 @@ export function useGame() {
   const botName = useRef("Bot");
   const sessionRef = useRef<GameSession | null>(null);
 
+  // Match-log metadata, populated at createGame, consumed on game_over.
+  const matchMetaRef = useRef<{
+    startedAt: number;
+    botStrategy: string;
+    testDeck: boolean;
+    humanIdentity: MatchIdentity;
+  } | null>(null);
+  const matchWrittenRef = useRef(false);
+
   // Single-player perspective is always 0 and isMyTurn is conceptually always
   // true (bot turns run synchronously inside our action calls). The shared
   // hook still detects new bot-log entries → flashes and uses prev/next state
@@ -107,7 +117,8 @@ export function useGame() {
       opponentType: string,
       opponentCharacter: string,
       botFirst: boolean = true,
-      testDeck: boolean = false
+      testDeck: boolean = false,
+      humanIdentity: MatchIdentity = { profileId: "", userId: "", name: pName }
     ) => {
       setLoading(true);
       setError(null);
@@ -115,6 +126,15 @@ export function useGame() {
       clearRecapEntries();
       playerName.current = pName;
       botName.current = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
+
+      // Reset match-log guard + capture start metadata for end-of-game write.
+      matchWrittenRef.current = false;
+      matchMetaRef.current = {
+        startedAt: Date.now(),
+        botStrategy: opponentType,
+        testDeck,
+        humanIdentity: { ...humanIdentity, name: humanIdentity.name || pName },
+      };
 
       try {
         resetCardIds();
@@ -511,6 +531,39 @@ export function useGame() {
     setGameState(session.getState(0) as unknown as GameState);
   }, []);
 
+  const writeMatchIfNeeded = useCallback(async () => {
+    if (matchWrittenRef.current) return;
+    const session = sessionRef.current;
+    const meta = matchMetaRef.current;
+    if (!session || !meta || !session.game.winner) return;
+    matchWrittenRef.current = true;
+    const bot = botIdentity(meta.botStrategy);
+    await saveMatchRecord({
+      session,
+      kind: "bot",
+      botStrategy: meta.botStrategy,
+      startedAt: meta.startedAt,
+      testDeck: meta.testDeck,
+      identities: [meta.humanIdentity, bot],
+    });
+  }, []);
+
+  // Write the match record exactly once, as soon as the phase resolves to
+  // game_over — covers natural ends and the forfeit() path below.
+  useEffect(() => {
+    if (gameState?.phase === "game_over") void writeMatchIfNeeded();
+  }, [gameState?.phase, writeMatchIfNeeded]);
+
+  /** Mark the human as the forfeiter, end the game, and persist the record. */
+  const forfeit = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session) return;
+    if (session.phase === "game_over") return;
+    session.forfeit(0); // human is always player 0 in bot games
+    setGameState(session.getState(0) as unknown as GameState);
+    await writeMatchIfNeeded();
+  }, [writeMatchIfNeeded]);
+
   return {
     gameState,
     loading,
@@ -533,5 +586,6 @@ export function useGame() {
     refreshState,
     undo,
     canUndo: gameState?.canUndo ?? false,
+    forfeit,
   };
 }

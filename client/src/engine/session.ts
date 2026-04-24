@@ -172,6 +172,8 @@ export class GameSession {
   players: Player[];
   playerKinds: PlayerKind[];
   activePlayer: 0 | 1 = 0;
+  /** The player who went first (set at construction, never mutated). */
+  firstPlayer: 0 | 1 = 0;
   phase: GamePhase = "actions";
 
   // Prompt / replay state
@@ -223,6 +225,7 @@ export class GameSession {
     this.players = this.game.players;
 
     const first = opts.firstPlayer ?? 0;
+    this.firstPlayer = first;
     this.activePlayer = first;
     this.game.turncount = 1;
 

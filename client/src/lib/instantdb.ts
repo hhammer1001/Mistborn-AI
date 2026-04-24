@@ -49,6 +49,53 @@ const schema = i.schema({
       // Guest action queue: guest writes here, host processes and clears
       pendingAction: i.any(), // { type, playerId, ...params } or null
     }),
+    // ── Finished-match log ─────────────────────────────────────────
+    // Written after each game ends (natural end or forfeit). Enables
+    // history/stat queries without re-reading the running `games` row.
+    matches: i.entity({
+      kind: i.string().indexed(),          // "mp" | "bot"
+      botStrategy: i.string(),             // "squash" | "twonky" | ... | "" for mp
+      createdAt: i.number().indexed(),     // match start timestamp
+      endedAt: i.number(),
+      durationMs: i.number(),
+      turnCount: i.number(),
+      firstPlayerIndex: i.number(),        // 0 | 1
+      winnerIndex: i.number(),             // 0 | 1 (forfeits: non-forfeiter)
+      victoryType: i.string().indexed(),   // "M" | "D" | "C" | "F"
+      forfeiter: i.number(),               // 0 | 1 | -1 (-1 = natural end)
+      missionNames: i.any(),               // string[]
+      testDeck: i.boolean(),
+    }),
+    // One row per player per match. Keeps user-scoped queries cheap
+    // and opens the door to per-character / per-card stats.
+    matchPlayers: i.entity({
+      matchId: i.string().indexed(),
+      playerIndex: i.number(),             // 0 | 1
+      profileId: i.string().indexed(),     // "__bot__" sentinel for bot side, "" for guest
+      userId: i.string().indexed(),        // "" for bot or unauthed guest
+      name: i.string(),
+      character: i.string().indexed(),
+      isBot: i.boolean(),
+
+      // Final numeric state
+      damage: i.number(),
+      mission: i.number(),
+      training: i.number(),
+      burns: i.number(),
+      atium: i.number(),
+
+      // Per-metal counts (9 slots, in engine METAL_NAMES order)
+      metalTokens: i.any(),
+      metalAvailable: i.any(),
+      metalBurned: i.any(),
+
+      // Per-mission progress, aligned with matches.missionNames
+      missionRanks: i.any(),               // number[]
+
+      // Final deck composition as name->count (allies folded in).
+      // Enables queries like "matches where Yeden was in the deck".
+      finalDeck: i.any(),                  // Record<string, number>
+    }),
   },
 });
 
