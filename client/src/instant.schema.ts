@@ -54,6 +54,14 @@ const _schema = i.schema({
       sessionId: i.any().optional(),
       status: i.string().indexed().optional(),
     }),
+    profiles: i.entity({
+      odib: i.string().unique().indexed().optional(),
+      name: i.string().optional(),
+      wins: i.number().optional(),
+      losses: i.number().optional(),
+      draws: i.number().optional(),
+      createdAt: i.number().optional(),
+    }),
     matches: i.entity({
       kind: i.string().indexed(),
       botStrategy: i.string(),
