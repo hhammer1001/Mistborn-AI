@@ -72,34 +72,26 @@ export function useGame() {
   const botName = useRef("Bot");
   const sessionRef = useRef<GameSession | null>(null);
 
-  // Stack of rawLog lengths parallel to session._undoStack. Each entry is the
-  // rawLog.length BEFORE a user-initiated undoable sequence began; on undo we
-  // pop and slice rawLog back to it. This handles single actions, prompt-driven
-  // actions (where the engine pushes only on prompt resolution), and composite
-  // playTwoActions (one engine entry, multiple hook entries) uniformly.
-  const undoLogLensRef = useRef<number[]>([]);
-  const pendingPushLenRef = useRef<number | null>(null);
-  const inCompositeRef = useRef(false);
+  // Synchronous mirror of rawLog. Read this — not the rawLog state — when
+  // you need the *current* length within an event handler, before React has
+  // flushed pending setRawLog updates. Updated atomically by appendLog().
+  const rawLogRef = useRef<LogEntry[]>([]);
 
-  /** Reconcile undoLogLensRef to the engine's current undo stack length.
-   *  When the engine's stack grows, push pendingPushLenRef (the rawLog length
-   *  captured before the operation that caused the growth). When it shrinks
-   *  (undo, end_actions clearing it), pop.
-   *
-   *  pendingPushLenRef is only cleared after we actually consume it for a
-   *  push — otherwise a prompt-triggering playAction (which doesn't grow the
-   *  stack until respondToPrompt completes) would lose its captured length. */
-  const syncUndoLogLens = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session) return;
-    const target = session.undoStackLength();
-    while (undoLogLensRef.current.length > target) undoLogLensRef.current.pop();
-    if (undoLogLensRef.current.length < target) {
-      while (undoLogLensRef.current.length < target) {
-        undoLogLensRef.current.push(pendingPushLenRef.current ?? 0);
-      }
-      pendingPushLenRef.current = null;
-    }
+  /** Append entries to rawLog, updating both the synchronous ref and React
+   *  state. Use this everywhere rawLog grows so subsequent code in the same
+   *  event handler sees the new length immediately. */
+  const appendLog = useCallback((newEntries: LogEntry[]) => {
+    if (newEntries.length === 0) return;
+    const next = consolidateLog([...rawLogRef.current, ...newEntries]);
+    rawLogRef.current = next;
+    setRawLog(next);
+  }, []);
+
+  /** Truncate rawLog to the given length (used by undo). */
+  const truncateLog = useCallback((length: number) => {
+    const next = rawLogRef.current.slice(0, length);
+    rawLogRef.current = next;
+    setRawLog(next);
   }, []);
 
   // Match-log metadata, populated at createGame, consumed on game_over.
@@ -154,10 +146,8 @@ export function useGame() {
       setLoading(true);
       setError(null);
       setRawLog([]);
+      rawLogRef.current = [];
       clearRecapEntries();
-      undoLogLensRef.current = [];
-      pendingPushLenRef.current = null;
-      inCompositeRef.current = false;
       playerName.current = pName;
       botName.current = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
 
@@ -227,6 +217,7 @@ export function useGame() {
         if (data.turnCount > 1) {
           initLog.push({ turn: data.turnCount, text: `${pName}'s turn` });
         }
+        rawLogRef.current = initLog;
         setRawLog(initLog);
         return data;
       } catch (e) {
@@ -251,9 +242,11 @@ export function useGame() {
 
       setError(null);
 
-      // Capture rawLog length before this action so undo can slice back to it.
-      // Inside a composite (playTwoActions), the outer wrapper owns this.
-      if (!inCompositeRef.current) pendingPushLenRef.current = rawLog.length;
+      // Tag the snapshot the engine is about to take with our current rawLog
+      // length. Whether the action completes immediately or via prompt, the
+      // same snapshot is what undo eventually restores — so the tag travels
+      // with it and tells us where to slice rawLog back to.
+      session.setNextSnapshotData(rawLogRef.current.length);
 
       try {
         const data = session.playAction(0, actionIndex) as SessionResult;
@@ -295,16 +288,15 @@ export function useGame() {
         // End-actions that just enter damage phase (no bot entries) skip this.
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
-          setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+          appendLog(newEntries);
         });
-        if (!inCompositeRef.current) syncUndoLogLens();
         return data;
       } catch (e) {
         setError(String(e));
         return null;
       }
     },
-    [gameState, syncUndoLogLens, applyBehindBanner, rawLog]
+    [gameState, appendLog, applyBehindBanner]
   );
 
   const advanceAllMission = useCallback(
@@ -332,11 +324,12 @@ export function useGame() {
     (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => {
       const session = sessionRef.current;
       if (!session) return null;
-      // Composite collapses to one engine undo entry; capture rawLog length
-      // before the first play so undo rolls back BOTH inner action's hook
-      // entries together.
-      pendingPushLenRef.current = rawLog.length;
-      inCompositeRef.current = true;
+      // Tag the batch's snapshot with the pre-composite rawLog length. Each
+      // inner playAction also tags its own snapshot — those get popped in
+      // endUndoBatch, EXCEPT when an inner triggers a prompt (its kept
+      // _preActionSnapshot lands on the stack via respondToPrompt later, and
+      // carries its own tag — the post-burn length).
+      session.setNextSnapshotData(rawLogRef.current.length);
       session.beginUndoBatch();
       try {
         const first = playAction(firstIndex) as unknown as SessionResult | null;
@@ -348,8 +341,6 @@ export function useGame() {
         return playAction(second.index);
       } finally {
         session.endUndoBatch();
-        inCompositeRef.current = false;
-        syncUndoLogLens();
       }
     },
     [playAction]
@@ -391,20 +382,15 @@ export function useGame() {
 
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
-          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+          appendLog(newEntries);
         });
-        // Engine pushes the undo snapshot only when a prompted action completes
-        // (not during the playAction that triggered the prompt). Sync here so
-        // pendingPushLenRef — captured at that earlier playAction — lands on
-        // the parallel stack at the right moment.
-        syncUndoLogLens();
         return data;
       } catch (e) {
         setError(String(e));
         return null;
       }
     },
-    [gameState, applyBehindBanner, syncUndoLogLens]
+    [gameState, applyBehindBanner, appendLog]
   );
 
   const assignDamage = useCallback(
@@ -455,18 +441,15 @@ export function useGame() {
 
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
-          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+          appendLog(newEntries);
         });
-        // Damage phase doesn't produce undo entries, but end_actions clears
-        // the engine's stack — sync so the parallel stack drains too.
-        syncUndoLogLens();
         return data;
       } catch (e) {
         setError(String(e));
         return null;
       }
     },
-    [gameState, applyBehindBanner, syncUndoLogLens]
+    [gameState, applyBehindBanner, appendLog]
   );
 
   const resolveSense = useCallback(
@@ -506,12 +489,11 @@ export function useGame() {
         }
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
-          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+          appendLog(newEntries);
         });
-        syncUndoLogLens();
         return data;
       } catch (e) { setError(String(e)); return null; }
-    }, [gameState, applyBehindBanner, syncUndoLogLens]
+    }, [gameState, applyBehindBanner, appendLog]
   );
 
   const resolveCloud = useCallback(
@@ -543,33 +525,27 @@ export function useGame() {
         }
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
-          if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
+          appendLog(newEntries);
         });
-        syncUndoLogLens();
         return data;
       } catch (e) { setError(String(e)); return null; }
-    }, [gameState, applyBehindBanner, syncUndoLogLens]
+    }, [gameState, applyBehindBanner, appendLog]
   );
 
   const undo = useCallback(() => {
     const session = sessionRef.current;
     if (!session || !session.canUndo()) return;
 
-    // Read the rawLog length captured before the action being undone, then
-    // pop it off the parallel stack (session.undo drops the engine entry).
-    const targetLen = undoLogLensRef.current[undoLogLensRef.current.length - 1];
+    // Read the externalData tag (rawLog length) off the snapshot at the top
+    // of the undo stack — i.e. the one undo() is about to restore.
+    const targetLen = session.peekUndoData();
 
     const ok = session.undo();
     if (!ok) return;
 
-    const data = session.getState(0) as unknown as GameState;
-    setGameState(data);
-    syncUndoLogLens();
-
-    if (typeof targetLen === "number") {
-      setRawLog((prev) => prev.slice(0, targetLen));
-    }
-  }, [syncUndoLogLens]);
+    setGameState(session.getState(0) as unknown as GameState);
+    if (typeof targetLen === "number") truncateLog(targetLen);
+  }, [truncateLog]);
 
   const refreshState = useCallback(() => {
     const session = sessionRef.current;

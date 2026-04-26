@@ -114,6 +114,10 @@ interface GameSnapshot {
    *  were appended during the action(s) being rolled back. Works for
    *  single actions and composite (multi-step) actions alike. */
   logLengths: [number, number];
+  /** Optional bookkeeping value the caller can attach to a snapshot via
+   *  `setNextSnapshotData`. Used by the hook to record its own pre-action
+   *  log length so undo can roll back UI state alongside engine state. */
+  externalData?: number;
 }
 
 // ── Snapshot helpers for effect logging ──
@@ -193,6 +197,9 @@ export class GameSession {
   // Snapshot-based prompt rollback and undo
   private _preActionSnapshot: GameSnapshot | null = null;
   private _undoStack: GameSnapshot[] = [];
+  // Optional caller-provided value attached to the next snapshot taken.
+  // Cleared on read so successive snapshots don't inherit stale data.
+  private _nextSnapshotData: number | null = null;
   private _dirty = false;
   private _playerSnapBefore: PSnap | null = null;
   private _missionBefore = 0;
@@ -297,6 +304,8 @@ export class GameSession {
       }
       cardStates.set(c.id, s);
     }
+    const externalData = this._nextSnapshotData;
+    this._nextSnapshotData = null;
     return {
       winnerIndex: winner ? winner.turnOrder : null,
       victoryType: this.game.victoryType,
@@ -309,6 +318,7 @@ export class GameSession {
       cardStates,
       hiddenCardIds: this._hiddenCardIds(this.activePlayer),
       logLengths: [this._logs[0].length, this._logs[1].length],
+      ...(externalData !== null ? { externalData } : {}),
     };
   }
 
@@ -401,11 +411,20 @@ export class GameSession {
     );
   }
 
-  /** Number of undo entries currently on the stack. Lets external bookkeeping
-   *  (e.g. a hook tracking rawLog lengths in parallel) reconcile after each
-   *  session call without peeking at private state. */
-  undoStackLength(): number {
-    return this._undoStack.length;
+  /** Tag the next snapshot taken (by playAction, beginUndoBatch, or
+   *  playComposite) with a caller-provided value. Used by the UI hook to
+   *  record its own pre-action log length so undo can roll back UI state
+   *  alongside engine state. Cleared on read; set fresh each time. */
+  setNextSnapshotData(data: number | null): void {
+    this._nextSnapshotData = data;
+  }
+
+  /** Read the externalData of the snapshot at the top of the undo stack —
+   *  i.e. what undo() will restore to. Returns null if the stack is empty
+   *  or the top snapshot wasn't tagged. */
+  peekUndoData(): number | null {
+    const top = this._undoStack[this._undoStack.length - 1];
+    return top?.externalData ?? null;
   }
 
   /** Open a batch so subsequent playAction calls collapse to one undo entry. */
