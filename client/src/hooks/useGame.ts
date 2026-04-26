@@ -84,16 +84,22 @@ export function useGame() {
   /** Reconcile undoLogLensRef to the engine's current undo stack length.
    *  When the engine's stack grows, push pendingPushLenRef (the rawLog length
    *  captured before the operation that caused the growth). When it shrinks
-   *  (undo, end_actions clearing it), pop. */
+   *  (undo, end_actions clearing it), pop.
+   *
+   *  pendingPushLenRef is only cleared after we actually consume it for a
+   *  push — otherwise a prompt-triggering playAction (which doesn't grow the
+   *  stack until respondToPrompt completes) would lose its captured length. */
   const syncUndoLogLens = useCallback(() => {
     const session = sessionRef.current;
     if (!session) return;
     const target = session.undoStackLength();
     while (undoLogLensRef.current.length > target) undoLogLensRef.current.pop();
-    while (undoLogLensRef.current.length < target) {
-      undoLogLensRef.current.push(pendingPushLenRef.current ?? 0);
+    if (undoLogLensRef.current.length < target) {
+      while (undoLogLensRef.current.length < target) {
+        undoLogLensRef.current.push(pendingPushLenRef.current ?? 0);
+      }
+      pendingPushLenRef.current = null;
     }
-    if (undoLogLensRef.current.length === target) pendingPushLenRef.current = null;
   }, []);
 
   // Match-log metadata, populated at createGame, consumed on game_over.
