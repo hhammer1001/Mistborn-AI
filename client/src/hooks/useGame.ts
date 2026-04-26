@@ -4,6 +4,7 @@ import { GameSession, opponentTypeToKind } from "../engine/session";
 import { resetCardIds } from "../engine/card";
 import { useTurnSideEffects, computeRecap, type TurnRecap } from "./useTurnSideEffects";
 import { saveMatchRecord, botIdentity, type MatchIdentity } from "../lib/matchLog";
+import { db } from "../lib/instantdb";
 
 // Re-export TurnRecap so existing consumers (LogEntry shape, components)
 // keep working without changing imports.
@@ -71,6 +72,30 @@ export function useGame() {
   const botName = useRef("Bot");
   const sessionRef = useRef<GameSession | null>(null);
 
+  // Stack of rawLog lengths parallel to session._undoStack. Each entry is the
+  // rawLog.length BEFORE a user-initiated undoable sequence began; on undo we
+  // pop and slice rawLog back to it. This handles single actions, prompt-driven
+  // actions (where the engine pushes only on prompt resolution), and composite
+  // playTwoActions (one engine entry, multiple hook entries) uniformly.
+  const undoLogLensRef = useRef<number[]>([]);
+  const pendingPushLenRef = useRef<number | null>(null);
+  const inCompositeRef = useRef(false);
+
+  /** Reconcile undoLogLensRef to the engine's current undo stack length.
+   *  When the engine's stack grows, push pendingPushLenRef (the rawLog length
+   *  captured before the operation that caused the growth). When it shrinks
+   *  (undo, end_actions clearing it), pop. */
+  const syncUndoLogLens = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    const target = session.undoStackLength();
+    while (undoLogLensRef.current.length > target) undoLogLensRef.current.pop();
+    while (undoLogLensRef.current.length < target) {
+      undoLogLensRef.current.push(pendingPushLenRef.current ?? 0);
+    }
+    if (undoLogLensRef.current.length === target) pendingPushLenRef.current = null;
+  }, []);
+
   // Match-log metadata, populated at createGame, consumed on game_over.
   const matchMetaRef = useRef<{
     startedAt: number;
@@ -124,6 +149,9 @@ export function useGame() {
       setError(null);
       setRawLog([]);
       clearRecapEntries();
+      undoLogLensRef.current = [];
+      pendingPushLenRef.current = null;
+      inCompositeRef.current = false;
       playerName.current = pName;
       botName.current = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
 
@@ -217,6 +245,10 @@ export function useGame() {
 
       setError(null);
 
+      // Capture rawLog length before this action so undo can slice back to it.
+      // Inside a composite (playTwoActions), the outer wrapper owns this.
+      if (!inCompositeRef.current) pendingPushLenRef.current = rawLog.length;
+
       try {
         const data = session.playAction(0, actionIndex) as SessionResult;
         if (data.error) { setError(data.error); return null; }
@@ -259,13 +291,14 @@ export function useGame() {
           setGameState(data as unknown as GameState);
           setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
         });
+        if (!inCompositeRef.current) syncUndoLogLens();
         return data;
       } catch (e) {
         setError(String(e));
         return null;
       }
     },
-    [gameState]
+    [gameState, syncUndoLogLens, applyBehindBanner, rawLog]
   );
 
   const advanceAllMission = useCallback(
@@ -293,7 +326,11 @@ export function useGame() {
     (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => {
       const session = sessionRef.current;
       if (!session) return null;
-      // Wrap both plays so a single undo rolls back the whole composite.
+      // Composite collapses to one engine undo entry; capture rawLog length
+      // before the first play so undo rolls back BOTH inner action's hook
+      // entries together.
+      pendingPushLenRef.current = rawLog.length;
+      inCompositeRef.current = true;
       session.beginUndoBatch();
       try {
         const first = playAction(firstIndex) as unknown as SessionResult | null;
@@ -305,6 +342,8 @@ export function useGame() {
         return playAction(second.index);
       } finally {
         session.endUndoBatch();
+        inCompositeRef.current = false;
+        syncUndoLogLens();
       }
     },
     [playAction]
@@ -348,14 +387,18 @@ export function useGame() {
           setGameState(data as unknown as GameState);
           if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
         });
-
+        // Engine pushes the undo snapshot only when a prompted action completes
+        // (not during the playAction that triggered the prompt). Sync here so
+        // pendingPushLenRef — captured at that earlier playAction — lands on
+        // the parallel stack at the right moment.
+        syncUndoLogLens();
         return data;
       } catch (e) {
         setError(String(e));
         return null;
       }
     },
-    [gameState, applyBehindBanner]
+    [gameState, applyBehindBanner, syncUndoLogLens]
   );
 
   const assignDamage = useCallback(
@@ -408,14 +451,16 @@ export function useGame() {
           setGameState(data as unknown as GameState);
           if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
         });
-
+        // Damage phase doesn't produce undo entries, but end_actions clears
+        // the engine's stack — sync so the parallel stack drains too.
+        syncUndoLogLens();
         return data;
       } catch (e) {
         setError(String(e));
         return null;
       }
     },
-    [gameState, applyBehindBanner]
+    [gameState, applyBehindBanner, syncUndoLogLens]
   );
 
   const resolveSense = useCallback(
@@ -457,9 +502,10 @@ export function useGame() {
           setGameState(data as unknown as GameState);
           if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
         });
+        syncUndoLogLens();
         return data;
       } catch (e) { setError(String(e)); return null; }
-    }, [gameState, applyBehindBanner]
+    }, [gameState, applyBehindBanner, syncUndoLogLens]
   );
 
   const resolveCloud = useCallback(
@@ -493,37 +539,31 @@ export function useGame() {
           setGameState(data as unknown as GameState);
           if (newEntries.length > 0) setRawLog((prev) => consolidateLog([...prev, ...newEntries]));
         });
+        syncUndoLogLens();
         return data;
       } catch (e) { setError(String(e)); return null; }
-    }, [gameState, applyBehindBanner]
+    }, [gameState, applyBehindBanner, syncUndoLogLens]
   );
 
   const undo = useCallback(() => {
     const session = sessionRef.current;
     if (!session || !session.canUndo()) return;
 
-    const pName = playerName.current;
+    // Read the rawLog length captured before the action being undone, then
+    // pop it off the parallel stack (session.undo drops the engine entry).
+    const targetLen = undoLogLensRef.current[undoLogLensRef.current.length - 1];
 
-    // Restore in place — session handles state rollback and log cleanup.
     const ok = session.undo();
     if (!ok) return;
 
     const data = session.getState(0) as unknown as GameState;
     setGameState(data);
+    syncUndoLogLens();
 
-    // Session's own log entry was removed by undo() — also remove the matching
-    // "Player — <action description>" line from the hook-side log.
-    setRawLog((prev) => {
-      const result = [...prev];
-      for (let i = result.length - 1; i >= 0; i--) {
-        if (!result[i].isBot && result[i].text.startsWith(`${pName} — `)) {
-          result.splice(i, 1);
-          break;
-        }
-      }
-      return result;
-    });
-  }, []);
+    if (typeof targetLen === "number") {
+      setRawLog((prev) => prev.slice(0, targetLen));
+    }
+  }, [syncUndoLogLens]);
 
   const refreshState = useCallback(() => {
     const session = sessionRef.current;
@@ -537,6 +577,23 @@ export function useGame() {
     const meta = matchMetaRef.current;
     if (!session || !meta || !session.game.winner) return;
     matchWrittenRef.current = true;
+
+    // Resolve missing profileId: createGame may run before useAuth's
+    // profile query has returned, leaving humanIdentity.profileId="".
+    // If we have a userId, look up the profile so the row lands clean.
+    let humanIdentity = meta.humanIdentity;
+    if (!humanIdentity.profileId && humanIdentity.userId) {
+      try {
+        const result = await db.queryOnce({
+          profiles: { $: { where: { odib: humanIdentity.userId } } },
+        });
+        const profile = (result.data?.profiles?.[0]) as { id: string } | undefined;
+        if (profile?.id) humanIdentity = { ...humanIdentity, profileId: profile.id };
+      } catch (e) {
+        console.error("Profile lookup failed for match log; continuing without profileId:", e);
+      }
+    }
+
     const bot = botIdentity(meta.botStrategy);
     await saveMatchRecord({
       session,
@@ -544,7 +601,7 @@ export function useGame() {
       botStrategy: meta.botStrategy,
       startedAt: meta.startedAt,
       testDeck: meta.testDeck,
-      identities: [meta.humanIdentity, bot],
+      identities: [humanIdentity, bot],
     });
   }, []);
 
