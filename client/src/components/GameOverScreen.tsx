@@ -27,6 +27,8 @@ export function GameOverScreen({ gameState, you, opp, log, youWon, backLabel, on
   const outcome = youWon ? "Victorious" : "Defeated";
   const tone = youWon ? "win" : "loss";
   const victoryPhrase = VICTORY_LABEL[gameState.victoryType ?? ""] ?? gameState.victoryType ?? "—";
+  const missionTotal = (turnOrder: number) =>
+    (gameState.missions ?? []).reduce((sum, m) => sum + (m.playerRanks?.[turnOrder] ?? 0), 0);
 
   return (
     <div className={`gg-scene gg-${tone}`}>
@@ -55,6 +57,8 @@ export function GameOverScreen({ gameState, you, opp, log, youWon, backLabel, on
         <Inscription label="Turns" value={String(gameState.turnCount)} />
         <Inscription label={`${you.name} HP`} value={String(you.health)} tone={you.health > 0 ? "ok" : "down"} />
         <Inscription label={`${opp.name} HP`} value={String(opp.health)} tone={opp.health > 0 ? "ok" : "down"} />
+        <Inscription label={`${you.name} Missions`} value={String(missionTotal(you.turnOrder))} />
+        <Inscription label={`${opp.name} Missions`} value={String(missionTotal(opp.turnOrder))} />
       </section>
 
       <main className="gg-chronicle">
