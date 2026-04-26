@@ -86,6 +86,7 @@ interface PlayerSnapshot {
   deckIds: number[];
   discardIds: number[];
   setAsideIds: number[];
+  eliminatedCardNames: string[];
 }
 
 interface CardStateSnap {
@@ -199,6 +200,9 @@ export class GameSession {
   private _oppDiscardIdsBefore: Set<number> | null = null;
   // For detecting cards that got eliminated (moved to market trash) during an action.
   private _marketTrashIdsBefore: Set<number> | null = null;
+  // Per-player card-id sets snapshotted before an action; used to attribute
+  // eliminations to the player who owned the card prior to the action.
+  private _playerCardsBefore: [Set<number>, Set<number>] | null = null;
   // Undo-batch: while open, multiple playAction calls collapse to one undo entry.
   private _batchStart: { snapshot: GameSnapshot; stackLen: number; dirtyBefore: boolean } | null = null;
 
@@ -248,6 +252,18 @@ export class GameSession {
     return this.playerKinds[i] !== "human";
   }
 
+  /** Set of every card-id currently owned by a player (deck library + hand +
+   *  discard + allies). Used to attribute mid-action eliminations. */
+  private _playerCardIdSet(i: number): Set<number> {
+    const p = this.players[i];
+    const ids = new Set<number>();
+    for (const c of p.deck.cards)   ids.add(c.id);
+    for (const c of p.deck.hand)    ids.add(c.id);
+    for (const c of p.deck.discard) ids.add(c.id);
+    for (const c of p.allies)       ids.add(c.id);
+    return ids;
+  }
+
   // ── Snapshot / restore ──
 
   private _takeSnapshot(): GameSnapshot {
@@ -268,6 +284,7 @@ export class GameSession {
       deckIds: p.deck.cards.map((c) => c.id),
       discardIds: p.deck.discard.map((c) => c.id),
       setAsideIds: p.deck.setAside.map((c) => c.id),
+      eliminatedCardNames: [...p.eliminatedCardNames],
     }));
     const cardStates = new Map<number, CardStateSnap>();
     for (const c of this._allCards()) {
@@ -327,6 +344,7 @@ export class GameSession {
       p.deck.cards = ps.deckIds.map((id) => byId.get(id)!).filter(Boolean);
       p.deck.discard = ps.discardIds.map((id) => byId.get(id)!).filter(Boolean);
       p.deck.setAside = ps.setAsideIds.map((id) => byId.get(id)!).filter(Boolean);
+      p.eliminatedCardNames = [...ps.eliminatedCardNames];
     }
     for (const [id, s] of snap.cardStates) {
       const c = byId.get(id);
@@ -601,6 +619,12 @@ export class GameSession {
     this._playerSnapBefore = psnap(p);
     this._missionBefore = p.curMission;
     this._marketTrashIdsBefore = new Set(this.game.market.discard.map((c) => c.id));
+    // Snapshot each player's card-id ownership before the action so that any
+    // newly-trashed card can be attributed to the player who owned it.
+    this._playerCardsBefore = [
+      this._playerCardIdSet(0),
+      this._playerCardIdSet(1),
+    ];
     // Snapshot opponent's discard pile before advance_mission so we can
     // identify which Sense card (if any) got auto-used to block.
     if (action.type === "advance_mission") {
@@ -734,14 +758,25 @@ export class GameSession {
 
     // Detect cards eliminated during this action (newly appeared in market trash).
     // For buy_eliminate/buy_elim_boxings, the bought card itself enters the trash
-    // as part of the action semantics — exclude it so it's not double-reported.
+    // as part of the action semantics — exclude it from the human-readable log
+    // so it's not double-reported, but still credit the buyer with the
+    // elimination in the persistent counter (they did just trash a card).
     const trashBefore = this._marketTrashIdsBefore;
     const excludeId = (action.type === "buy_eliminate" || action.type === "buy_elim_boxings")
       ? action.card.id : null;
     const eliminatedNames: string[] = [];
     if (trashBefore) {
       for (const c of this.game.market.discard) {
-        if (!trashBefore.has(c.id) && c.id !== excludeId) eliminatedNames.push(c.name);
+        if (trashBefore.has(c.id)) continue;
+        // Persistent attribution: which player owned this card before the action?
+        const before = this._playerCardsBefore;
+        if (before) {
+          if (before[0].has(c.id))      this.players[0].eliminatedCardNames.push(c.name);
+          else if (before[1].has(c.id)) this.players[1].eliminatedCardNames.push(c.name);
+          else this.players[playerIndex].eliminatedCardNames.push(c.name); // bought-and-eliminated from market
+        }
+        // Human-readable log entry skips the buy_eliminate target.
+        if (c.id !== excludeId) eliminatedNames.push(c.name);
       }
     }
     if (eliminatedNames.length > 0) {
@@ -811,6 +846,7 @@ export class GameSession {
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
     this._marketTrashIdsBefore = null;
+    this._playerCardsBefore = null;
 
     if (this.game.winner) {
       this.phase = "game_over";

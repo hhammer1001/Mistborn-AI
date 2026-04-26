@@ -31,6 +31,12 @@ function countByName(cards: Array<{ name: string }>): Record<string, number> {
   return out;
 }
 
+function countNames(names: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const n of names) out[n] = (out[n] ?? 0) + 1;
+  return out;
+}
+
 function playerCards(player: Player): Array<{ name: string }> {
   // Fold library + hand + discard + allies into one list of {name}.
   const deck = player.deck;
@@ -105,6 +111,7 @@ export async function saveMatchRecord(args: SaveMatchArgs): Promise<void> {
 
         missionRanks: missions.map((m) => m.playerRanks[idx]),
         finalDeck: countByName(playerCards(p)),
+        eliminatedCounts: countNames(p.eliminatedCardNames),
       },
     };
   });

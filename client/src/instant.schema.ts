@@ -94,6 +94,7 @@ const _schema = i.schema({
       metalBurned: i.any(),
       missionRanks: i.any(),
       finalDeck: i.any(),
+      eliminatedCounts: i.any().optional(),
     }),
   },
   links: {

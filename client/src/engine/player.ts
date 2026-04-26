@@ -21,6 +21,7 @@ export function copyPlayerState(dest: Player, src: Player, cardMap: Map<number, 
   dest.metalBurned = [...src.metalBurned];
   dest.burns = src.burns;
   dest.training = src.training;
+  dest.eliminatedCardNames = [...src.eliminatedCardNames];
   dest.charAbility1 = src.charAbility1;
   dest.charAbility2 = src.charAbility2;
   dest.charAbility3 = src.charAbility3;
@@ -65,6 +66,10 @@ export class Player {
   burns = 1;
   training = 0;
   trainingRewards = TRAINING_REWARDS;
+  /** Names of cards that left this player's collection mid-game (eliminated
+   *  to the market trash, by their own action or an opponent's). Bought-and-
+   *  eliminated cards count for the buyer. Cumulative across the match. */
+  eliminatedCardNames: string[] = [];
   charAbility1 = true;
   charAbility2 = true;
   charAbility3 = true;
