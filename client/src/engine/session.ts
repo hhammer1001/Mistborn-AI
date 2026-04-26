@@ -383,6 +383,13 @@ export class GameSession {
     );
   }
 
+  /** Number of undo entries currently on the stack. Lets external bookkeeping
+   *  (e.g. a hook tracking rawLog lengths in parallel) reconcile after each
+   *  session call without peeking at private state. */
+  undoStackLength(): number {
+    return this._undoStack.length;
+  }
+
   /** Open a batch so subsequent playAction calls collapse to one undo entry. */
   beginUndoBatch(): void {
     if (this._batchStart) return;
