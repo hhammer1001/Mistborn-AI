@@ -21,7 +21,17 @@ import Vin_sp from "./data/squash_weights/Vin.json";
 import Marsh_sp from "./data/squash_weights/Marsh.json";
 import Prodigy_sp from "./data/squash_weights/Prodigy.json";
 
+// Phase-aware acquisition timing data (selfplayTimed.ts)
+// Format: { cardName: { "1-3": [wins,total,wr], "4-8":..., "9-15":..., "16+":... } }
+import Kelsier_t from "./data/squash_timing/Kelsier.json";
+import Shan_t from "./data/squash_timing/Shan.json";
+import Vin_t from "./data/squash_timing/Vin.json";
+import Marsh_t from "./data/squash_timing/Marsh.json";
+import Prodigy_t from "./data/squash_timing/Prodigy.json";
+
 type SelfPlayWeights = Record<string, number[]>;
+type TimingBucket = "1-3" | "4-8" | "9-15" | "16+";
+type TimingWeights = Record<string, Record<TimingBucket, number[]>>;
 
 const SELFPLAY_WEIGHTS: Record<string, SelfPlayWeights> = {
   Kelsier: Kelsier_sp as SelfPlayWeights,
@@ -31,10 +41,27 @@ const SELFPLAY_WEIGHTS: Record<string, SelfPlayWeights> = {
   Prodigy: Prodigy_sp as SelfPlayWeights,
 };
 
+const TIMING_WEIGHTS: Record<string, TimingWeights> = {
+  Kelsier: Kelsier_t as TimingWeights,
+  Shan: Shan_t as TimingWeights,
+  Vin: Vin_t as TimingWeights,
+  Marsh: Marsh_t as TimingWeights,
+  Prodigy: Prodigy_t as TimingWeights,
+};
+
 // Minimum sample size before we trust a self-play weight
 const SELFPLAY_MIN_SAMPLES = 100;
 // How strongly to weight self-play vs analytical (additive blend)
 const SELFPLAY_BLEND_STRENGTH = 80.0;
+// How strongly to weight phase-adjustment (acquisition-timing) on top.
+// Applied as: bucketLift × strength, where bucketLift = card_winrate_in_bucket
+// minus the average winrate of all cards in that bucket (a baseline that
+// strips out "everyone bought late = losing" selection bias).
+const TIMING_MIN_SAMPLES = 50;
+const TIMING_BLEND_STRENGTH_DEFAULT = 20.0;
+function getTimingBlendStrength(): number {
+  return (globalThis as { __TIMING_BLEND?: number }).__TIMING_BLEND ?? TIMING_BLEND_STRENGTH_DEFAULT;
+}
 
 // ── Resource Base Values ──
 // These are the "exchange rates" of the game economy.
@@ -628,6 +655,61 @@ const { ratings: ANALYTICAL_RATINGS, cardData: CARD_DATA } = computeAllRatings()
 export { ANALYTICAL_RATINGS, CARD_DATA };
 export type { AnalyticalCardData };
 
+// ── Phase-aware timing baselines ──
+// For each character and each turn-bucket, compute the AVERAGE winrate of
+// all bought cards. This gives us a per-bucket selection-bias baseline:
+// bots buying cards late are losing on average, so the late-bucket avg is low.
+// A card's "lift" against this baseline strips out the bias and reveals
+// actual time-decay or time-appreciation in card value.
+const TIMING_BASELINES: Record<string, Record<TimingBucket, number>> = {};
+for (const [char, weights] of Object.entries(TIMING_WEIGHTS)) {
+  const buckets: Record<TimingBucket, { wins: number; total: number }> = {
+    "1-3": { wins: 0, total: 0 }, "4-8": { wins: 0, total: 0 },
+    "9-15": { wins: 0, total: 0 }, "16+": { wins: 0, total: 0 },
+  };
+  for (const data of Object.values(weights)) {
+    for (const b of ["1-3", "4-8", "9-15", "16+"] as TimingBucket[]) {
+      const arr = data[b];
+      if (arr && arr[1] >= TIMING_MIN_SAMPLES) {
+        buckets[b].wins += arr[0];
+        buckets[b].total += arr[1];
+      }
+    }
+  }
+  TIMING_BASELINES[char] = {
+    "1-3": buckets["1-3"].total > 0 ? buckets["1-3"].wins / buckets["1-3"].total : 0,
+    "4-8": buckets["4-8"].total > 0 ? buckets["4-8"].wins / buckets["4-8"].total : 0,
+    "9-15": buckets["9-15"].total > 0 ? buckets["9-15"].wins / buckets["9-15"].total : 0,
+    "16+": buckets["16+"].total > 0 ? buckets["16+"].wins / buckets["16+"].total : 0,
+  };
+}
+
+function turnToBucket(turncount: number): TimingBucket {
+  if (turncount <= 3) return "1-3";
+  if (turncount <= 8) return "4-8";
+  if (turncount <= 15) return "9-15";
+  return "16+";
+}
+
+/** Phase-adjusted rating delta: lift this card has at the current turn's bucket. */
+function timingPhaseAdjust(cardName: string, character: string, turncount: number): number {
+  const blend = getTimingBlendStrength();
+  if (blend === 0) return 0;
+  const charTiming = TIMING_WEIGHTS[character];
+  if (!charTiming) return 0;
+  const cardTiming = charTiming[cardName];
+  if (!cardTiming) return 0;
+  const bucket = turnToBucket(turncount);
+  const arr = cardTiming[bucket];
+  if (!arr || arr[1] < TIMING_MIN_SAMPLES) return 0;
+  const cardWR = arr[2];
+  const baselineWR = TIMING_BASELINES[character]?.[bucket] ?? 0;
+  const lift = cardWR - baselineWR;
+  return lift * blend;
+}
+
+export { timingPhaseAdjust, TIMING_BASELINES };
+
 // ── Dynamic Card Rating ──
 
 export function dynamicCardRating(
@@ -637,7 +719,7 @@ export function dynamicCardRating(
 ): number {
   const base = ANALYTICAL_RATINGS[character]?.[cardName] ?? ANALYTICAL_RATINGS.Kelsier?.[cardName] ?? 0;
   const cd = CARD_DATA[cardName];
-  if (!cd) return base;
+  if (!cd) return base + timingPhaseAdjust(cardName, character, snap.turnCount);
 
   let adjust = 0;
 
@@ -674,6 +756,11 @@ export function dynamicCardRating(
   } else if (cd.metal === 8) {
     adjust += 0.05; // atium flexibility bonus
   }
+
+  // Phase adjustment from acquisition-timing data: cards whose value decays
+  // over the course of a game (Pierce, Hyperaware, Strategize) get rated
+  // higher in early-turn buckets, lower in late-turn buckets.
+  adjust += timingPhaseAdjust(cardName, character, snap.turnCount);
 
   return base + adjust;
 }

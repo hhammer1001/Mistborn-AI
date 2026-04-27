@@ -27,7 +27,7 @@
     "src/engine/benchmark.ts",
     "src/engine/squashBot.ts",
     "src/engine/squashBotEval.ts",
-    "src/engine/selfplay.ts",
+    "src/engine/selfplay.ts", "src/engine/selfplayTimed.ts",
     "src/engine/cloneTest.ts",
     "src/engine/twitchBot.ts",
     "src/engine/twitchDebug.ts",
