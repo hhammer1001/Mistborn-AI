@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { MinistrySidebar, type ChronicleEntry } from "./MinistrySidebar";
+import { MinistrySidebar } from "./MinistrySidebar";
 import { AuthModal } from "./AuthModal";
 import { MetalSigilPicker } from "./MetalSigilPicker";
 import { SettingsPopover } from "./SettingsPopover";
 import { FeedbackModal } from "./FeedbackModal";
 import { MainMenuView, BotSetupView, OnlineSetupView } from "./MenuStages";
 import { useMinistryPrefs, type BotSetupConfig } from "../hooks/useMinistryPrefs";
+import { useMatchHistory } from "../hooks/useMatchHistory";
 import type { Room } from "../hooks/useLobby";
 
 type StageView = "menu" | "bot" | "online";
@@ -13,6 +14,7 @@ type StageView = "menu" | "bot" | "online";
 interface Props {
   // Auth state
   isAuthed: boolean;
+  userId: string | null;
   displayName: string | null;
   profileCreatedAt?: number | null;
   authError?: { message: string } | null;
@@ -35,6 +37,7 @@ interface Props {
 
 export function MenuShell({
   isAuthed,
+  userId,
   displayName,
   profileCreatedAt,
   authError,
@@ -65,8 +68,8 @@ export function MenuShell({
     if (isAuthed && authOpen) setAuthOpen(false);
   }, [isAuthed, authOpen]);
 
-  // Chronicle data is empty until the DB is wired up for game logs.
-  const entries: ChronicleEntry[] = [];
+  // Match history feeds the sidebar's chronicle list and W/L tally.
+  const entries = useMatchHistory(userId);
 
   // When the user clicks Play Online while already in online view, nothing changes;
   // but if they're guest and we land on online, the view's internal gate handles it.

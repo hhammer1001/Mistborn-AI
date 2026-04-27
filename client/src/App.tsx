@@ -185,6 +185,7 @@ function App() {
   return (
     <MenuShell
       isAuthed={!!auth.user}
+      userId={auth.user?.id ?? null}
       displayName={auth.profile?.name ?? auth.user?.email?.split("@")[0] ?? null}
       profileCreatedAt={auth.profile?.createdAt ?? null}
       authError={auth.error}
