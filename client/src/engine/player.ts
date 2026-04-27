@@ -430,6 +430,10 @@ export class Player {
   }
 
   private _isHighest(m: Mission): boolean {
+    // First player to reach the top of a mission stays "highest" forever,
+    // even if an opponent later ties their rank.
+    if (m.topReachedBy === this.turnOrder) return true;
+    if (m.topReachedBy !== null) return false;
     const ours = m.playerRanks[this.turnOrder];
     if (ours <= 0) return false;
     for (let i = 0; i < m.playerRanks.length; i++) {

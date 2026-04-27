@@ -104,6 +104,7 @@ interface GameSnapshot {
   victoryType: string;
   turncount: number;
   missionRanks: number[][];
+  missionTopReachedBy: (number | null)[];
   marketHand: number[];
   marketCards: number[];
   marketDiscard: number[];
@@ -311,6 +312,7 @@ export class GameSession {
       victoryType: this.game.victoryType,
       turncount: this.game.turncount,
       missionRanks: this.game.missions.map((m) => [...m.playerRanks]),
+      missionTopReachedBy: this.game.missions.map((m) => m.topReachedBy),
       marketHand: this.game.market.hand.map((c) => c.id),
       marketCards: this.game.market.cards.map((c) => c.id),
       marketDiscard: this.game.market.discard.map((c) => c.id),
@@ -331,6 +333,7 @@ export class GameSession {
     this.game.turncount = snap.turncount;
     for (let i = 0; i < this.game.missions.length; i++) {
       this.game.missions[i].playerRanks = [...snap.missionRanks[i]];
+      this.game.missions[i].topReachedBy = snap.missionTopReachedBy[i] ?? null;
     }
     this.game.market.hand = snap.marketHand.map((id) => byId.get(id)!).filter(Boolean);
     this.game.market.cards = snap.marketCards.map((id) => byId.get(id)!).filter(Boolean);

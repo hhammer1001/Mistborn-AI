@@ -5,6 +5,10 @@ export class Mission {
   name: string;
   tiers: MissionTierDef[];
   playerRanks: number[];
+  /** Player who first reached the top tier of this mission. They remain
+   *  "highest" for cards/abilities that check it (Lookout, Hyperaware) even
+   *  if an opponent later ties them at the top. */
+  topReachedBy: number | null = null;
   private game: Game;
 
   constructor(name: string, game: Game, tiers: MissionTierDef[]) {
@@ -35,6 +39,11 @@ export class Mission {
       }
     }
 
+    const topThreshold = this.tiers[this.tiers.length - 1]?.threshold ?? Infinity;
+    if (this.topReachedBy === null && oldRank < topThreshold && newRank >= topThreshold) {
+      this.topReachedBy = playerNum;
+    }
+
     this.playerRanks[playerNum] = newRank;
     this.game.missionVictoryCheck(playerNum);
   }
@@ -44,6 +53,7 @@ export class Mission {
     m.name = this.name;
     m.tiers = this.tiers;
     m.playerRanks = [...this.playerRanks];
+    m.topReachedBy = this.topReachedBy;
     (m as unknown as { game: Game }).game = newGame;
     return m;
   }
@@ -52,6 +62,7 @@ export class Mission {
     return {
       name: this.name,
       playerRanks: [...this.playerRanks],
+      topReachedBy: this.topReachedBy,
       tiers: this.tiers.map((t) => ({
         threshold: t.threshold,
         reward: t.reward,

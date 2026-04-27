@@ -34,6 +34,9 @@ export interface MissionTier {
 export interface MissionData {
   name: string;
   playerRanks: number[];
+  /** Player index of whoever reached the top of this mission first.
+   *  null until either player crosses the top tier. */
+  topReachedBy: number | null;
   tiers: MissionTier[];
   maxRank: number;
 }
