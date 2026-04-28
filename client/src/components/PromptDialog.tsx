@@ -36,11 +36,13 @@ interface Props {
 /** Find the CardData for a given cardId by searching all visible locations. */
 function findCard(cardId: number, gameState: GameState): CardData | undefined {
   const you = gameState.players[0];
+  const opp = gameState.players[1];
   const byId = (c: CardData) => c.id === cardId;
   return (
     you.hand.find(byId) ||
     you.discard.find(byId) ||
     you.allies.find(byId) ||
+    opp?.allies.find(byId) ||
     gameState.market.hand.find(byId) ||
     gameState.market.discard.find(byId)
   );

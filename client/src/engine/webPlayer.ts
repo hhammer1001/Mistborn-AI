@@ -71,8 +71,13 @@ export class WebPlayer extends Player {
 
   override killEnemyAllyIn(allies: Ally[]): number {
     if (allies.length === 0) return -1;
-    return allies.reduce((best, ally, i) =>
-      ally.health > allies[best].health ? i : best, 0);
+    const resp = this._getResponse("kill_ally");
+    if (resp !== undefined) return Number(resp);
+
+    const options: PromptOption[] = allies.map((a, i) => ({
+      index: i, name: a.name, cardId: a.id, source: "opponent-allies",
+    }));
+    throw new PromptNeeded("kill_ally", options, "Choose an opponent's Ally to destroy");
   }
 
   override cloudAlly(_card: Card, _ally: Ally): boolean {
