@@ -68,15 +68,17 @@ interface CardGroup {
 
 function groupCards(cards: CardData[]): CardGroup[] {
   const groups: CardGroup[] = [];
-  const seen = new Map<string, number>();
+  // Only Funding stacks — every other card type renders as its own slot so
+  // identical action/ally copies stay individually addressable for actions
+  // like burn-this-copy-not-that-one.
+  let fundingIdx: number | null = null;
 
   for (const card of cards) {
-    const existing = seen.get(card.name);
-    if (existing !== undefined) {
-      groups[existing].count++;
-      groups[existing].allIds.push(card.id);
+    if (card.type === "funding" && fundingIdx !== null) {
+      groups[fundingIdx].count++;
+      groups[fundingIdx].allIds.push(card.id);
     } else {
-      seen.set(card.name, groups.length);
+      if (card.type === "funding") fundingIdx = groups.length;
       groups.push({ card, count: 1, allIds: [card.id] });
     }
   }
