@@ -231,11 +231,16 @@ export function useGame() {
   );
 
   const playAction = useCallback(
-    (actionIndex: number) => {
+    (actionIndex: number, descOverride?: string) => {
       const session = sessionRef.current;
       if (!session || !gameState) return null;
+      // descOverride lets a caller (e.g. playTwoActions) supply a description
+      // it already resolved against fresher availableActions. Inside the same
+      // event handler, gameState in this closure is still the pre-first-action
+      // snapshot — looking up by index against it would land on the wrong
+      // action because the engine reshuffles indices after each play.
       const action = gameState.availableActions.find((a) => a.index === actionIndex);
-      const desc = action?.description ?? `Action ${actionIndex}`;
+      const desc = descOverride ?? action?.description ?? `Action ${actionIndex}`;
       const prevTurn = gameState.turnCount;
       const pName = playerName.current;
       const bName = botName.current;
@@ -338,7 +343,7 @@ export function useGame() {
         const second = actions.find((a) => a.code === secondMatch.code
           && (secondMatch.cardIds === undefined || (a.cardId !== undefined && secondMatch.cardIds.includes(a.cardId))));
         if (!second) return first;
-        return playAction(second.index);
+        return playAction(second.index, second.description);
       } finally {
         session.endUndoBatch();
       }
