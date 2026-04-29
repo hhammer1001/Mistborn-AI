@@ -817,6 +817,7 @@ export class Player {
         this.metalBurned[mi] += 1;
         if (mi !== 8) this.metalBurned[8] += 1;
         this.atium -= 1;
+        this.metalTokens[8] += 1;
         break;
       }
       case "buy_with_boxings": {
