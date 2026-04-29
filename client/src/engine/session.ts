@@ -119,6 +119,13 @@ interface GameSnapshot {
    *  `setNextSnapshotData`. Used by the hook to record its own pre-action
    *  log length so undo can roll back UI state alongside engine state. */
   externalData?: number;
+  /** True if the action that LEFT this state revealed previously-hidden
+   *  information (drew a card, refilled the market, blocked with sense, etc.).
+   *  When the snapshot sits on top of the undo stack, this flag gates undo:
+   *  reversing a revealing action would un-reveal info the player has already
+   *  seen, so canUndo returns false. Per-action — earlier dirty actions don't
+   *  block undo of later clean ones. */
+  dirty?: boolean;
 }
 
 // ── Snapshot helpers for effect logging ──
@@ -201,7 +208,6 @@ export class GameSession {
   // Optional caller-provided value attached to the next snapshot taken.
   // Cleared on read so successive snapshots don't inherit stale data.
   private _nextSnapshotData: number | null = null;
-  private _dirty = false;
   private _playerSnapBefore: PSnap | null = null;
   private _missionBefore = 0;
   // For detecting which opponent Sense card was auto-used to block a mission advance.
@@ -212,7 +218,7 @@ export class GameSession {
   // eliminations to the player who owned the card prior to the action.
   private _playerCardsBefore: [Set<number>, Set<number>] | null = null;
   // Undo-batch: while open, multiple playAction calls collapse to one undo entry.
-  private _batchStart: { snapshot: GameSnapshot; stackLen: number; dirtyBefore: boolean } | null = null;
+  private _batchStart: { snapshot: GameSnapshot; stackLen: number } | null = null;
 
   // Per-player logs (cumulative). Index 0 = player 0, index 1 = player 1.
   private _logs: [LogEntry[], LogEntry[]] = [[], []];
@@ -406,9 +412,10 @@ export class GameSession {
   // ── Undo ──
 
   canUndo(): boolean {
+    const top = this._undoStack[this._undoStack.length - 1];
     return (
-      this._undoStack.length > 0 &&
-      !this._dirty &&
+      top !== undefined &&
+      !top.dirty &&
       this.phase === "actions" &&
       !this._isBot(this.activePlayer)
     );
@@ -436,17 +443,24 @@ export class GameSession {
     this._batchStart = {
       snapshot: this._takeSnapshot(),
       stackLen: this._undoStack.length,
-      dirtyBefore: this._dirty,
     };
   }
 
-  /** Close the batch opened by beginUndoBatch; collapses pushed entries. */
+  /** Close the batch opened by beginUndoBatch; collapses pushed entries.
+   *  The composite snapshot inherits dirty=true if any inner action revealed
+   *  info, so undoing the whole composite is forbidden whenever any of its
+   *  steps would unreveal something. */
   endUndoBatch(): void {
     if (!this._batchStart) return;
-    const { snapshot, stackLen, dirtyBefore } = this._batchStart;
+    const { snapshot, stackLen } = this._batchStart;
     this._batchStart = null;
-    while (this._undoStack.length > stackLen) this._undoStack.pop();
-    if (!dirtyBefore) this._undoStack.push(snapshot);
+    let anyDirty = false;
+    while (this._undoStack.length > stackLen) {
+      const popped = this._undoStack.pop()!;
+      if (popped.dirty) anyDirty = true;
+    }
+    snapshot.dirty = anyDirty;
+    this._undoStack.push(snapshot);
   }
 
   undo(): boolean {
@@ -633,7 +647,6 @@ export class GameSession {
       this._preActionSnapshot = null;
       this._playerSnapBefore = null;
       this._undoStack = [];
-      this._dirty = false;
       return this.getState(playerIndex);
     }
 
@@ -694,7 +707,6 @@ export class GameSession {
     if (this.phase !== "actions") return { error: `Cannot play action in phase: ${this.phase}` };
 
     const stackLenBefore = this._undoStack.length;
-    const dirtyBefore = this._dirty;
     const preCompositeSnapshot = this._takeSnapshot();
 
     const first = this.playAction(playerIndex, firstIndex) as Record<string, unknown> & {
@@ -715,9 +727,16 @@ export class GameSession {
 
     const second = this.playAction(playerIndex, secondAction.index);
 
-    // Collapse any snapshots pushed during the composite into a single entry.
-    while (this._undoStack.length > stackLenBefore) this._undoStack.pop();
-    if (!dirtyBefore) this._undoStack.push(preCompositeSnapshot);
+    // Collapse any snapshots pushed during the composite into a single entry,
+    // OR-ing their dirty tags so the composite is undoable only when none of
+    // its inner steps revealed info.
+    let anyDirty = false;
+    while (this._undoStack.length > stackLenBefore) {
+      const popped = this._undoStack.pop()!;
+      if (popped.dirty) anyDirty = true;
+    }
+    preCompositeSnapshot.dirty = anyDirty;
+    this._undoStack.push(preCompositeSnapshot);
 
     return second;
   }
@@ -860,10 +879,10 @@ export class GameSession {
       this._oppDiscardIdsBefore = null;
     }
 
-    if (!this._dirty && this._preActionSnapshot) {
+    if (this._preActionSnapshot) {
+      this._preActionSnapshot.dirty = revealedInfo;
       this._undoStack.push(this._preActionSnapshot);
     }
-    if (revealedInfo) this._dirty = true;
 
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
@@ -1125,7 +1144,6 @@ export class GameSession {
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
     this._undoStack = [];
-    this._dirty = false;
 
     if (this._isBot(nextPi)) {
       this._runBotTurn(nextPi);
