@@ -5,6 +5,7 @@ import { MetalSigilPicker } from "./MetalSigilPicker";
 import { SettingsPopover } from "./SettingsPopover";
 import { FeedbackModal } from "./FeedbackModal";
 import { MainMenuView, BotSetupView, OnlineSetupView } from "./MenuStages";
+import { PWAUpdatePrompt } from "./PWAUpdatePrompt";
 import { useMinistryPrefs, type BotSetupConfig } from "../hooks/useMinistryPrefs";
 import { useMatchHistory } from "../hooks/useMatchHistory";
 import type { Room } from "../hooks/useLobby";
@@ -98,6 +99,7 @@ export function MenuShell({
 
   return (
     <div className="ms-shell">
+      <PWAUpdatePrompt />
       <MinistrySidebar
         isAuthed={isAuthed}
         displayName={displayName}
