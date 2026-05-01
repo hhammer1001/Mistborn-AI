@@ -12,6 +12,8 @@ export interface CardDef {
   ability2Amount?: string;
   ability3Effect?: string;
   ability3Amount?: string;
+  ability4Effect?: string;
+  ability4Amount?: string;
   activeEffect?: string;
   activeAmount?: string;
   burnEffect?: string;

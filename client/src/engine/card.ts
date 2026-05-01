@@ -81,6 +81,8 @@ export class Action extends Card {
   private _ab2Amt: string;
   private _ab3Eff: string;
   private _ab3Amt: string;
+  private _ab4Eff: string;
+  private _ab4Amt: string;
   private _activeEff: string;
   private _activeAmt: string;
   private _burnEff: string;
@@ -94,13 +96,17 @@ export class Action extends Card {
     this._ab2Amt = def.ability2Amount ?? "";
     this._ab3Eff = def.ability3Effect ?? "";
     this._ab3Amt = def.ability3Amount ?? "";
+    this._ab4Eff = def.ability4Effect ?? "";
+    this._ab4Amt = def.ability4Amount ?? "";
     this._activeEff = def.activeEffect ?? "";
     this._activeAmt = def.activeAmount ?? "";
     this._burnEff = def.burnEffect ?? "";
     this._burnAmt = def.burnAmount ?? "";
 
     // Capacity = how many metal levels this card supports
-    if (this._ab3Eff) {
+    if (this._ab4Eff) {
+      this.capacity = 4;
+    } else if (this._ab3Eff) {
       this.capacity = 3;
     } else if (this._ab2Eff) {
       this.capacity = 2;
@@ -138,14 +144,14 @@ export class Action extends Card {
 
   addMetal(player: { resolve(effect: string, amount: string): void }) {
     this.metalUsed += 1;
-    // Ability index: metalUsed=1 -> data[3,4], metalUsed=2 -> data[5,6], metalUsed=3 -> data[7,8]
     const idx = this.metalUsed;
     const effects = [
       [this._ab1Eff, this._ab1Amt],
       [this._ab2Eff, this._ab2Amt],
       [this._ab3Eff, this._ab3Amt],
+      [this._ab4Eff, this._ab4Amt],
     ];
-    if (idx >= 1 && idx <= 3) {
+    if (idx >= 1 && idx <= effects.length) {
       const [eff, amt] = effects[idx - 1];
       if (eff) {
         player.resolve(eff, amt);
@@ -182,7 +188,11 @@ export class Action extends Card {
       [this._ab1Eff, this._ab1Amt],
       [this._ab2Eff, this._ab2Amt],
       [this._ab3Eff, this._ab3Amt],
+      [this._ab4Eff, this._ab4Amt],
     ];
+    // Trim trailing empty slots so cards with capacity < 4 don't carry a
+    // dangling null in their serialized abilitySlots.
+    while (pairs.length > 0 && !pairs[pairs.length - 1][0]) pairs.pop();
     return pairs.map(([eff, amt]) => (eff ? { effect: eff, amount: amt } : null));
   }
 
@@ -192,6 +202,7 @@ export class Action extends Card {
       [this._ab1Eff, this._ab1Amt],
       [this._ab2Eff, this._ab2Amt],
       [this._ab3Eff, this._ab3Amt],
+      [this._ab4Eff, this._ab4Amt],
     ];
     for (const [eff, amt] of pairs) {
       if (eff) abilities.push({ effect: eff, amount: amt });

@@ -591,8 +591,8 @@ export const MARKET_DECK: CardDef[] =
     "metal": 8,
     "ability1Effect": "special12",
     "ability1Amount": "0",
-    "ability2Effect": "special13",
-    "ability2Amount": "0"
+    "ability4Effect": "special13",
+    "ability4Amount": "0"
   },
   {
     "cardType": 3,
