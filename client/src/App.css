@@ -5121,3 +5121,297 @@ h3 {
   width: 14px;
   height: 14px;
 }
+
+/* ─── Sense Ranking Panel ─────────────────────────────────────────────────
+   Defender's pre-turn priority list. Aesthetic: a wax-sealed ledger page —
+   gold corner jewels, a thin double border, and per-card medallion strips
+   where the active rank glows tin-blue (Tin is the metal that grants Sense
+   in Mistborn lore). Hover/active animations stay subtle. */
+
+.sense-ranking {
+  --sr-edge: rgba(201, 164, 74, 0.28);
+  --sr-edge-strong: rgba(201, 164, 74, 0.6);
+  --sr-tin: #7faecf;
+  --sr-tin-soft: rgba(127, 174, 207, 0.18);
+  --sr-skip: rgba(190, 183, 168, 0.55);
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+.sense-ranking__frame {
+  position: relative;
+  padding: 24px 22px 20px;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(127, 174, 207, 0.07) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(20, 18, 32, 0.97) 0%, rgba(13, 12, 22, 0.97) 100%);
+  border: 1px solid var(--sr-edge);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35) inset,
+    0 10px 32px rgba(0, 0, 0, 0.55);
+}
+.sense-ranking__frame::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(201, 164, 74, 0.13);
+  pointer-events: none;
+}
+
+/* Tiny rotated-square jewels at the four corners — sealed-document feel. */
+.sense-ranking__corner {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: var(--gold);
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(201, 164, 74, 0.55);
+  pointer-events: none;
+}
+.sense-ranking__corner--tl { top: -4px; left: -4px; }
+.sense-ranking__corner--tr { top: -4px; right: -4px; }
+.sense-ranking__corner--bl { bottom: -4px; left: -4px; }
+.sense-ranking__corner--br { bottom: -4px; right: -4px; }
+
+.sense-ranking__head {
+  text-align: center;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  position: relative;
+}
+.sense-ranking__head::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 164, 74, 0.45) 35%,
+    rgba(201, 164, 74, 0.6) 50%,
+    rgba(201, 164, 74, 0.45) 65%,
+    transparent 100%
+  );
+}
+
+.sense-ranking__eyebrow {
+  font-family: var(--font-ledger, var(--font-display));
+  font-size: 0.62rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.sense-ranking__title {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 0 0 8px;
+  text-shadow: 0 1px 14px rgba(127, 174, 207, 0.18);
+}
+.sense-ranking__caption {
+  margin: 0;
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.06em;
+  font-style: italic;
+}
+
+.sense-ranking__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sense-ranking__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 2px solid rgba(201, 164, 74, 0.32);
+  transition: background 220ms ease, border-color 220ms ease;
+  animation: sense-row-in 380ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+}
+.sense-ranking__row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: var(--gold);
+}
+
+@keyframes sense-row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.sense-ranking__identity {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sense-ranking__art {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid rgba(201, 164, 74, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  display: inline-block;
+}
+.sense-ranking__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sense-ranking__text {
+  min-width: 0;
+}
+.sense-ranking__name {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.13em;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sense-ranking__block {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.06em;
+  margin-top: 3px;
+}
+.sense-ranking__block strong {
+  color: var(--sr-tin);
+  font-weight: 600;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  margin: 0 1px;
+}
+
+.sense-ranking__chips {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Round seal-like priority chip. — / I / II / III / … */
+.sense-chip {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0) 70%),
+    linear-gradient(180deg, rgba(40, 38, 50, 0.95), rgba(20, 18, 28, 0.95));
+  border: 1px solid rgba(201, 164, 74, 0.25);
+  border-radius: 50%;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0;
+  position: relative;
+  transition: 180ms cubic-bezier(0.2, 0.7, 0.25, 1);
+  transition-property: transform, color, border-color, background, box-shadow;
+}
+.sense-chip:hover {
+  color: var(--text);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+.sense-chip:focus-visible {
+  outline: none;
+  border-color: var(--sr-tin);
+  box-shadow: 0 0 0 2px rgba(127, 174, 207, 0.4);
+}
+.sense-chip__numeral {
+  display: inline-block;
+  line-height: 1;
+  transform: translateY(-0.5px);
+}
+.sense-chip__mark {
+  display: inline-block;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--sr-skip);
+  transform: translateY(-1px);
+}
+
+/* Active rank: tin-blue glow inside a gold inset ring. */
+.sense-chip.is-active {
+  color: var(--text);
+  border-color: var(--sr-tin);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(127, 174, 207, 0.42), rgba(20, 18, 32, 0.85) 75%),
+    linear-gradient(180deg, rgba(46, 64, 86, 0.95), rgba(28, 36, 52, 0.95));
+  box-shadow:
+    0 0 0 1px rgba(201, 164, 74, 0.65) inset,
+    0 0 12px rgba(127, 174, 207, 0.5),
+    0 0 24px rgba(127, 174, 207, 0.16);
+  transform: translateY(-1px) scale(1.04);
+  animation: sense-chip-pulse 2.6s ease-in-out infinite;
+}
+
+/* Skip stays muted even when active — it's the absence of an order. */
+.sense-chip--skip.is-active {
+  color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(190, 183, 168, 0.7);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0) 75%),
+    linear-gradient(180deg, rgba(40, 38, 50, 0.95), rgba(20, 18, 28, 0.95));
+  box-shadow:
+    0 0 0 1px rgba(190, 183, 168, 0.35) inset,
+    0 0 6px rgba(190, 183, 168, 0.18);
+  transform: translateY(-1px);
+  animation: none;
+}
+.sense-chip--skip.is-active .sense-chip__mark {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@keyframes sense-chip-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(201, 164, 74, 0.65) inset,
+      0 0 12px rgba(127, 174, 207, 0.5),
+      0 0 24px rgba(127, 174, 207, 0.12);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(201, 164, 74, 0.85) inset,
+      0 0 18px rgba(127, 174, 207, 0.72),
+      0 0 32px rgba(127, 174, 207, 0.22);
+  }
+}
+
+@media (max-width: 480px) {
+  .sense-ranking__row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .sense-ranking__chips {
+    justify-content: center;
+  }
+  .sense-chip { width: 34px; height: 34px; }
+}
