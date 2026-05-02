@@ -1790,6 +1790,37 @@ h3 {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
+/* Copy letter (A / B / C …) for duplicate-name cards in hand. Gold seal,
+   top-left, distinct enough to read at a glance but small so it never
+   competes with the card art. */
+.card-copy-label {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 220, 150, 0.35), rgba(0, 0, 0, 0) 70%),
+    linear-gradient(180deg, rgba(28, 22, 14, 0.95), rgba(14, 10, 6, 0.95));
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  border: 1px solid rgba(201, 164, 74, 0.7);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5) inset,
+    0 2px 6px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 6px rgba(201, 164, 74, 0.45);
+  pointer-events: none;
+}
+
 .badge.burned {
   background: rgba(139, 0, 0, 0.85);
 }

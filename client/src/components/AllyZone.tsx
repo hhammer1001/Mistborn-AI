@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
 import { METAL_ICONS } from "../data/metalIcons";
+import { copyLabelsForHand, nameWithCopy } from "../utils/copyLabels";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 
@@ -29,6 +30,7 @@ function getCompositeAllyActions(
   ally: CardData,
   actions: GameAction[],
   player: PlayerData,
+  copyLabels: Map<number, string>,
 ): CompositeAllyAction[] {
   const composites: CompositeAllyAction[] = [];
   const metal = ally.metal;
@@ -37,41 +39,75 @@ function getCompositeAllyActions(
   const metalName = METAL_NAMES[metal];
   const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
 
-  // Check if burn/flare token action exists for this metal
-  const burnTokenAction = actions.find((a) => a.code === 5 && a.metalIndex === metal);
-  if (!burnTokenAction) return composites;
-
-  const burnCount = player.metalTokens.slice(0, 8).filter((t) => t === 1).length + player.metalTokens[8];
-  const isFlare = burnCount >= player.burns;
-  const verb = isFlare ? "Flare" : "Burn";
-
-  // Ability 1: needs metalBurned > 0, available1 must be true
+  // Either path (burn token OR burn card) bumps metalBurned[metal] by 1.
+  // Ability 1 fires when metalBurned > 0 → pre-burn must be 0.
+  // Ability 2 fires when metalBurned > 1 → pre-burn must be 1.
   const hasAbility1 = ally.available1 && player.metalBurned[metal] === 0;
-  if (hasAbility1) {
-    composites.push({
-      textBefore: `${verb}`,
-      textAfter: "+ Ability 1",
-      metalIcon: icon,
-      isFlare,
-      title: `${verb} ${metalName} and use ${ally.name}'s first ability`,
-      firstActionIndex: burnTokenAction.index,
-      secondMatch: { code: 8, cardIds: [ally.id] },
-    });
+  const hasAbility2 = ally.available2 && player.metalBurned[metal] === 1;
+  if (!hasAbility1 && !hasAbility2) return composites;
+
+  // 1) Burn/Flare a metal TOKEN + ability — unchanged path.
+  const burnTokenAction = actions.find((a) => a.code === 5 && a.metalIndex === metal);
+  if (burnTokenAction) {
+    const burnCount = player.metalTokens.slice(0, 8).filter((t) => t === 1).length + player.metalTokens[8];
+    const isFlare = burnCount >= player.burns;
+    const verb = isFlare ? "Flare" : "Burn";
+
+    if (hasAbility1) {
+      composites.push({
+        textBefore: `${verb}`,
+        textAfter: "+ Ability 1",
+        metalIcon: icon,
+        isFlare,
+        title: `${verb} ${metalName} and use ${ally.name}'s first ability`,
+        firstActionIndex: burnTokenAction.index,
+        secondMatch: { code: 8, cardIds: [ally.id] },
+      });
+    }
+    if (hasAbility2) {
+      composites.push({
+        textBefore: `${verb}`,
+        textAfter: "+ Ability 2",
+        metalIcon: icon,
+        isFlare,
+        title: `${verb} ${metalName} and use ${ally.name}'s second ability`,
+        firstActionIndex: burnTokenAction.index,
+        secondMatch: { code: 9, cardIds: [ally.id] },
+      });
+    }
   }
 
-  // Ability 2: needs metalBurned > 1, available2 must be true
-  // One burn adds 1, so we need metalBurned to be exactly 1 (will become 2 after burn)
-  const hasAbility2 = ally.available2 && player.metalBurned[metal] === 1;
-  if (hasAbility2) {
-    composites.push({
-      textBefore: `${verb}`,
-      textAfter: "+ Ability 2",
-      metalIcon: icon,
-      isFlare,
-      title: `${verb} ${metalName} and use ${ally.name}'s second ability`,
-      firstActionIndex: burnTokenAction.index,
-      secondMatch: { code: 9, cardIds: [ally.id] },
-    });
+  // 2) Burn another CARD from hand for this metal + ability — mirrors the
+  //    Hand.tsx composite. Each burnable copy gets its own entry, with
+  //    duplicate-name copies disambiguated by their copy letter.
+  const burnCardActions = actions.filter(
+    (a) => a.code === 2 && a.metalIndex === metal && a.cardId !== undefined,
+  );
+  for (const burnAction of burnCardActions) {
+    const sourceCard = player.hand.find((c) => c.id === burnAction.cardId);
+    if (!sourceCard) continue;
+    const labeledName = nameWithCopy(sourceCard.name, copyLabels.get(sourceCard.id));
+
+    if (hasAbility1) {
+      composites.push({
+        textBefore: `Burn ${labeledName}`,
+        textAfter: "+ Ability 1",
+        metalIcon: icon,
+        title: `Burn ${labeledName} for ${metalName} and use ${ally.name}'s first ability`,
+        firstActionIndex: burnAction.index,
+        secondMatch: { code: 8, cardIds: [ally.id] },
+      });
+    }
+    if (hasAbility2) {
+      composites.push({
+        textBefore: `Burn ${labeledName}`,
+        textAfter: "+ Ability 2",
+        metalIcon: icon,
+        title: `Burn ${labeledName} for ${metalName} and use ${ally.name}'s second ability`,
+        firstActionIndex: burnAction.index,
+        secondMatch: { code: 9, cardIds: [ally.id] },
+      });
+    }
   }
 
   return composites;
@@ -158,6 +194,7 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
   if (allies.length === 0) return null;
 
   const isInteractive = !!player && !!onCompositeAction;
+  const copyLabels = isInteractive ? copyLabelsForHand(player!.hand) : new Map<number, string>();
 
   return (
     <div className="ally-zone">
@@ -165,7 +202,7 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
       <div className="card-row">
         {allies.map((ally) => {
           const allyActions = actions.filter((a) => a.cardId === ally.id && [8, 9].includes(a.code));
-          const composites = isInteractive ? getCompositeAllyActions(ally, actions, player!) : [];
+          const composites = isInteractive ? getCompositeAllyActions(ally, actions, player!, copyLabels) : [];
           const hasMenu = allyActions.length > 0 || composites.length > 0;
           const isSelected = selectedAlly === ally.id;
 

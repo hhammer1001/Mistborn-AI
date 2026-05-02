@@ -4,6 +4,7 @@ import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
 import { METAL_ICONS } from "../data/metalIcons";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
+import { copyLabelsForHand, nameWithCopy } from "../utils/copyLabels";
 
 const ATIUM_ICON_SRC = "/cards/atium%20token.png";
 
@@ -275,6 +276,7 @@ function getCompositeActions(
   allIds: number[],
   actions: GameAction[],
   player: PlayerData,
+  copyLabels: Map<number, string>,
 ): CompositeAction[] {
   const composites: CompositeAction[] = [];
   if (card.type !== "action" || card.burned) return composites;
@@ -307,26 +309,25 @@ function getCompositeActions(
     });
   }
 
-  // 2) "Burn [other card] + add to this card" — if another card can be burned for this metal
-  //    For stacked cards (count > 1), allow burning one copy of the same card
+  // 2) "Burn [other card] + add to this card" — every other-name burnable
+  //    card in hand gets its own entry. Duplicate-name copies are
+  //    distinguished by their copy letter (A/B/C…) so the player can pick
+  //    which specific copy to spend.
   const burnCardActions = actions.filter(
     (a) => a.code === 2 && a.metalIndex === cardMetal && a.cardId !== undefined
-           && (allIds.length > 1 ? a.cardId !== allIds[0] : !allIds.includes(a.cardId))
+           && !allIds.includes(a.cardId),
   );
-  // Deduplicate by source card name (stacked cards generate duplicate actions)
-  const seenSources = new Set<string>();
   for (const burnAction of burnCardActions) {
     const sourceCard = player.hand.find((c) => c.id === burnAction.cardId);
     const sourceName = sourceCard?.name ?? "card";
-    if (seenSources.has(sourceName)) continue;
-    seenSources.add(sourceName);
+    const labeledName = nameWithCopy(sourceName, sourceCard ? copyLabels.get(sourceCard.id) : undefined);
     const metalName = METAL_NAMES[cardMetal];
     const icon = metalIcon(cardMetal);
     composites.push({
-      textBefore: `Burn ${sourceCard?.name ?? "card"}`,
+      textBefore: `Burn ${labeledName}`,
       textAfter: nextAbilityLabel(card) ? `→ ${nextAbilityLabel(card)}` : "+ add",
       metalIcon: icon,
-      title: `Burn ${sourceCard?.name ?? "card"} for ${metalName} and add to ${card.name}`,
+      title: `Burn ${labeledName} for ${metalName} and add to ${card.name}`,
       firstActionIndex: burnAction.index,
       secondMatch: { code: 4, cardIds: allIds },
     });
@@ -354,6 +355,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
     actions.filter((a) => a.cardId !== undefined && ids.includes(a.cardId));
 
   const groups = groupCards(cards);
+  const copyLabels = copyLabelsForHand(cards);
 
   const handleCardClick = useCallback((groupId: number) => {
     setSelectedGroup((prev) => prev === groupId ? null : groupId);
@@ -371,7 +373,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
       <div className="card-row" ref={scrollRef}>
         {groups.map((group) => {
           const groupActions = getGroupActions(group.allIds);
-          const composites = getCompositeActions(group.card, group.allIds, actions, player);
+          const composites = getCompositeActions(group.card, group.allIds, actions, player, copyLabels);
           const hasActions = groupActions.length > 0 || composites.length > 0;
           const isSelected = selectedGroup === group.card.id;
           return (
@@ -384,6 +386,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
                 card={group.card}
                 highlighted={hasActions}
                 stackCount={group.count > 1 ? group.count : undefined}
+                copyLabel={copyLabels.get(group.card.id)}
                 onClick={hasActions ? () => handleCardClick(group.card.id) : undefined}
               />
               {isSelected && hasActions && (

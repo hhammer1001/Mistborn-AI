@@ -16,6 +16,10 @@ interface Props {
   cropped?: boolean;
   baseWidth?: number;
   stackCount?: number;
+  /** Letter ("A", "B", …) shown in the top-left corner when the player has
+   *  multiple copies of this card in hand. Lets menus and the player refer
+   *  to a specific copy. Omit when there's only one copy. */
+  copyLabel?: string;
 }
 
 function UprightSprite({ sprite, width }: { sprite: CardSprite; width: number }) {
@@ -190,7 +194,7 @@ function CardDetailPopup({ card, sprite, cardRef, scale }: {
   return createPortal(popup, document.body);
 }
 
-export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder, small, cropped, baseWidth, stackCount }: Props) {
+export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder, small, cropped, baseWidth, stackCount, copyLabel }: Props) {
   const [showTooltip, setShowTooltip] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const sprite = getCardSprite(card.name);
@@ -255,6 +259,7 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
           </div>
         )}
         {stackCount && <div className="card-stack-count">{stackCount}</div>}
+        {copyLabel && <div className="card-copy-label" aria-label={`Copy ${copyLabel}`}>{copyLabel}</div>}
       </div>
       {showTooltip && <CardDetailPopup card={card} sprite={sprite} cardRef={cardRef} scale={scale} />}
     </div>
