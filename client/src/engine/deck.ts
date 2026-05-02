@@ -174,13 +174,23 @@ export class Market extends Deck {
   }
 
   private _buildTestDeck() {
-    const hazekillerDef: CardDef = {
-      cardType: 3, name: "Hazekillers", cost: 4, metal: -1,
-      health: 3, defenseType: "D",
+    // 10 Charm + 10 Intimidate — both are cost-3 zinc (metal=4) action
+    // cards with ability 1 + ability 2. Duplicate names exercise the
+    // A/B/C copy-label UI in hand, and a hand of all-zinc cards lets the
+    // player keep burning one to fuel another card's ability progression.
+    const charmDef: CardDef = {
+      cardType: 2, name: "Charm", cost: 3, metal: 4,
+      ability1Effect: "M", ability1Amount: "3",
+      ability2Effect: "M", ability2Amount: "2",
+      burnEffect: "M", burnAmount: "2",
     };
-    for (let i = 0; i < 20; i++) {
-      this.cards.push(createCard(hazekillerDef));
-    }
+    const intimidateDef: CardDef = {
+      cardType: 2, name: "Intimidate", cost: 3, metal: 4,
+      ability1Effect: "M", ability1Amount: "3",
+      ability2Effect: "M.C", ability2Amount: "1.1",
+    };
+    for (let i = 0; i < 10; i++) this.cards.push(createCard(charmDef));
+    for (let i = 0; i < 10; i++) this.cards.push(createCard(intimidateDef));
   }
 
   buy(card: Card) {
