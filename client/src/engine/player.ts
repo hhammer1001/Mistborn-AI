@@ -94,12 +94,11 @@ export class Player {
     this.character = character;
     this.turnOrder = turnOrder;
     this.deck = deck;
-    this.curHealth = 36 + 2 * turnOrder;
-
-    if (this.curHealth > 40) {
-      this.curHealth = 40;
-      this.curBoxings = 1;
-    }
+    // Base HP. The going-second compensation (+2 per turn-position past
+    // first, with overflow above 40 converting to a starting boxing) is
+    // applied by GameSession after firstPlayer is known, since turnOrder
+    // here is the seat index, not the position in turn order.
+    this.curHealth = 36;
 
     const charDef = CHARACTER_DEFS[character];
     this.ability1metal = charDef ? String(charDef.ability1Metal) : "0";

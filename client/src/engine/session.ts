@@ -247,6 +247,20 @@ export class GameSession {
     this.activePlayer = first;
     this.game.turncount = 1;
 
+    // Going-second HP compensation: +2 HP per position past first in the
+    // turn order, capped at 40 with overflow becoming a starting boxing.
+    // Applied here (not in Player) because Player only knows its seat
+    // index, not who actually plays first.
+    for (let i = 0; i < this.players.length; i++) {
+      const positionInTurnOrder = (i - first + this.players.length) % this.players.length;
+      let hp = 36 + 2 * positionInTurnOrder;
+      if (hp > 40) {
+        this.players[i].curBoxings += hp - 40;
+        hp = 40;
+      }
+      this.players[i].curHealth = hp;
+    }
+
     // Start-of-turn routine for the first player: apply permanent bonuses,
     // play the allies/funding drawn into their initial hand (now pending),
     // then resolve training.
