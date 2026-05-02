@@ -78,7 +78,7 @@ function App() {
       userId:    auth.user?.id ?? "",
       name:      displayName,
     };
-    botGame.createGame(displayName, myChar, cfg.botType, oppChar, !cfg.youFirst, false, humanIdentity);
+    botGame.createGame(displayName, myChar, cfg.botType, oppChar, !cfg.youFirst, cfg.testDeck, humanIdentity);
     setMode("bot_game");
   };
 

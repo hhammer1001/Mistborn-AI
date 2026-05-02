@@ -11,6 +11,7 @@ export interface BotSetupConfig {
   oppChar: string;
   botType: BotType;
   youFirst: boolean;
+  testDeck: boolean;
 }
 
 export const DEFAULT_BOT_CONFIG: BotSetupConfig = {
@@ -18,6 +19,7 @@ export const DEFAULT_BOT_CONFIG: BotSetupConfig = {
   oppChar: "Random",
   botType: "zoom",
   youFirst: false,
+  testDeck: false,
 };
 
 export type LogMode = "all" | "bot" | "human";
