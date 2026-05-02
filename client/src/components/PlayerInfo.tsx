@@ -301,10 +301,10 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                   const canBurn = !!burnAtiumAction;
 
                   if (used) {
-                    return <button className="action-btn disabled" disabled>Ability III (used)</button>;
+                    return <button className="action-btn disabled" disabled>Ab III (used)</button>;
                   }
                   if (ready) {
-                    return <button className="action-btn" onClick={() => onAction!(ready.index)}>Use Ability III</button>;
+                    return <button className="action-btn" onClick={() => onAction!(ready.index)}>Use Ab III</button>;
                   }
                   if (canBurn && onCompositeAction) {
                     const handleChoose = (metalIndex: number) => {
@@ -320,7 +320,7 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                           className="action-btn"
                           onClick={() => setShowAbility3Choice(true)}
                         >
-                          Burn atium + Ability III
+                          Burn atium + Ab III
                         </button>
                         {showAbility3Choice && (
                           <MetalChoicePopup
@@ -333,8 +333,8 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
                       </>
                     );
                   }
-                  const reason = player.atium === 0 ? "no atium token" : "no burns";
-                  return <button className="action-btn disabled" disabled>Ability III ({reason})</button>;
+                  const reason = player.atium === 0 ? "no atium" : "no burns";
+                  return <button className="action-btn disabled" disabled>Ab III ({reason})</button>;
                 })()}
               </div>
             );
