@@ -3,6 +3,7 @@ import { Card, Action, Ally, Funding } from "./card";
 import { PlayerDeck } from "./deck";
 import type { Game } from "./game";
 import type { GameActionInternal } from "./types";
+import type { Rng } from "./rng";
 import {
   CHARACTER_CARD_RATINGS,
   CHARACTER_BUFFERS,
@@ -19,9 +20,12 @@ export class Twonky extends Player {
   protected missionLookup: Record<string, number>;
   protected buffer: number;
   private seekCount = 0;
+  /** Deterministic per-bot RNG sourced from game.botRngs at construction. */
+  protected rng: Rng;
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Twonky", character = "Marsh") {
     super(deck, game, turnOrder, name, character);
+    this.rng = game.botRngs[turnOrder];
 
     // Load character-specific card ratings
     this.buffer = CHARACTER_BUFFERS[character] ?? 0;
@@ -289,14 +293,14 @@ export class Twonky extends Player {
     if (options.includes("Mi")) return options.indexOf("Mi") >> 1;
     if (options.includes("T")) return options.indexOf("T") >> 1;
     if (options.includes("M")) return options.indexOf("M") >> 1;
-    return Math.floor(Math.random() * (options.length / 2));
+    return Math.floor(this.rng.next() * (options.length / 2));
   }
 
   override refreshIn(): number {
     for (let i = 0; i < this.metalTokens.length; i++) {
       if (this.metalTokens[i] === 2 || this.metalTokens[i] === 4) return i;
     }
-    return Math.floor(Math.random() * 8);
+    return this.rng.nextInt(8);
   }
 
   override pushIn(): number {

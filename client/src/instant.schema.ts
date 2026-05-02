@@ -75,6 +75,12 @@ const _schema = i.schema({
       forfeiter: i.number(),
       missionNames: i.any(),
       testDeck: i.boolean(),
+      // Replay payload — root seed (every RNG stream derives from this) plus
+      // the structured action log captured by GameSession. schemaVersion lets
+      // future shape changes coexist with older recorded matches.
+      seed: i.number().optional(),
+      actionLog: i.any().optional(),
+      schemaVersion: i.number().optional(),
     }),
     matchPlayers: i.entity({
       matchId: i.string().indexed(),

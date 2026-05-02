@@ -24,7 +24,7 @@ export const MINISTRY_METALS: MetalSigil[] = [
 
 export const MINISTRY_SYMBOL_SRC = "/ministry/symbol.png";
 
-export const BOT_TYPES = ["squash", "twonky", "synergy", "random", "hammer"] as const;
+export const BOT_TYPES = ["squash", "zoom", "twonky", "synergy", "random", "hammer"] as const;
 export type BotType = (typeof BOT_TYPES)[number];
 
 export const VICTORY_TYPES = ["Mission", "Combat", "Confrontation", "Forfeit"] as const;

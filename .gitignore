@@ -190,6 +190,15 @@ oldData
 !client/src/engine/data/*.json
 !client/src/engine/data/v2_weights/*.json
 !client/src/engine/data/synergyData/*.json
+!client/src/engine/data/squash_weights/*.json
+!client/src/engine/data/squash_timing/*.json
+!client/src/engine/data/zoom_weights/*.json
+!client/src/engine/data/zoom_timing/*.json
+!client/src/engine/data/zoom_vs_kelsier/*.json
+!client/src/engine/data/zoom_vs_shan/*.json
+!client/src/engine/data/zoom_vs_vin/*.json
+!client/src/engine/data/zoom_vs_marsh/*.json
+!client/src/engine/data/zoom_vs_prodigy/*.json
 !client/package.json
 !client/package-lock.json
 !client/tsconfig.json

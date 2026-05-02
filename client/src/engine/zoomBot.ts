@@ -1,0 +1,238 @@
+/**
+ * ZoomBot — going-second specialist. Same scoring methodology as SquashBot
+ * (state-aware action scoring + first-principles analytical card values
+ * blended with self-play correlations and acquisition-timing data), but
+ * trained on a corpus of mirror games where only the SECOND-PLAYER seat is
+ * recorded. This pushes Zoom's card weights toward whatever wins from a
+ * tempo-deficit position rather than toward the average mirror outcome.
+ *
+ * Lookahead: when enabled, ZoomBot does 1-ply state-value lookahead in seat
+ * 2 — for each candidate action, snapshot game → simulate the action →
+ * score the resulting state → restore. Pick action whose resulting state
+ * scores highest. Captures "what's the state value AFTER this action" rather
+ * than "what's the immediate effect value of this action," which lets Zoom
+ * see cascading effects (e.g. burning a metal that unlocks another card's
+ * tier-2 ability vs just the burn's direct value).
+ */
+
+import type { Game } from "./game";
+import type { Player } from "./player";
+import type { PlayerDeck } from "./deck";
+import { SquashBot } from "./squashBot";
+import { type BotProfile } from "./squashBotEval";
+import type { GameActionInternal } from "./types";
+import { snapshotGame, restoreGame } from "./gameSnapshot";
+
+export class ZoomBot extends SquashBot {
+  static seat2Variance = 0;
+
+  /** Enable 1-ply heuristic-chain lookahead in seat 2. Each candidate's value
+   * is its immediate heuristic plus a discounted contribution from the
+   * heuristic-best follow-up in the post-action state. Captures "X enables Y"
+   * effects. ~2× slower than heuristic-only at runtime.
+   *
+   * Off during self-play training (clean signal needed; lookahead-trained
+   * data regressed in testing). */
+  static lookaheadEnabled = true;
+
+  /** When opp HP ≤ this, do a tactical lethal search before normal action
+   * selection. Pattern from chess endgame solvers / Hearthstone lethal calc. */
+  static lethalThreshold = 14;
+
+  /** Top-K candidates from heuristic scoring to apply lookahead to.
+   * K=2 narrowly beat K=3 globally (39.26% vs 39.08% over 40k samples). */
+  static lookaheadTopK = 2;
+
+  /** Discount on follow-up heuristic value vs immediate.
+   * 0.55-0.65 tied around 39.6%; 0.8 was 39.3%. Lower weight prevents the
+   * lookahead from over-trusting noisy follow-up estimates. */
+  static followupWeight = 0.6;
+
+  constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Zoom Bot", character = "Marsh") {
+    super(deck, game, turnOrder, name, character);
+  }
+
+  protected override get evalProfile(): BotProfile {
+    return "zoom";
+  }
+
+  override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
+    if (
+      !ZoomBot.lookaheadEnabled ||
+      this.turnOrder !== 1 ||
+      SquashBot.explorationRate > 0 ||
+      actions.length < 2
+    ) {
+      return super.selectAction(actions, game);
+    }
+
+    // Lethal solver: when opp HP is in striking range, do a greedy depth
+    // search for kill sequences. If lethal exists, return the next step on
+    // the kill path. Cheap & effective — research-doc-recommended pattern.
+    const opp = game.players[(this.turnOrder + 1) % 2];
+    if (opp.curHealth > 0 && opp.curHealth <= ZoomBot.lethalThreshold) {
+      const lethal = this.findLethalAction(actions, game);
+      if (lethal) return lethal;
+    }
+
+    // Heuristic scoring narrows the candidate set.
+    const { scored } = this.scoreAndSortActions(actions, game);
+    const candidates = scored.slice(0, ZoomBot.lookaheadTopK);
+
+    const stateBefore = snapshotGame(game);
+    let bestAction: GameActionInternal = candidates[0].action;
+    let bestValue = -Infinity;
+
+    for (const cand of candidates) {
+      const action = cand.action;
+      let value: number = cand.score;
+
+      if (action.type !== "end_actions") {
+        try {
+          this.performAction(action, game);
+          if (game.winner === this) value += 1000;
+          else if (game.winner && game.winner !== this) value -= 1000;
+          else {
+            // 1-ply chain: best follow-up heuristic from post-action state
+            const nextActions = this.availableActions(game);
+            if (nextActions.length > 0) {
+              const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
+              const followup = nextScored[0]?.score ?? 0;
+              value += followup * ZoomBot.followupWeight;
+            }
+          }
+        } catch {
+          // Sim failed — keep heuristic value
+        } finally {
+          restoreGame(game, stateBefore);
+        }
+      }
+
+      if (value > bestValue) {
+        bestValue = value;
+        bestAction = action;
+      }
+    }
+
+    // Reset action count when ending turn (mirrors SquashBot's behavior)
+    if (bestAction.type === "end_actions") {
+      (this as unknown as { actionCount: number }).actionCount = 0;
+    } else {
+      const ac = this as unknown as { actionCount?: number };
+      ac.actionCount = (ac.actionCount ?? 0) + 1;
+      if (ac.actionCount > 200) {
+        ac.actionCount = 0;
+        return actions.find((a) => a.type === "end_actions")!;
+      }
+    }
+
+    return bestAction;
+  }
+
+  /**
+   * Lethal solver: starting from `actions`, search for a sequence that ends
+   * in opp's death this turn. Returns the FIRST action of the kill sequence
+   * (or null if no kill found within the depth/breadth budget).
+   *
+   * Strategy: greedy by damage-priority — try damage-producing actions first,
+   * accumulate curDamage, simulate game.attack at each "could-end-turn" point.
+   * If accumulated damage exceeds opp HP (after defenders), found lethal.
+   *
+   * Bounded by max actions per branch; uses snapshot/restore to avoid game
+   * state corruption. Cost: ~5-15 simulations per call when in striking range.
+   */
+  private findLethalAction(
+    actions: GameActionInternal[],
+    game: Game,
+  ): GameActionInternal | null {
+    const opp = game.players[(this.turnOrder + 1) % 2];
+    const oppDefenderHP = opp.allies.reduce((s, a) => s + (a.defender ? a.health : 0), 0);
+    const damageNeeded = opp.curHealth + oppDefenderHP;
+
+    // Quick-check: rank candidate actions by IMMEDIATE damage potential.
+    // For each candidate, simulate; if game.winner becomes us within rollout, lethal.
+    const damageCandidates = actions.filter((a) =>
+      a.type !== "end_actions" && a.type !== "buy_boxing"
+    );
+    if (damageCandidates.length === 0) return null;
+
+    const stateBefore = snapshotGame(game);
+    let lethalFirstAction: GameActionInternal | null = null;
+    let bestLethalDamage = -Infinity;
+
+    for (const first of damageCandidates) {
+      try {
+        this.performAction(first, game);
+        if (game.winner === this) {
+          // Direct kill — already best.
+          restoreGame(game, stateBefore);
+          return first;
+        }
+        // Greedy follow-up: keep performing highest-damage actions until end_actions
+        // or no more damage moves.
+        let damageBuilt = this.curDamage;
+        for (let depth = 0; depth < 12; depth++) {
+          const next = this.availableActions(game);
+          // Prefer actions that build curDamage
+          const damaging = next.filter((a) => a.type !== "end_actions" && a.type !== "buy_boxing");
+          if (damaging.length === 0) break;
+          // Use heuristic to pick best — but bias toward damage by checking curDamage
+          const { scored } = this.scoreAndSortActions(damaging, game);
+          const best = scored[0]?.action;
+          if (!best) break;
+          try {
+            this.performAction(best, game);
+          } catch {
+            break;
+          }
+          if (game.winner === this) {
+            restoreGame(game, stateBefore);
+            return first;
+          }
+          damageBuilt = Math.max(damageBuilt, this.curDamage);
+        }
+        // Check if accumulated damage would kill (curDamage at end of branch)
+        if (this.curDamage >= damageNeeded && this.curDamage > bestLethalDamage) {
+          bestLethalDamage = this.curDamage;
+          lethalFirstAction = first;
+        }
+      } catch {
+        // Skip failed branches
+      } finally {
+        restoreGame(game, stateBefore);
+      }
+    }
+
+    return lethalFirstAction;
+  }
+
+  protected override maybeOverridePick(
+    picked: GameActionInternal,
+    scored: { action: GameActionInternal; score: number }[],
+  ): GameActionInternal {
+    // Variance hook (kept for testing — disabled by default since it regressed)
+    if (SquashBot.explorationRate > 0) return picked;
+    if (ZoomBot.seat2Variance <= 0) return picked;
+    if (this.turnOrder !== 1) return picked;
+    if (picked.type === "end_actions") return picked;
+    if (this.rng.next() >= ZoomBot.seat2Variance) return picked;
+
+    const candidates = scored
+      .filter((s) => s.action.type !== "end_actions")
+      .slice(0, 3)
+      .map((s) => s.action);
+    if (candidates.length < 2) return picked;
+    return candidates[this.rng.nextInt(candidates.length)];
+  }
+}
+
+/** Factory function for creating Zoom bots */
+export function createZoomBot(
+  deck: PlayerDeck,
+  game: Game,
+  turnOrder: number,
+  name: string,
+  character: string,
+): Player {
+  return new ZoomBot(deck, game, turnOrder, name, character);
+}

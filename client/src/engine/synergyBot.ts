@@ -15,6 +15,7 @@ import { Card, Action, Ally } from "./card";
 import { PlayerDeck } from "./deck";
 import type { Game } from "./game";
 import type { GameActionInternal } from "./types";
+import type { Rng } from "./rng";
 
 import Kelsier0 from "./data/synergyData/Kelsier0.json";
 import Kelsier1 from "./data/synergyData/Kelsier1.json";
@@ -65,9 +66,12 @@ export class SynergyBotPrime extends Player {
   private numCards = 0;
   private totalValue = 0;
   private count = 0;
+  /** Deterministic per-bot RNG sourced from game.botRngs at construction. */
+  private rng: Rng;
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Synergy", character = "Kelsier") {
     super(deck, game, turnOrder, name, character);
+    this.rng = game.botRngs[turnOrder];
 
     // Pick per-character, per-turn-order synergy table (fallback: Kelsier0).
     const charTables = SYNERGY_DATA[character] ?? SYNERGY_DATA.Kelsier;
@@ -390,31 +394,31 @@ export class SynergyBotPrime extends Player {
 
   override chooseIn(options: string[]): number {
     const k = Math.max(0, Math.floor(options.length / 2) - 1);
-    return Math.floor(Math.random() * (k + 1));
+    return this.rng.nextInt(k + 1);
   }
 
   override refreshIn(): number {
     for (let i = 0; i < this.metalTokens.length; i++) {
       if (this.metalTokens[i] === 2 || this.metalTokens[i] === 4) return i;
     }
-    return Math.floor(Math.random() * 8);
+    return this.rng.nextInt(8);
   }
 
   override pushIn(): number {
     const len = this.game.market.hand.length;
-    return Math.floor(Math.random() * (len + 1)) - 1;
+    return this.rng.nextInt(len + 1) - 1;
   }
 
   override riotIn(riotable: Ally[]): Ally {
-    return riotable[Math.floor(Math.random() * riotable.length)];
+    return riotable[this.rng.nextInt(riotable.length)];
   }
 
   override seekIn(twice: boolean, _seeker: boolean, choices: Action[]): [number, number] {
     if (choices.length === 0) return [-1, -1];
-    const choice = Math.floor(Math.random() * (choices.length + 1)) - 1;
+    const choice = this.rng.nextInt(choices.length + 1) - 1;
     let choice2 = -1;
     if (twice) {
-      choice2 = Math.floor(Math.random() * choices.length) - 1;
+      choice2 = this.rng.nextInt(choices.length) - 1;
       if (choice === choice2 && choice > -1) choice2 += 1;
     }
     return [choice, choice2];

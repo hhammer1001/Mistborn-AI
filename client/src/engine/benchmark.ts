@@ -8,13 +8,15 @@
 import { Game, type PlayerFactory } from "./game";
 import { createTwonky } from "./bot";
 import { createSquashBot } from "./squashBot";
+import { createZoomBot } from "./zoomBot";
 import { createSynergyBotPrime } from "./synergyBot";
 import { resetCardIds } from "./card";
 
-type BotName = "V1" | "Squash" | "Synergy";
+type BotName = "V1" | "Squash" | "Zoom" | "Synergy";
 const BOT_FACTORIES: Record<BotName, PlayerFactory> = {
   V1: createTwonky as PlayerFactory,
   Squash: createSquashBot as PlayerFactory,
+  Zoom: createZoomBot as PlayerFactory,
   Synergy: createSynergyBotPrime as PlayerFactory,
 };
 
@@ -211,6 +213,81 @@ function matchup(botA: BotName, botB: BotName, numGamesPerMatchup: number) {
   return { botA, botB, wins: totalAWins, total: totalGames, pct: overallPct };
 }
 
+// ── Zoom going-second specialist benchmark ──
+// Zoom is trained to specialize in the second-player seat. This pins Zoom to
+// seat 2 every game (no alternation) and runs it against the named opponent
+// in seat 1, across all asymmetric character pairings. Reports how well
+// Zoom-going-second performs against the chosen opponent-going-first.
+
+function zoomSecondSeatBench(
+  opponent: BotName,
+  numGamesPerMatchup: number,
+  secondSeatBot: BotName = "Zoom",
+) {
+  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+  const fOpp = BOT_FACTORIES[opponent];
+  const fSecond = BOT_FACTORIES[secondSeatBot];
+
+  let totalSecondWins = 0;
+  let totalGames = 0;
+  const vt: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };
+
+  console.log(`\n${secondSeatBot} (going second) vs ${opponent} (going first) — ${numGamesPerMatchup} games per matchup`);
+  console.log(`(${numGamesPerMatchup * chars.length * (chars.length - 1)} total)\n`);
+  console.log("Matchup".padEnd(25) + `${secondSeatBot} Win%`.padStart(12) + `${secondSeatBot} Wins`.padStart(13) + "Avg Turns".padStart(12) + "  Victory Distribution");
+  console.log("-".repeat(95));
+
+  for (const cFirst of chars) {
+    for (const cSecond of chars) {
+      if (cFirst === cSecond) continue;
+
+      let wins = 0;
+      let total = 0;
+      let totalTurns = 0;
+      const mVt: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };
+
+      for (let i = 0; i < numGamesPerMatchup; i++) {
+        try {
+          resetCardIds();
+          const game = new Game({
+            playerFactories: [fOpp, fSecond],
+            names: [opponent, secondSeatBot],
+            chars: [cFirst, cSecond],
+          });
+          const winner = game.play();
+          total++;
+          totalTurns += game.turncount;
+          if (winner.name === secondSeatBot) wins++;
+          if (game.victoryType in mVt) mVt[game.victoryType]++;
+        } catch (e) {
+          console.error(`  Error in ${cFirst} vs ${cSecond} game ${i}: ${e}`);
+        }
+      }
+
+      totalSecondWins += wins;
+      totalGames += total;
+      for (const k of Object.keys(vt)) vt[k] += mVt[k];
+
+      const winPct = total > 0 ? (wins / total * 100).toFixed(1) : "N/A";
+      const avgTurns = total > 0 ? (totalTurns / total).toFixed(0) : "N/A";
+      const vtDist = Object.entries(mVt).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v}`).join(" ");
+
+      console.log(
+        `${cFirst} vs ${cSecond}`.padEnd(25) +
+        `${winPct}%`.padStart(12) +
+        `${wins}/${total}`.padStart(13) +
+        `${avgTurns}`.padStart(12) +
+        `  ${vtDist}`,
+      );
+    }
+  }
+
+  console.log("-".repeat(95));
+  const overallPct = totalGames > 0 ? (totalSecondWins / totalGames * 100).toFixed(1) : "N/A";
+  console.log(`\n${secondSeatBot} (going second) vs ${opponent} (going first) overall: ${totalSecondWins}/${totalGames} (${overallPct}%)`);
+  console.log("Victory type distribution:", vt, "\n");
+}
+
 // ── Baseline: V1 vs V1 sanity check ──
 
 function baseline(numGames: number) {
@@ -245,6 +322,16 @@ const mode = args[0] || "benchmark";
 if (mode === "baseline") {
   const n = parseInt(args[1] || "100", 10);
   baseline(isNaN(n) ? 100 : n);
+} else if (mode === "zoom") {
+  // npx tsx benchmark.ts zoom [opponent=Squash] [games=20] [secondSeatBot=Zoom]
+  const opp = (args[1] as BotName) || "Squash";
+  const n = parseInt(args[2] || "20", 10);
+  const second = ((args[3] as BotName) || "Zoom");
+  if (!BOT_FACTORIES[opp] || !BOT_FACTORIES[second]) {
+    console.error(`Usage: zoom <V1|Squash|Synergy> [games] [V1|Squash|Zoom|Synergy]`);
+    process.exit(1);
+  }
+  zoomSecondSeatBench(opp, isNaN(n) ? 20 : n, second);
 } else if (mode === "synergy") {
   const n = parseInt(args[1] || "20", 10);
   const games = isNaN(n) ? 20 : n;

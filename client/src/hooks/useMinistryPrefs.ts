@@ -16,7 +16,7 @@ export interface BotSetupConfig {
 export const DEFAULT_BOT_CONFIG: BotSetupConfig = {
   myChar: "Random",
   oppChar: "Random",
-  botType: "squash",
+  botType: "zoom",
   youFirst: false,
 };
 

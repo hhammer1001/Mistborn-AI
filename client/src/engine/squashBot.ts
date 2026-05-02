@@ -8,6 +8,8 @@ import { Card, Action, Ally, Funding } from "./card";
 import { PlayerDeck } from "./deck";
 import type { Game } from "./game";
 import type { GameActionInternal } from "./types";
+import type { Rng } from "./rng";
+import type { ActionAnnotation } from "./session";
 import {
   buildSnapshot,
   estimateEffectValue,
@@ -18,6 +20,7 @@ import {
   ANALYTICAL_RATINGS,
   MISSION_INTRINSIC,
   type GameStateSnapshot,
+  type BotProfile,
 } from "./squashBotEval";
 
 export class SquashBot extends Player {
@@ -26,9 +29,32 @@ export class SquashBot extends Player {
   // Exploration rate for self-play data collection — 0 for normal play.
   // When > 0, bot occasionally picks a near-best action instead of the best.
   static explorationRate = 0;
+  /** Deterministic per-bot RNG sourced from game.botRngs at construction. */
+  protected rng: Rng;
+  /** Cached after each selectAction; consumed once by the session's bot
+   *  performAction wrapper so each bot_action event carries the score for
+   *  the picked move plus the top alternatives the bot considered. */
+  private _lastAnnotation: ActionAnnotation | null = null;
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Squash Bot", character = "Marsh") {
     super(deck, game, turnOrder, name, character);
+    this.rng = game.botRngs[turnOrder];
+  }
+
+  lastDecisionAnnotation(): ActionAnnotation | null {
+    const a = this._lastAnnotation;
+    this._lastAnnotation = null;
+    return a;
+  }
+
+  /**
+   * Selects which evaluator profile to use — controls which self-play /
+   * timing-data weights feed into card ratings and buffer. Subclasses
+   * (e.g. ZoomBot) override to swap in a profile trained on different
+   * conditions (e.g. going second only).
+   */
+  protected get evalProfile(): BotProfile {
+    return "squash";
   }
 
   // ── Card evaluation ──
@@ -43,6 +69,20 @@ export class SquashBot extends Player {
 
   // ── Action selection: score everything, pick the best ──
 
+  /**
+   * Score every action and return them sorted best-first. Exposed protected
+   * so subclasses (ZoomBot) can pick from top-N for variance injection.
+   */
+  protected scoreAndSortActions(
+    actions: GameActionInternal[],
+    game: Game,
+  ): { snap: GameStateSnapshot; scored: { action: GameActionInternal; score: number }[] } {
+    const snap = buildSnapshot(this, game, this.evalProfile);
+    const scored = actions.map((a) => ({ action: a, score: this.scoreAction(a, snap, game) }));
+    scored.sort((a, b) => b.score - a.score);
+    return { snap, scored };
+  }
+
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
     // Safety: prevent infinite action loops
     this.actionCount++;
@@ -51,26 +91,48 @@ export class SquashBot extends Player {
       return actions.find((a) => a.type === "end_actions")!;
     }
 
-    const snap = buildSnapshot(this, game);
-
-    // Score all actions
-    const scored = actions.map((a) => ({ action: a, score: this.scoreAction(a, snap, game) }));
-    scored.sort((a, b) => b.score - a.score);
+    const { scored } = this.scoreAndSortActions(actions, game);
 
     let picked = scored[0].action;
 
     // Epsilon-greedy exploration (only during self-play data collection)
-    if (SquashBot.explorationRate > 0 && scored.length > 1 && Math.random() < SquashBot.explorationRate) {
+    if (SquashBot.explorationRate > 0 && scored.length > 1 && this.rng.next() < SquashBot.explorationRate) {
       // Pick a random action from the top-5 (weighted toward the best)
       const topN = Math.min(5, scored.length);
-      const idx = Math.floor(Math.random() * topN);
+      const idx = this.rng.nextInt(topN);
       picked = scored[idx].action;
     }
+
+    // Subclass hook for runtime action selection (e.g., ZoomBot's seat-2 variance)
+    picked = this.maybeOverridePick(picked, scored);
+
+    // Cache annotation for the session's action-log writer. Top-5 alternatives
+    // is enough to reconstruct the decision context without bloating the log.
+    const pickedScore = scored.find((s) => s.action === picked)?.score ?? scored[0].score;
+    this._lastAnnotation = {
+      picked: { score: pickedScore },
+      alternatives: scored.slice(0, 5).map((s) => ({
+        description: this.serializeAction(s.action, game).description,
+        score: s.score,
+      })),
+    };
 
     if (picked.type === "end_actions") {
       this.actionCount = 0;
     }
 
+    return picked;
+  }
+
+  /**
+   * Subclass hook: given the deterministic best pick and the full scored
+   * ranking, optionally return a different action (e.g., for variance
+   * injection). Default: keep the deterministic pick.
+   */
+  protected maybeOverridePick(
+    picked: GameActionInternal,
+    _scored: { action: GameActionInternal; score: number }[],
+  ): GameActionInternal {
     return picked;
   }
 
@@ -121,6 +183,15 @@ export class SquashBot extends Player {
     // First-to-tier bonus (first player to reach a tier gets bonus rewards)
     if (mSnap.myRank >= mSnap.oppRank) score += 8;
 
+    // Per-mission opp-lead awareness: penalize advancing a mission opp leads
+    // by significant margin. Don't waste actions catching up; focus on
+    // missions where Zoom can win the race or share progress with no loss.
+    if (snap.profile === "zoom" && snap.turnOrder === 1) {
+      const lead = mSnap.oppRank - mSnap.myRank;
+      if (lead >= 4) score -= 12;       // opp dominates — hard to recover
+      else if (lead >= 2) score -= 5;   // opp ahead — diminishing returns
+    }
+
     // Mission victory proximity — about to win the game!
     if (snap.completedMissions === 2 && mSnap.distanceToComplete <= 3) {
       score += 60;
@@ -145,7 +216,12 @@ export class SquashBot extends Player {
 
     // Victory path multiplier
     if (snap.victoryPath === "damage") score *= 0.7;
-    if (snap.victoryPath === "mission") score *= 1.2;
+    if (snap.victoryPath === "mission") {
+      // Shan-zoom is ~20% win rate; commit harder to mission as her one
+      // viable path. Plateau at 1.8+ in Shan-focused sweep (n=4000).
+      const m = snap.profile === "zoom" && this.character === "Shan" ? 1.8 : 1.2;
+      score *= m;
+    }
 
     return score;
   }
@@ -333,7 +409,21 @@ export class SquashBot extends Player {
     action: GameActionInternal & { type: "use_atium" },
     snap: GameStateSnapshot,
   ): number {
-    return metalUnlockValue(action.metalIndex, this, snap) - 2;
+    // For Zoom seat 2: atium-banking. Atium is rare and valuable for late-
+    // game burst. Higher use cost when opp is far from death (save it),
+    // lower when opp is in killing range (cash it in).
+    let cost = 2;
+    if (snap.profile === "zoom" && snap.turnOrder === 1) {
+      if (this.character === "Shan") {
+        // Shan-zoom is mission/status-focused; atium is more valuable saved
+        // for late-game flexibility than for damage. Plateau at cost ≥ 6 in
+        // sweep, settled on 8 as a stable midpoint.
+        cost = 8;
+      } else if (snap.oppHealth > 25) cost = 6;       // save atium — opp is healthy
+      else if (snap.oppHealth > 15) cost = 4;  // moderate
+      else if (snap.oppHealth <= 8) cost = 0;  // burn for the kill
+    }
+    return metalUnlockValue(action.metalIndex, this, snap) - cost;
   }
 
   private scoreBuyBoxing(snap: GameStateSnapshot): number {
@@ -362,7 +452,7 @@ export class SquashBot extends Player {
     if (targets.length === 0) return -1;
 
     // Priority: kill defenders first, then highest ability-value allies
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const scored = targets.map((ally, i) => {
       let score = 0;
       // Defenders are high priority to remove
@@ -396,7 +486,7 @@ export class SquashBot extends Player {
     if (allies.length === 0) return -1;
 
     // Kill defenders first, then highest-ability, then highest-health
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const scored = allies.map((ally, i) => {
       let score = 0;
       if (ally.defender) score += 10;
@@ -425,7 +515,7 @@ export class SquashBot extends Player {
     const c = this.deck.cards.length;
     if (d + h + c < 6) return -1;
 
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
 
     // Prioritize eliminating Funding
     for (let i = 0; i < this.deck.hand.length; i++) {
@@ -452,7 +542,7 @@ export class SquashBot extends Player {
   }
 
   override pullIn(): number {
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const sorted = this.deck.discard
       .map((c, i) => ({ i, score: this.cardRating(c, snap) }))
       .sort((a, b) => b.score - a.score);
@@ -462,7 +552,7 @@ export class SquashBot extends Player {
   }
 
   override subdueIn(choices: Card[]): number {
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const sorted = choices
       .map((c, i) => ({ i, score: this.cardRating(c, snap) }))
       .sort((a, b) => b.score - a.score);
@@ -472,7 +562,7 @@ export class SquashBot extends Player {
   }
 
   override soarIn(choices: Card[]): number {
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const sorted = choices
       .map((c, i) => ({ i, score: this.cardRating(c, snap) }))
       .sort((a, b) => b.score - a.score);
@@ -482,7 +572,7 @@ export class SquashBot extends Player {
   }
 
   override confrontationIn(choices: Action[]): number {
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const sorted = choices
       .map((c, i) => ({ i, score: estimateEffectValue(c.data[3], c.data[4], snap) }))
       .sort((a, b) => b.score - a.score);
@@ -492,7 +582,7 @@ export class SquashBot extends Player {
 
   override informantIn(card: Card): boolean {
     // Eliminate top of deck if it's low value
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     return this.cardRating(card, snap) < dynamicBuffer(this.character, snap);
   }
 
@@ -502,7 +592,7 @@ export class SquashBot extends Player {
 
   override chooseIn(options: string[]): number {
     // Evaluate each option pair with estimateEffectValue
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     let bestIdx = 0;
     let bestVal = -Infinity;
 
@@ -518,7 +608,7 @@ export class SquashBot extends Player {
 
   override refreshIn(): number {
     // Refresh the most valuable burned/flared token
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     let bestIdx = 0;
     let bestVal = -Infinity;
 
@@ -537,7 +627,7 @@ export class SquashBot extends Player {
       for (let i = 0; i < this.metalTokens.length; i++) {
         if (this.metalTokens[i] === 2 || this.metalTokens[i] === 4) return i;
       }
-      return Math.floor(Math.random() * 8);
+      return this.rng.nextInt(8);
     }
 
     return bestIdx;
@@ -545,7 +635,7 @@ export class SquashBot extends Player {
 
   override pushIn(): number {
     // Push the highest-rated market card (deny it from opponent)
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const choices = this.game.market.hand;
     const sorted = choices
       .map((c, i) => ({ i, score: this.cardRating(c, snap) }))
@@ -556,7 +646,7 @@ export class SquashBot extends Player {
 
   override riotIn(riotable: Ally[]): Ally {
     // Pick the ally whose ability produces the highest value
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const scored = riotable.map((ally) => ({
       ally,
       score: estimateEffectValue(ally.data[3], ally.data[4], snap),
@@ -569,7 +659,7 @@ export class SquashBot extends Player {
     this.seekCount += 1;
     if (this.seekCount > 100) return [-1, -1];
 
-    const snap = buildSnapshot(this, this.game);
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
     const sorted = choices
       .map((c, i) => ({ i, score: estimateEffectValue(c.data[3], c.data[4], snap) }))
       .sort((a, b) => b.score - a.score);

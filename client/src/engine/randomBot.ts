@@ -13,10 +13,10 @@ export class RandomBot extends Twonky {
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Random", character = "Marsh") {
     super(deck, game, turnOrder, name, character);
-    this.buffer = Math.random() * 0.5 - 0.25;
+    this.buffer = this.rng.next() * 0.5 - 0.25;
     this.missionLookup = new Proxy(this.randomMissionCache, {
       get: (target, prop: string) => {
-        if (!(prop in target)) target[prop] = Math.random();
+        if (!(prop in target)) target[prop] = this.rng.next();
         return target[prop];
       },
     });
@@ -24,7 +24,7 @@ export class RandomBot extends Twonky {
 
   protected override cardLookup(card: Card): number {
     if (!(card.name in this.randomCardCache)) {
-      this.randomCardCache[card.name] = Math.random();
+      this.randomCardCache[card.name] = this.rng.next();
     }
     return this.randomCardCache[card.name];
   }

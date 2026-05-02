@@ -2,10 +2,11 @@ import { Card, Ally, Funding, createCard } from "./card";
 import type { CardDef } from "./types";
 import { STARTER_DECKS } from "./data/starterDecks";
 import { MARKET_DECK } from "./data/marketDeck";
+import { Rng } from "./rng";
 
-function shuffle<T>(arr: T[]): T[] {
+function shuffle<T>(arr: T[], rng: Rng): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = rng.nextInt(i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -26,13 +27,16 @@ export class Deck {
   cards: Card[] = [];
   discard: Card[] = [];
   setAside: Card[] = [];
+  /** Stream used for mid-game reshuffles. Set by subclass constructors;
+   *  cloned decks (Object.create) must copy this from the original. */
+  rng!: Rng;
 
   draw(amount: number) {
     for (let i = 0; i < amount; i++) {
       if (this.cards.length === 0) {
         this.cards = this.discard;
         this.discard = [];
-        shuffle(this.cards);
+        shuffle(this.cards, this.rng);
         if (this.cards.length === 0) return;
       }
       this.hand.push(this.cards.shift()!);
@@ -52,15 +56,20 @@ export interface PlayerLike {
 }
 
 export class PlayerDeck extends Deck {
-  constructor(characterCode: string) {
+  /** initRng is consumed exactly once for the constructor's initial shuffle.
+   *  gameRng is retained on `this.rng` for every mid-game reshuffle. Splitting
+   *  the two streams keeps the initial deck order stable across unrelated
+   *  changes elsewhere in the engine. */
+  constructor(characterCode: string, initRng: Rng, gameRng: Rng) {
     super();
+    this.rng = gameRng;
     // Select starter deck group based on character
     const deckGroup = ["Kelsier", "Shan"].includes(characterCode) ? 0 : 1;
     const defs = STARTER_DECKS.filter((d) => d.deckGroup === deckGroup);
     for (const def of defs) {
       this.cards.push(createCard(def));
     }
-    shuffle(this.cards);
+    shuffle(this.cards, initRng);
   }
 
   /** Draw cards. By default, auto-plays Allies (→ zone) and Funding (→ money)
@@ -77,7 +86,7 @@ export class PlayerDeck extends Deck {
       if (this.cards.length === 0) {
         this.cards = this.discard;
         this.discard = [];
-        shuffle(this.cards);
+        shuffle(this.cards, this.rng);
         if (this.cards.length === 0) return;
       }
       const card = this.cards.shift()!;
@@ -139,6 +148,7 @@ export class PlayerDeck extends Deck {
     d.cards = this.cards.map((c) => cloneThrough(c, cardMap));
     d.discard = this.discard.map((c) => cloneThrough(c, cardMap));
     d.setAside = this.setAside.map((c) => cloneThrough(c, cardMap));
+    d.rng = this.rng.clone();
     return d;
   }
 }
@@ -146,8 +156,12 @@ export class PlayerDeck extends Deck {
 // ── Market ──
 
 export class Market extends Deck {
-  constructor(testDeck = false) {
+  /** marketRng is consumed exactly once for the initial shuffle (and is
+   *  intentionally an independent stream so the market order stays fixed
+   *  across unrelated changes). gameRng handles any future reshuffle. */
+  constructor(testDeck: boolean, marketRng: Rng, gameRng: Rng) {
     super();
+    this.rng = gameRng;
     if (testDeck) {
       this._buildTestDeck();
     } else {
@@ -155,7 +169,7 @@ export class Market extends Deck {
         this.cards.push(createCard(def));
       }
     }
-    shuffle(this.cards);
+    shuffle(this.cards, marketRng);
     this.draw(6);
   }
 
@@ -183,6 +197,7 @@ export class Market extends Deck {
     m.cards = this.cards.map((c) => cloneThrough(c, cardMap));
     m.discard = this.discard.map((c) => cloneThrough(c, cardMap));
     m.setAside = this.setAside.map((c) => cloneThrough(c, cardMap));
+    m.rng = this.rng.clone();
     return m;
   }
 }

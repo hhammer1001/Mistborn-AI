@@ -3,6 +3,7 @@ import { Ally, Card } from "./card";
 import { PlayerDeck, Market } from "./deck";
 import { Mission } from "./mission";
 import { MISSION_TIERS, ALL_MISSION_NAMES, METAL_NAMES } from "./types";
+import { Rng, randomSeed, subRng } from "./rng";
 
 export type PlayerFactory = (
   deck: PlayerDeck,
@@ -25,6 +26,16 @@ export class Game {
   missions: Mission[];
   decks: PlayerDeck[];
   players: Player[];
+  /** Root seed for this game. All RNG streams are derived from it via
+   *  `subRng(seed, label)`. Persist this for replay. */
+  seed: number;
+  /** Stream used for mission picks and any future game-wide randomness.
+   *  Independent of the market/initial-deck streams so consuming this
+   *  more or less doesn't perturb the fixed initial orderings. */
+  gameRng: Rng;
+  /** Per-bot streams, indexed by player turnOrder. Bots that opt in read
+   *  from these for exploration / tie-breaking. */
+  botRngs: Rng[];
 
   constructor(opts: {
     names?: string[];
@@ -32,6 +43,7 @@ export class Game {
     chars?: string[];
     playerFactories?: [PlayerFactory, PlayerFactory];
     testDeck?: boolean;
+    seed?: number;
   } = {}) {
     const {
       names = ["Player 1", "Player 2"],
@@ -39,11 +51,19 @@ export class Game {
       chars = ["Kelsier", "Shan"],
       playerFactories,
       testDeck = false,
+      seed,
     } = opts;
+
+    this.seed = seed ?? randomSeed();
+    const marketRng = subRng(this.seed, "market");
+    this.gameRng = subRng(this.seed, "game");
+    this.botRngs = Array.from({ length: numPlayers }, (_, i) =>
+      subRng(this.seed, `bot_${i}`),
+    );
 
     this.numPlayers = numPlayers;
     this.testDeck = testDeck;
-    this.market = new Market(testDeck);
+    this.market = new Market(testDeck, marketRng, this.gameRng);
     this.characters = [...chars];
 
     // Pick 3 missions. In test-deck mode, restrict to the 3 missions whose
@@ -62,7 +82,8 @@ export class Game {
     // Create decks
     this.decks = [];
     for (let i = 0; i < numPlayers; i++) {
-      this.decks.push(new PlayerDeck(this.characters[i]));
+      const initRng = subRng(this.seed, `p${i}_init`);
+      this.decks.push(new PlayerDeck(this.characters[i], initRng, this.gameRng));
     }
 
     // Create players
@@ -81,6 +102,20 @@ export class Game {
     // Initial hand draw
     for (let i = 0; i < numPlayers; i++) {
       this.decks[i].cleanUp(this.players[i], this.market);
+    }
+
+    // Going-second HP compensation. GameSession applies this independently
+    // (it overrides what we set here), since it knows firstPlayer; for bare
+    // Game.play() (benches and self-play) seat 0 always plays first, so
+    // seat 1 is the going-second player. Mirror GameSession's formula:
+    // +2 HP per position past first, overflow above 40 → starting boxings.
+    for (let i = 0; i < this.players.length; i++) {
+      let hp = 36 + 2 * i;
+      if (hp > 40) {
+        this.players[i].curBoxings += hp - 40;
+        hp = 40;
+      }
+      this.players[i].curHealth = hp;
     }
   }
 
@@ -175,6 +210,9 @@ export class Game {
     g.winner = null;
     g.characters = [...this.characters];
     g.missionNames = [...this.missionNames];
+    g.seed = this.seed;
+    g.gameRng = this.gameRng.clone();
+    g.botRngs = this.botRngs.map((r) => r.clone());
 
     const cardMap = new Map<number, Card>();
     g.market = this.market.clone(cardMap);
@@ -201,7 +239,7 @@ export class Game {
     const indices = Array.from({ length: total }, (_, i) => i);
     // Fisher-Yates partial shuffle
     for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = this.gameRng.nextInt(i + 1);
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     return indices.slice(0, count).sort((a, b) => a - b);

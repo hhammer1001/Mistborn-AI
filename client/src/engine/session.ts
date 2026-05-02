@@ -17,6 +17,7 @@ import { Player } from "./player";
 import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
 import { SquashBot } from "./squashBot";
+import { ZoomBot } from "./zoomBot";
 import { SynergyBotPrime } from "./synergyBot";
 import { RandomBot } from "./randomBot";
 import { PromptNeeded } from "./prompt";
@@ -25,7 +26,7 @@ import { METAL_NAMES } from "./types";
 
 // ── Player kinds ──
 
-export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_synergy" | "bot_random";
+export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_zoom" | "bot_synergy" | "bot_random";
 
 export interface PlayerConfig {
   kind: PlayerKind;
@@ -39,6 +40,8 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
       return (deck, game, to, name, char) => new WebPlayer(deck, game, to, name, char);
     case "bot_squash":
       return (deck, game, to, name, char) => new SquashBot(deck, game, to, name, char);
+    case "bot_zoom":
+      return (deck, game, to, name, char) => new ZoomBot(deck, game, to, name, char);
     case "bot_synergy":
       return (deck, game, to, name, char) => new SynergyBotPrime(deck, game, to, name, char);
     case "bot_random":
@@ -52,6 +55,7 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
 /** Map the legacy opponentType strings from the UI to a PlayerKind. */
 export function opponentTypeToKind(opponentType: string): PlayerKind {
   if (opponentType === "squash") return "bot_squash";
+  if (opponentType === "zoom") return "bot_zoom";
   if (opponentType === "synergy") return "bot_synergy";
   if (opponentType === "random") return "bot_random";
   return "bot_twonky";
@@ -115,6 +119,9 @@ interface GameSnapshot {
    *  were appended during the action(s) being rolled back. Works for
    *  single actions and composite (multi-step) actions alike. */
   logLengths: [number, number];
+  /** Length of the structured action-event log at snapshot time. Undo trims
+   *  the action log back to this so undone moves are not persisted. */
+  actionEventsLength: number;
   /** Optional bookkeeping value the caller can attach to a snapshot via
    *  `setNextSnapshotData`. Used by the hook to record its own pre-action
    *  log length so undo can roll back UI state alongside engine state. */
@@ -169,6 +176,40 @@ function diffToText(before: PSnap, after: PSnap): string[] {
 import type { CardData } from "../types/game";
 interface LogEntry { turn: number; text: string; card?: CardData; actionType?: string; metalIndex?: number }
 
+// ── Structured action log (for replay + post-game review) ──
+
+/** Bot-decision metadata attached to an event when the actor was a bot.
+ *  Captures the chosen action's score and the top alternatives the bot
+ *  considered, so reviewers can see what was weighed against what. */
+export interface ActionAnnotation {
+  picked: { score?: number; reason?: string };
+  alternatives?: Array<{ description: string; score: number }>;
+}
+
+export type ActionEventType =
+  | "action"
+  | "composite"
+  | "prompt"
+  | "damage"
+  | "sense"
+  | "cloud"
+  | "advance_all"
+  | "forfeit"
+  | "bot_action";
+
+/** One structured entry in the action log. Human moves are recorded with
+ *  enough information to drive a replay (`type` + `args` map to the session
+ *  entry-point that produced them). Bot moves are recorded for review only —
+ *  at replay time the bot regenerates them deterministically from the seed. */
+export interface ActionEvent {
+  type: ActionEventType;
+  playerIndex: 0 | 1;
+  args: Record<string, unknown>;
+  turncount: number;
+  timestamp: number;
+  annotation?: ActionAnnotation;
+}
+
 // ── GameSession ──
 
 export type GamePhase = "actions" | "damage" | "sense_defense" | "cloud_defense" | "awaiting_prompt" | "game_over";
@@ -177,6 +218,11 @@ export interface GameSessionOpts {
   players: [PlayerConfig, PlayerConfig];
   firstPlayer?: 0 | 1;
   testDeck?: boolean;
+  /** Optional root seed. Omit to auto-generate via Math.random; supply when
+   *  reconstructing a recorded match for replay. All RNG streams (market,
+   *  per-player initial decks, mid-game shuffles, per-bot exploration) are
+   *  derived from this single value via splitSeed. */
+  seed?: number;
 }
 
 export class GameSession {
@@ -225,6 +271,10 @@ export class GameSession {
   // Read-pointer into each log for delta consumption (single-player hook use).
   private _logRead: [number, number] = [0, 0];
 
+  // Structured action-event log for replay + post-game review. Append-only
+  // during play; trimmed by undo via the snapshot's `actionEventsLength`.
+  private _actionEvents: ActionEvent[] = [];
+
   constructor(opts: GameSessionOpts) {
     this.id = crypto.randomUUID();
     this.playerKinds = [opts.players[0].kind, opts.players[1].kind];
@@ -239,6 +289,7 @@ export class GameSession {
       chars: [opts.players[0].character, opts.players[1].character],
       playerFactories: factories,
       testDeck: opts.testDeck ?? false,
+      seed: opts.seed,
     });
     this.players = this.game.players;
 
@@ -340,6 +391,7 @@ export class GameSession {
       cardStates,
       hiddenCardIds: this._hiddenCardIds(this.activePlayer),
       logLengths: [this._logs[0].length, this._logs[1].length],
+      actionEventsLength: this._actionEvents.length,
       ...(externalData !== null ? { externalData } : {}),
     };
   }
@@ -451,6 +503,32 @@ export class GameSession {
     return top?.externalData ?? null;
   }
 
+  // ── Structured action log ──
+
+  /** Read-only view of the structured action log. Each entry corresponds to
+   *  one external session call (human move) or one bot performAction (bot
+   *  move). Persist alongside the seed for replay + post-game review. */
+  getActionLog(): readonly ActionEvent[] {
+    return this._actionEvents;
+  }
+
+  private _pushActionEvent(
+    type: ActionEventType,
+    playerIndex: number,
+    args: Record<string, unknown>,
+    annotation?: ActionAnnotation,
+  ): void {
+    const ev: ActionEvent = {
+      type,
+      playerIndex: playerIndex as 0 | 1,
+      args,
+      turncount: this.game.turncount,
+      timestamp: Date.now(),
+    };
+    if (annotation) ev.annotation = annotation;
+    this._actionEvents.push(ev);
+  }
+
   /** Open a batch so subsequent playAction calls collapse to one undo entry. */
   beginUndoBatch(): void {
     if (this._batchStart) return;
@@ -487,6 +565,7 @@ export class GameSession {
     this._logs[1].length = Math.min(this._logs[1].length, snap.logLengths[1]);
     this._logRead[0] = Math.min(this._logRead[0], this._logs[0].length);
     this._logRead[1] = Math.min(this._logRead[1], this._logs[1].length);
+    this._actionEvents.length = Math.min(this._actionEvents.length, snap.actionEventsLength);
     this._cached_raw = null;
     return true;
   }
@@ -625,6 +704,9 @@ export class GameSession {
 
     const action = this._cached_raw![actionIndex];
     p.clearPromptResponses?.();
+
+    // Record the call for replay before we mutate any state.
+    this._pushActionEvent("action", playerIndex, { actionIndex });
 
     // end_actions: session-managed flow (defer cleanUp until after damage phase
     // so the player can still see their hand during damage assignment).
@@ -925,6 +1007,8 @@ export class GameSession {
     this._pending_prompt = null;
     this.phase = "actions";
 
+    this._pushActionEvent("prompt", playerIndex, { promptType, value });
+
     const p = this.players[playerIndex] as WebPlayer;
     const [, raw] = p.serializeActions(this.game);
     this._cached_raw = raw;
@@ -939,6 +1023,8 @@ export class GameSession {
   assignDamage(playerIndex: number, targetIndex: number): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "damage") return { error: `Cannot assign damage in phase: ${this.phase}` };
+
+    this._pushActionEvent("damage", playerIndex, { targetIndex });
 
     const p = this.players[playerIndex];
     if (targetIndex === -1) {
@@ -978,6 +1064,8 @@ export class GameSession {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "sense_defense") return { error: `Cannot resolve sense in phase: ${this.phase}` };
 
+    this._pushActionEvent("sense", playerIndex, { use });
+
     const defender = this.players[playerIndex] as WebPlayer;
     defender._sense_flag = use;
 
@@ -1001,6 +1089,8 @@ export class GameSession {
   resolveCloud(playerIndex: number, cardId: number): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "cloud_defense") return { error: `Cannot resolve cloud in phase: ${this.phase}` };
+
+    this._pushActionEvent("cloud", playerIndex, { cardId });
 
     const p = this.players[playerIndex];
     const attackerIndex = (1 - playerIndex) as 0 | 1;
@@ -1054,6 +1144,7 @@ export class GameSession {
   }
 
   forfeit(playerIndex: number): Record<string, unknown> {
+    this._pushActionEvent("forfeit", playerIndex, {});
     const winnerIndex = (1 - playerIndex) as 0 | 1;
     this.game.winner = this.players[winnerIndex];
     this.game.victoryType = "F";
@@ -1227,6 +1318,24 @@ export class GameSession {
         ? (action as { metalIndex: number }).metalIndex
         : undefined;
       this._logs[bi_captured].push({ turn: botTurn, text: desc, card, actionType: action.type, metalIndex: mi });
+      // Record the bot's move in the structured action log. Bot moves are
+      // informational at replay time (the bot regenerates them from the
+      // seeded RNG) but valuable for post-game review. Bots that score
+      // alternatives (e.g. SquashBot) expose lastDecisionAnnotation() so
+      // we can attach the considered options + scores to the event.
+      const annotation =
+        (bot as Player & { lastDecisionAnnotation?: () => ActionAnnotation | null }).lastDecisionAnnotation?.() ?? undefined;
+      this._pushActionEvent(
+        "bot_action",
+        bi_captured,
+        {
+          actionType: action.type,
+          description: desc,
+          ...(card ? { cardName: card.name } : {}),
+          ...(mi !== undefined ? { metalIndex: mi } : {}),
+        },
+        annotation ?? undefined,
+      );
       return originalPerform(action, g);
     };
 

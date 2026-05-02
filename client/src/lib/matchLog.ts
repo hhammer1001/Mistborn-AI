@@ -83,6 +83,9 @@ export async function saveMatchRecord(args: SaveMatchArgs): Promise<void> {
     forfeiter,
     missionNames,
     testDeck,
+    seed: game.seed,
+    actionLog: session.getActionLog(),
+    schemaVersion: 1,
   };
 
   const playerRows = [0, 1].map((idx) => {
