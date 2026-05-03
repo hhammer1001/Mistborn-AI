@@ -83,35 +83,43 @@ export class ZoomBot extends SquashBot {
     let bestAction: GameActionInternal = candidates[0].action;
     let bestValue = -Infinity;
 
-    for (const cand of candidates) {
-      const action = cand.action;
-      let value: number = cand.score;
+    // Mark this bot as simulating so the session's performAction wrapper
+    // skips logging during candidate evaluation. Cleared after the loop.
+    const self = this as Player & { _simulating?: boolean };
+    self._simulating = true;
+    try {
+      for (const cand of candidates) {
+        const action = cand.action;
+        let value: number = cand.score;
 
-      if (action.type !== "end_actions") {
-        try {
-          this.performAction(action, game);
-          if (game.winner === this) value += 1000;
-          else if (game.winner && game.winner !== this) value -= 1000;
-          else {
-            // 1-ply chain: best follow-up heuristic from post-action state
-            const nextActions = this.availableActions(game);
-            if (nextActions.length > 0) {
-              const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
-              const followup = nextScored[0]?.score ?? 0;
-              value += followup * ZoomBot.followupWeight;
+        if (action.type !== "end_actions") {
+          try {
+            this.performAction(action, game);
+            if (game.winner === this) value += 1000;
+            else if (game.winner && game.winner !== this) value -= 1000;
+            else {
+              // 1-ply chain: best follow-up heuristic from post-action state
+              const nextActions = this.availableActions(game);
+              if (nextActions.length > 0) {
+                const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
+                const followup = nextScored[0]?.score ?? 0;
+                value += followup * ZoomBot.followupWeight;
+              }
             }
+          } catch {
+            // Sim failed — keep heuristic value
+          } finally {
+            restoreGame(game, stateBefore);
           }
-        } catch {
-          // Sim failed — keep heuristic value
-        } finally {
-          restoreGame(game, stateBefore);
+        }
+
+        if (value > bestValue) {
+          bestValue = value;
+          bestAction = action;
         }
       }
-
-      if (value > bestValue) {
-        bestValue = value;
-        bestAction = action;
-      }
+    } finally {
+      self._simulating = false;
     }
 
     // Reset action count when ending turn (mirrors SquashBot's behavior)
@@ -160,47 +168,59 @@ export class ZoomBot extends SquashBot {
     let lethalFirstAction: GameActionInternal | null = null;
     let bestLethalDamage = -Infinity;
 
-    for (const first of damageCandidates) {
-      try {
-        this.performAction(first, game);
-        if (game.winner === this) {
-          // Direct kill — already best.
-          restoreGame(game, stateBefore);
-          return first;
-        }
-        // Greedy follow-up: keep performing highest-damage actions until end_actions
-        // or no more damage moves.
-        let damageBuilt = this.curDamage;
-        for (let depth = 0; depth < 12; depth++) {
-          const next = this.availableActions(game);
-          // Prefer actions that build curDamage
-          const damaging = next.filter((a) => a.type !== "end_actions" && a.type !== "buy_boxing");
-          if (damaging.length === 0) break;
-          // Use heuristic to pick best — but bias toward damage by checking curDamage
-          const { scored } = this.scoreAndSortActions(damaging, game);
-          const best = scored[0]?.action;
-          if (!best) break;
-          try {
-            this.performAction(best, game);
-          } catch {
-            break;
-          }
+    // Suppress activity-log entries from the lethal-search simulations
+    // (parallels chooseAction's lookahead loop). Wrapped in try/finally so
+    // the flag is cleared on any return path including the "direct kill"
+    // and "won mid-rollout" early returns below.
+    const self = this as Player & { _simulating?: boolean };
+    const wasSimulating = self._simulating;
+    self._simulating = true;
+
+    try {
+      for (const first of damageCandidates) {
+        try {
+          this.performAction(first, game);
           if (game.winner === this) {
+            // Direct kill — already best.
             restoreGame(game, stateBefore);
             return first;
           }
-          damageBuilt = Math.max(damageBuilt, this.curDamage);
+          // Greedy follow-up: keep performing highest-damage actions until end_actions
+          // or no more damage moves.
+          let damageBuilt = this.curDamage;
+          for (let depth = 0; depth < 12; depth++) {
+            const next = this.availableActions(game);
+            // Prefer actions that build curDamage
+            const damaging = next.filter((a) => a.type !== "end_actions" && a.type !== "buy_boxing");
+            if (damaging.length === 0) break;
+            // Use heuristic to pick best — but bias toward damage by checking curDamage
+            const { scored } = this.scoreAndSortActions(damaging, game);
+            const best = scored[0]?.action;
+            if (!best) break;
+            try {
+              this.performAction(best, game);
+            } catch {
+              break;
+            }
+            if (game.winner === this) {
+              restoreGame(game, stateBefore);
+              return first;
+            }
+            damageBuilt = Math.max(damageBuilt, this.curDamage);
+          }
+          // Check if accumulated damage would kill (curDamage at end of branch)
+          if (this.curDamage >= damageNeeded && this.curDamage > bestLethalDamage) {
+            bestLethalDamage = this.curDamage;
+            lethalFirstAction = first;
+          }
+        } catch {
+          // Skip failed branches
+        } finally {
+          restoreGame(game, stateBefore);
         }
-        // Check if accumulated damage would kill (curDamage at end of branch)
-        if (this.curDamage >= damageNeeded && this.curDamage > bestLethalDamage) {
-          bestLethalDamage = this.curDamage;
-          lethalFirstAction = first;
-        }
-      } catch {
-        // Skip failed branches
-      } finally {
-        restoreGame(game, stateBefore);
       }
+    } finally {
+      self._simulating = wasSimulating;
     }
 
     return lethalFirstAction;

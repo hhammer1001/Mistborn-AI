@@ -1312,6 +1312,14 @@ export class GameSession {
     const botTurn = this.game.turncount;
     const bi_captured = bi;
     bot.performAction = (action: GameActionInternal, g: Game) => {
+      // Lookahead bots (Zoom) call performAction inside snapshot/restore
+      // simulation loops to evaluate candidates. Those calls must NOT pollute
+      // the activity log or the structured action-event stream — only the
+      // committed action does. Bots opt into this by setting _simulating
+      // on themselves around their simulation blocks.
+      if ((bot as Player & { _simulating?: boolean })._simulating) {
+        return originalPerform(action, g);
+      }
       const desc = bot.serializeAction(action, g).description;
       const card = ("card" in action && action.card) ? action.card.toJSON() as CardData : undefined;
       const mi = ("metalIndex" in action && typeof (action as { metalIndex?: number }).metalIndex === "number")
