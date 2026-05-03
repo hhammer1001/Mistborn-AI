@@ -35,10 +35,16 @@ export function MetalTokens({ player, actions, onAction }: Props) {
     }
   };
 
+  // Burn-slot accounting: regular tokens flipped to "burned" state (value 1)
+  // plus each atium burned this turn (metalTokens[8] is a counter, not a state).
+  // Same formula used by Hand/AllyZone composite gating.
+  const burnsUsed = player.metalTokens.slice(0, 8).filter((t) => t === 1).length + player.metalTokens[8];
+  const burnsLeft = Math.max(0, player.burns - burnsUsed);
+
   return (
     <div className="metal-col-zone">
       <div className="metal-col-header">
-        <div className="metal-col-stat">Burns: {player.burns}</div>
+        <div className="metal-col-stat">Burns: {burnsLeft}/{player.burns}</div>
       </div>
       <div className="metal-col">
         {player.metalNames.slice(0, 8).map((name, i) => {
