@@ -67,9 +67,17 @@ export function PromptDialog({ prompt, gameState, onRespond }: Props) {
         {hasCardGrid && (
           <div className="prompt-card-grid">
             {cardOptions.map((opt) => {
-              const card = findCard(opt.cardId as number, gameState);
+              // Prefer the live card in gameState (so visual state like
+              // metalUsed / burned is current). Fall back to the snapshot
+              // the engine attached to the option — needed when the
+              // referenced card is in market.cards (a hidden zone the
+              // findCard helper doesn't search), e.g. for the post-buy
+              // refill that lands there after _restoreSnapshot rolls a
+              // buy_eliminate's seek/push prompt back.
+              const card = findCard(opt.cardId as number, gameState) ?? (opt.card as CardData | undefined);
               if (!card) {
-                // Fallback: card not visible in game state — show as button
+                // Last-resort fallback: card not visible and no snapshot
+                // attached — show as a labeled button.
                 return (
                   <button
                     key={opt.index}

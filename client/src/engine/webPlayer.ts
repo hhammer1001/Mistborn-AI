@@ -124,8 +124,12 @@ export class WebPlayer extends Player {
     const resp = this._getResponse("subdue");
     if (resp !== undefined) return Number(resp);
 
+    // Snapshot card data on each option so the modal can render it even
+    // when state restore (after PromptNeeded throws inside a buy_eliminate
+    // chain) has moved a fresh market refill back into market.cards — a
+    // hidden zone the UI's findCard helper doesn't search.
     const options: PromptOption[] = choices.map((c, i) => ({
-      index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market",
+      index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market", card: c.toJSON(),
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("subdue", options, "Choose a market card to gain (cost ≤ 5)");
@@ -206,7 +210,7 @@ export class WebPlayer extends Player {
     if (market.length === 0) return -1;
 
     const options: PromptOption[] = market.map((c, i) => ({
-      index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market",
+      index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market", card: c.toJSON(),
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
     throw new PromptNeeded("push", options, "Choose a market card to eliminate");
@@ -230,7 +234,7 @@ export class WebPlayer extends Player {
     const resp1 = this._getQueueResponse("seek");
     if (resp1 === undefined) {
       const options: PromptOption[] = choices.map((c, i) => ({
-        index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market",
+        index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market", card: c.toJSON(),
       }));
       options.push({ index: -1, name: "Skip", source: "skip" });
       const ctx = twice
@@ -248,7 +252,7 @@ export class WebPlayer extends Player {
     const resp2 = this._getQueueResponse("seek");
     if (resp2 === undefined) {
       const options: PromptOption[] = choices
-        .map((c, i) => ({ index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market" as const }))
+        .map((c, i) => ({ index: i, name: c.name, cost: c.cost, cardId: c.id, source: "market" as const, card: c.toJSON() }))
         .filter((o) => o.index !== choice1);
       options.push({ index: -1, name: "Skip", source: "skip" });
       throw new PromptNeeded("seek", options, "Choose a 2nd action to use (different from 1st)");
