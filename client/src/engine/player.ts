@@ -502,8 +502,18 @@ export class Player {
         }
       }
     }
+    // Trash each cleared market card to market.discard before market.buy
+    // splices it out. Without this, market.buy alone removed the card from
+    // market.hand without putting it anywhere, so the card was destroyed
+    // outright — and lookahead snapshot/restore couldn't recover it (the
+    // card vanished from allCards(game), so byId lookup returned undefined
+    // and the restored arrays dropped it via filter(Boolean)). Trashing
+    // also matches typical TCG "wipe market" semantics and lets effects
+    // like Soar/Confrontation/Subdue interact with the trashed pile.
     while (this.game.market.hand.length > 0) {
-      this.game.market.buy(this.game.market.hand[0]);
+      const card = this.game.market.hand[0];
+      this.game.market.discard.push(card);
+      this.game.market.buy(card);
     }
   }
   special12() { // Confrontation 1: play first ability of an eliminated action
