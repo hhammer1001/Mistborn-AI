@@ -333,6 +333,27 @@ function getCompositeActions(
     });
   }
 
+  // 3) "Burn atium token (as cardMetal) + add to this card" — only listed
+  //    when the player has an atium token AND a burn slot left (the
+  //    use_atium action only exists in `actions` when both hold). Skipped
+  //    for atium cards themselves; the burn_metal mi=8 path above already
+  //    covers "burn atium token, use it on an atium card".
+  if (cardMetal < 8) {
+    const useAtiumAction = actions.find((a) => a.code === 12 && a.metalIndex === cardMetal);
+    if (useAtiumAction) {
+      const metalName = METAL_NAMES[cardMetal];
+      const icon = metalIcon(cardMetal);
+      composites.push({
+        textBefore: "Burn atium",
+        textAfter: nextAbilityLabel(card) ? `→ ${nextAbilityLabel(card)}` : "+ add",
+        metalIcon: icon,
+        title: `Burn atium as ${metalName} and add to ${card.name}`,
+        firstActionIndex: useAtiumAction.index,
+        secondMatch: { code: 4, cardIds: allIds },
+      });
+    }
+  }
+
   return composites;
 }
 

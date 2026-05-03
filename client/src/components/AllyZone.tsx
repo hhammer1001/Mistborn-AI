@@ -110,6 +110,35 @@ function getCompositeAllyActions(
     }
   }
 
+  // 3) Burn an ATIUM TOKEN as this metal + ability — only listed when the
+  //    player has an atium token AND a burn slot left (the use_atium action
+  //    only exists in `actions` when both hold). Ally metal is already
+  //    constrained to 0-7 by the early return above, so this composite is
+  //    valid for every interactive ally that needs a metal kick.
+  const useAtiumAction = actions.find((a) => a.code === 12 && a.metalIndex === metal);
+  if (useAtiumAction) {
+    if (hasAbility1) {
+      composites.push({
+        textBefore: "Burn atium",
+        textAfter: "+ Ability 1",
+        metalIcon: icon,
+        title: `Burn atium as ${metalName} and use ${ally.name}'s first ability`,
+        firstActionIndex: useAtiumAction.index,
+        secondMatch: { code: 8, cardIds: [ally.id] },
+      });
+    }
+    if (hasAbility2) {
+      composites.push({
+        textBefore: "Burn atium",
+        textAfter: "+ Ability 2",
+        metalIcon: icon,
+        title: `Burn atium as ${metalName} and use ${ally.name}'s second ability`,
+        firstActionIndex: useAtiumAction.index,
+        secondMatch: { code: 9, cardIds: [ally.id] },
+      });
+    }
+  }
+
   return composites;
 }
 
