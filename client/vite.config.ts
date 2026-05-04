@@ -13,7 +13,7 @@ export default defineConfig({
       // Auto-cache static assets (HTML, JS, CSS, icons, card art under
       // /cards, /ministry, /icons.svg) so the app loads cold offline.
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2,json}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2,json}'],
         // Card art folder can be sizeable; bump from the 2 MB default.
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
