@@ -189,7 +189,7 @@ export class WebPlayer extends Player {
   }
 
   override refreshIn(): number {
-    const resp = this._getResponse("refresh");
+    const resp = this._getQueueResponse("refresh");
     if (resp !== undefined) return Number(resp);
 
     const flared = this.metalTokens
