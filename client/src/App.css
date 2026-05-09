@@ -1565,6 +1565,26 @@ h3 {
   min-height: 5.3rem;
 }
 
+/* Compact right-side panel on phones/small tablets: narrower column,
+   tighter mission padding, and the End Actions button anchored to the
+   top of a content-hugging footer rather than centered in a reserved
+   area. Desktop keeps the roomier defaults above. */
+@media (max-width: 900px) {
+  .board-right {
+    width: calc(400px * var(--ui-scale, 1));
+  }
+
+  .mission-col {
+    padding: 0.35rem 0.15rem;
+  }
+
+  .right-footer {
+    align-items: flex-start;
+    min-height: 0;
+    margin-bottom: 3rem;
+  }
+}
+
 /* ─── Damage Phase ────────────────────────────────────────────────── */
 .damage-phase {
   display: flex;
