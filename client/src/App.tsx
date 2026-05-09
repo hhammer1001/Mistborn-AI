@@ -25,6 +25,7 @@ import { TurnBanner } from "./components/TurnBanner";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 import { GameOverScreen } from "./components/GameOverScreen";
+import { RankingPanel } from "./components/RankingPanel";
 import { CHARACTERS } from "./data/ministrySigils";
 import type { BotSetupConfig } from "./hooks/useMinistryPrefs";
 import type { GameState } from "./types/game";
@@ -479,49 +480,73 @@ function GameBoard({
       )}
       {gameState.phase === "sense_defense" && gameState.senseCards && isMyTurn && (
         <div className="modal-overlay">
-          <div className="modal-dialog">
-            <h3>Sense Defense</h3>
-            <p className="modal-note">
-              {gameState.senseMissionName
-                ? <>Opponent is advancing <strong>{gameState.senseMissionName}</strong>. Block it with a Sense card?</>
-                : <>Opponent is advancing a mission. Block it with a Sense card?</>}
-            </p>
-            {gameState.senseCards.map(c => (
-              <p key={c.cardId}>
-                <strong>{c.name}</strong> — blocks <strong>{c.amount}</strong> mission
-              </p>
-            ))}
-            <div className="modal-actions">
-              <button className="action-btn" style={{borderColor: "var(--blue-bright)"}}
-                onClick={() => { if (!loading) resolveSense(true); }}>
-                Use Sense
-              </button>
-              <button className="action-btn" style={{borderColor: "var(--text-dim)", opacity: 0.7}}
-                onClick={() => { if (!loading) resolveSense(false); }}>
-                Skip
-              </button>
-            </div>
-          </div>
+          <RankingPanel
+            variant="sense"
+            mode="toggle"
+            cards={gameState.senseCards.map((c) => ({
+              id: c.cardId,
+              name: c.name,
+              blockValue: c.amount,
+            }))}
+            caption={
+              gameState.senseMissionName
+                ? `Opponent is advancing ${gameState.senseMissionName}.`
+                : "Opponent is advancing a mission."
+            }
+            formatStatus={(selected) => {
+              // Advances are 1 mission each in the engine; engine consumes one
+              // sense card if the defender chose "use," so "in pool" reads as
+              // the threat being defended against.
+              const advance = 1;
+              const sumSelected = selected.reduce((s, c) => s + c.blockValue, 0);
+              const left = advance - sumSelected;
+              return (
+                <>
+                  <strong>{advance}</strong> mission currently in pool,{" "}
+                  <strong>{left}</strong> mission left after sensing
+                </>
+              );
+            }}
+            onSubmit={(ids) => {
+              if (loading) return;
+              // Engine takes a binary use/no-use; consumes one sense card from
+              // hand internally. Multi-select isn't surfaced to the engine yet —
+              // the panel's UX still helps the player see the trade.
+              resolveSense(ids.length > 0);
+            }}
+          />
         </div>
       )}
       {gameState.phase === "cloud_defense" && gameState.cloudCards && isMyTurn && (
         <div className="modal-overlay">
-          <div className="modal-dialog">
-            <h3>Cloud Defense</h3>
-            <p>Incoming: <strong>{gameState.incomingDamage ?? "?"}</strong> damage! Discard a cloud card to block?</p>
-            <div className="modal-actions">
-              {gameState.cloudCards.map(c => (
-                <button key={c.cardId} className="action-btn" style={{borderColor: "var(--green)"}}
-                  onClick={() => { if (!loading) resolveCloud(c.cardId); }}>
-                  Use {c.name} (block {c.reduction})
-                </button>
-              ))}
-              <button className="action-btn" style={{borderColor: "var(--text-dim)", opacity: 0.7}}
-                onClick={() => { if (!loading) resolveCloud(-1); }}>
-                Take the damage
-              </button>
-            </div>
-          </div>
+          <RankingPanel
+            variant="cloud"
+            mode="toggle"
+            cards={gameState.cloudCards.map((c) => ({
+              id: c.cardId,
+              name: c.name,
+              blockValue: c.reduction,
+            }))}
+            caption="Opponent is hitting you."
+            formatStatus={(selected) => {
+              const incoming = gameState.incomingDamage ?? 0;
+              const blocked = selected.reduce((s, c) => s + c.blockValue, 0);
+              const taken = Math.max(0, incoming - blocked);
+              return (
+                <>
+                  <strong>{incoming}</strong> damage currently in pool,{" "}
+                  <strong>{taken}</strong> damage left after smoking
+                </>
+              );
+            }}
+            onSubmit={(ids) => {
+              if (loading) return;
+              // Engine consumes exactly one cloud per damage event; if multiple
+              // are toggled we send the first. Subsequent damage events will
+              // re-prompt (the panel's pool/left math now makes that legible).
+              resolveCloud(ids.length === 0 ? -1 : ids[0]);
+            }}
+          />
         </div>
       )}
     </div>

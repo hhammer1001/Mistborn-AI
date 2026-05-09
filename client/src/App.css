@@ -5153,18 +5153,21 @@ h3 {
   height: 14px;
 }
 
-/* ─── Sense Ranking Panel ─────────────────────────────────────────────────
-   Defender's pre-turn priority list. Aesthetic: a wax-sealed ledger page —
-   gold corner jewels, a thin double border, and per-card medallion strips
-   where the active rank glows tin-blue (Tin is the metal that grants Sense
-   in Mistborn lore). Hover/active animations stay subtle. */
+/* ─── Ranking Panel ───────────────────────────────────────────────────────
+   Defender's pre-turn priority list (sense vs. mission advances, cloud vs.
+   damage). Aesthetic: a wax-sealed ledger page — gold corner jewels, a thin
+   double border, and per-card medallion strips where the active rank glows
+   in the variant accent. Variants override --rp-accent-rgb / --rp-active-bg
+   to retheme without forking the rules. */
 
-.sense-ranking {
-  --sr-edge: rgba(201, 164, 74, 0.28);
-  --sr-edge-strong: rgba(201, 164, 74, 0.6);
-  --sr-tin: #7faecf;
-  --sr-tin-soft: rgba(127, 174, 207, 0.18);
-  --sr-skip: rgba(190, 183, 168, 0.55);
+.ranking-panel {
+  --rp-edge: rgba(201, 164, 74, 0.28);
+  --rp-edge-strong: rgba(201, 164, 74, 0.6);
+  --rp-accent-rgb: 127, 174, 207;             /* sense default — tin-blue */
+  --rp-accent: rgb(var(--rp-accent-rgb));
+  --rp-active-bg-top: rgba(46, 64, 86, 0.95);
+  --rp-active-bg-bottom: rgba(28, 36, 52, 0.95);
+  --rp-skip: rgba(190, 183, 168, 0.55);
   display: block;
   width: 100%;
   max-width: 460px;
@@ -5172,18 +5175,27 @@ h3 {
   color: var(--text);
 }
 
-.sense-ranking__frame {
+/* Cloud variant — copper accent, lore-flavored after the Smoker's "copper
+   cloud." Different glow + warmer chip background lets you tell at a glance
+   which defense type the panel is asking about. */
+.ranking-panel--cloud {
+  --rp-accent-rgb: 212, 145, 90;
+  --rp-active-bg-top: rgba(86, 56, 36, 0.95);
+  --rp-active-bg-bottom: rgba(52, 32, 20, 0.95);
+}
+
+.ranking-panel__frame {
   position: relative;
   padding: 24px 22px 20px;
   background:
-    radial-gradient(ellipse at 50% -10%, rgba(127, 174, 207, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% -10%, rgba(var(--rp-accent-rgb), 0.07) 0%, transparent 55%),
     linear-gradient(180deg, rgba(20, 18, 32, 0.97) 0%, rgba(13, 12, 22, 0.97) 100%);
-  border: 1px solid var(--sr-edge);
+  border: 1px solid var(--rp-edge);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.35) inset,
     0 10px 32px rgba(0, 0, 0, 0.55);
 }
-.sense-ranking__frame::before {
+.ranking-panel__frame::before {
   content: "";
   position: absolute;
   inset: 4px;
@@ -5191,8 +5203,7 @@ h3 {
   pointer-events: none;
 }
 
-/* Tiny rotated-square jewels at the four corners — sealed-document feel. */
-.sense-ranking__corner {
+.ranking-panel__corner {
   position: absolute;
   width: 7px;
   height: 7px;
@@ -5201,18 +5212,18 @@ h3 {
   box-shadow: 0 0 8px rgba(201, 164, 74, 0.55);
   pointer-events: none;
 }
-.sense-ranking__corner--tl { top: -4px; left: -4px; }
-.sense-ranking__corner--tr { top: -4px; right: -4px; }
-.sense-ranking__corner--bl { bottom: -4px; left: -4px; }
-.sense-ranking__corner--br { bottom: -4px; right: -4px; }
+.ranking-panel__corner--tl { top: -4px; left: -4px; }
+.ranking-panel__corner--tr { top: -4px; right: -4px; }
+.ranking-panel__corner--bl { bottom: -4px; left: -4px; }
+.ranking-panel__corner--br { bottom: -4px; right: -4px; }
 
-.sense-ranking__head {
+.ranking-panel__head {
   text-align: center;
   margin-bottom: 18px;
   padding-bottom: 14px;
   position: relative;
 }
-.sense-ranking__head::after {
+.ranking-panel__head::after {
   content: "";
   position: absolute;
   left: 18%;
@@ -5229,7 +5240,7 @@ h3 {
   );
 }
 
-.sense-ranking__eyebrow {
+.ranking-panel__eyebrow {
   font-family: var(--font-ledger, var(--font-display));
   font-size: 0.62rem;
   letter-spacing: 0.42em;
@@ -5237,7 +5248,7 @@ h3 {
   color: var(--gold);
   margin-bottom: 6px;
 }
-.sense-ranking__title {
+.ranking-panel__title {
   font-family: var(--font-display);
   font-size: 1.18rem;
   font-weight: 600;
@@ -5245,9 +5256,9 @@ h3 {
   text-transform: uppercase;
   color: var(--text);
   margin: 0 0 8px;
-  text-shadow: 0 1px 14px rgba(127, 174, 207, 0.18);
+  text-shadow: 0 1px 14px rgba(var(--rp-accent-rgb), 0.18);
 }
-.sense-ranking__caption {
+.ranking-panel__caption {
   margin: 0;
   font-size: 0.74rem;
   color: rgba(255, 255, 255, 0.5);
@@ -5255,7 +5266,7 @@ h3 {
   font-style: italic;
 }
 
-.sense-ranking__list {
+.ranking-panel__list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -5264,7 +5275,7 @@ h3 {
   gap: 8px;
 }
 
-.sense-ranking__row {
+.ranking-panel__row {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -5273,26 +5284,26 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-left: 2px solid rgba(201, 164, 74, 0.32);
   transition: background 220ms ease, border-color 220ms ease;
-  animation: sense-row-in 380ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  animation: ranking-row-in 380ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
 }
-.sense-ranking__row:hover {
+.ranking-panel__row:hover {
   background: rgba(255, 255, 255, 0.04);
   border-left-color: var(--gold);
 }
 
-@keyframes sense-row-in {
+@keyframes ranking-row-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
 
-.sense-ranking__identity {
+.ranking-panel__identity {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
-.sense-ranking__art {
+.ranking-panel__art {
   flex: none;
   width: 36px;
   height: 36px;
@@ -5301,40 +5312,50 @@ h3 {
   background: rgba(0, 0, 0, 0.4);
   display: inline-block;
 }
-.sense-ranking__art img {
+.ranking-panel__art img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-.sense-ranking__text {
+.ranking-panel__text {
   min-width: 0;
 }
-.sense-ranking__name {
+.ranking-panel__name {
   font-family: var(--font-display);
   font-size: 0.82rem;
   letter-spacing: 0.13em;
   font-weight: 500;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ranking-panel__name > span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
-.sense-ranking__block {
+.ranking-panel__eye {
+  flex-shrink: 0;
+}
+.ranking-panel__block {
   font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.06em;
   margin-top: 3px;
 }
-.sense-ranking__block strong {
-  color: var(--sr-tin);
+.ranking-panel__block strong {
+  color: var(--rp-accent);
   font-weight: 600;
   font-family: var(--font-display);
   letter-spacing: 0.04em;
   margin: 0 1px;
 }
 
-.sense-ranking__chips {
+.ranking-panel__chips {
   display: flex;
   flex: none;
   flex-wrap: wrap;
@@ -5342,8 +5363,7 @@ h3 {
   gap: 4px;
 }
 
-/* Round seal-like priority chip. — / I / II / III / … */
-.sense-chip {
+.ranking-chip {
   width: 30px;
   height: 30px;
   display: inline-flex;
@@ -5365,46 +5385,48 @@ h3 {
   transition: 180ms cubic-bezier(0.2, 0.7, 0.25, 1);
   transition-property: transform, color, border-color, background, box-shadow;
 }
-.sense-chip:hover {
+.ranking-chip:hover {
   color: var(--text);
   border-color: var(--gold);
   transform: translateY(-1px);
 }
-.sense-chip:focus-visible {
+.ranking-chip:focus-visible {
   outline: none;
-  border-color: var(--sr-tin);
-  box-shadow: 0 0 0 2px rgba(127, 174, 207, 0.4);
+  border-color: var(--rp-accent);
+  box-shadow: 0 0 0 2px rgba(var(--rp-accent-rgb), 0.4);
 }
-.sense-chip__numeral {
+.ranking-chip__numeral {
   display: inline-block;
   line-height: 1;
   transform: translateY(-0.5px);
 }
-.sense-chip__mark {
+.ranking-chip__mark {
   display: inline-block;
   font-size: 1rem;
   line-height: 1;
-  color: var(--sr-skip);
+  color: var(--rp-skip);
   transform: translateY(-1px);
 }
 
-/* Active rank: tin-blue glow inside a gold inset ring. */
-.sense-chip.is-active {
+/* Active rank chip uses the burn (ember) palette — visually matches the
+   toggle-mode burn switch so "I picked this card" reads consistently
+   across modes. Rank chips are sense-only in practice; the theming is
+   intentionally not variant-driven. */
+.ranking-chip.is-active {
   color: var(--text);
-  border-color: var(--sr-tin);
+  border-color: #ff7a3d;
   background:
-    radial-gradient(circle at 50% 32%, rgba(127, 174, 207, 0.42), rgba(20, 18, 32, 0.85) 75%),
-    linear-gradient(180deg, rgba(46, 64, 86, 0.95), rgba(28, 36, 52, 0.95));
+    radial-gradient(circle at 50% 32%, rgba(255, 122, 60, 0.45), rgba(40, 18, 12, 0.85) 75%),
+    linear-gradient(180deg, rgba(86, 36, 14, 0.95), rgba(50, 20, 8, 0.95));
   box-shadow:
     0 0 0 1px rgba(201, 164, 74, 0.65) inset,
-    0 0 12px rgba(127, 174, 207, 0.5),
-    0 0 24px rgba(127, 174, 207, 0.16);
+    0 0 12px rgba(255, 122, 60, 0.5),
+    0 0 24px rgba(255, 122, 60, 0.16);
   transform: translateY(-1px) scale(1.04);
-  animation: sense-chip-pulse 2.6s ease-in-out infinite;
+  animation: ranking-chip-pulse 2.6s ease-in-out infinite;
 }
 
-/* Skip stays muted even when active — it's the absence of an order. */
-.sense-chip--skip.is-active {
+.ranking-chip--skip.is-active {
   color: rgba(255, 255, 255, 0.85);
   border-color: rgba(190, 183, 168, 0.7);
   background:
@@ -5416,33 +5438,265 @@ h3 {
   transform: translateY(-1px);
   animation: none;
 }
-.sense-chip--skip.is-active .sense-chip__mark {
+.ranking-chip--skip.is-active .ranking-chip__mark {
   color: rgba(255, 255, 255, 0.85);
 }
 
-@keyframes sense-chip-pulse {
+@keyframes ranking-chip-pulse {
   0%, 100% {
     box-shadow:
       0 0 0 1px rgba(201, 164, 74, 0.65) inset,
-      0 0 12px rgba(127, 174, 207, 0.5),
-      0 0 24px rgba(127, 174, 207, 0.12);
+      0 0 12px rgba(var(--rp-accent-rgb), 0.5),
+      0 0 24px rgba(var(--rp-accent-rgb), 0.12);
   }
   50% {
     box-shadow:
       0 0 0 1px rgba(201, 164, 74, 0.85) inset,
-      0 0 18px rgba(127, 174, 207, 0.72),
-      0 0 32px rgba(127, 174, 207, 0.22);
+      0 0 18px rgba(var(--rp-accent-rgb), 0.72),
+      0 0 32px rgba(var(--rp-accent-rgb), 0.22);
   }
 }
 
+/* ── Toggle-mode burn switch ─────────────────────────────────────────────
+   Replaces the rank-chip strip when the panel is asked "burn which one?"
+   instead of "rank these." Each row has a slider switch — flipping it on
+   commits the burn (allomancers burn metals, hence the flame imagery).
+   The row then plays a short flare-and-collapse animation so the player
+   actually sees the card consumed instead of guessing whether it worked. */
+.ranking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 200ms ease;
+}
+.ranking-toggle:hover { color: var(--text); }
+.ranking-toggle.is-on { color: #ff8a4d; }
+.ranking-toggle:disabled { cursor: default; opacity: 0.85; }
+
+.ranking-toggle__track {
+  position: relative;
+  width: 50px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(20, 18, 28, 0.95), rgba(40, 38, 50, 0.95));
+  border: 1px solid rgba(201, 164, 74, 0.3);
+  display: inline-block;
+  flex-shrink: 0;
+  transition: border-color 200ms ease, background 220ms ease, box-shadow 220ms ease;
+}
+.ranking-toggle:hover .ranking-toggle__track {
+  border-color: rgba(201, 164, 74, 0.6);
+}
+.ranking-toggle.is-on .ranking-toggle__track {
+  border-color: #ff8a4d;
+  background: linear-gradient(180deg, rgba(90, 38, 14, 0.95), rgba(50, 20, 8, 0.95));
+  box-shadow:
+    0 0 14px rgba(255, 122, 60, 0.55),
+    inset 0 0 10px rgba(255, 122, 60, 0.25);
+}
+
+.ranking-toggle__icon {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.ranking-toggle__icon--off {
+  left: 8px;
+  color: var(--rp-skip);
+  font-size: 0.95rem;
+  font-weight: bold;
+  opacity: 1;
+  line-height: 1;
+}
+.ranking-toggle__icon--on {
+  right: 7px;
+  color: #ffb070;
+  opacity: 0.25;
+}
+.ranking-toggle.is-on .ranking-toggle__icon--off { opacity: 0.25; }
+.ranking-toggle.is-on .ranking-toggle__icon--on { opacity: 1; }
+
+.ranking-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(220, 215, 200, 0.95), rgba(170, 160, 145, 0.95));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition:
+    transform 240ms cubic-bezier(0.5, 0, 0.4, 1.4),
+    background 240ms ease,
+    box-shadow 240ms ease;
+}
+.ranking-toggle.is-on .ranking-toggle__knob {
+  transform: translateX(26px);
+  background: radial-gradient(circle at 40% 35%, #ffd498 0%, #ff8a3d 50%, #c14010 100%);
+  box-shadow:
+    0 0 10px rgba(255, 122, 60, 0.8),
+    0 0 20px rgba(255, 122, 60, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Row burn animation — fired when the toggle commits. Flares warm, then
+   collapses the row's box so the eye reads "this card is consumed." */
+.ranking-panel__row.is-burning {
+  animation: ranking-row-burn 720ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  overflow: hidden;
+  pointer-events: none;
+}
+@keyframes ranking-row-burn {
+  0% {
+    background: rgba(255, 255, 255, 0.025);
+    border-left-color: rgba(201, 164, 74, 0.32);
+    box-shadow: none;
+    max-height: 90px;
+    opacity: 1;
+    transform: none;
+  }
+  18% {
+    background: linear-gradient(90deg, rgba(255, 100, 50, 0.22), rgba(255, 150, 80, 0.16));
+    border-left-color: #ff7a3d;
+    box-shadow:
+      0 0 26px 4px rgba(255, 100, 50, 0.55),
+      inset 0 0 18px rgba(255, 130, 60, 0.32);
+    max-height: 90px;
+    opacity: 1;
+    transform: scale(1.012);
+  }
+  45% {
+    background: linear-gradient(90deg, rgba(180, 80, 30, 0.2), rgba(120, 50, 20, 0.12));
+    border-left-color: #d4915a;
+    box-shadow:
+      0 0 16px 2px rgba(212, 145, 90, 0.4),
+      inset 0 0 12px rgba(180, 80, 30, 0.22);
+    max-height: 90px;
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  100% {
+    background: rgba(60, 30, 20, 0.04);
+    border-left-color: transparent;
+    box-shadow: none;
+    max-height: 0;
+    opacity: 0;
+    transform: scale(0.94);
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+  }
+}
+
+.ranking-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: 180ms cubic-bezier(0.2, 0.7, 0.25, 1);
+  transition-property: transform, color, border-color, background, box-shadow;
+}
+.ranking-pill--submit {
+  display: block;
+  margin: 14px auto 0;
+  padding: 0 26px;
+  height: 34px;
+  color: var(--rp-accent);
+  border: 1px solid var(--rp-accent);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(var(--rp-accent-rgb), 0.18), rgba(20, 18, 32, 0.85) 80%),
+    linear-gradient(180deg, var(--rp-active-bg-top), var(--rp-active-bg-bottom));
+  box-shadow:
+    0 0 0 1px rgba(201, 164, 74, 0.35) inset,
+    0 0 12px rgba(var(--rp-accent-rgb), 0.18);
+}
+.ranking-pill--submit:hover:not(:disabled) {
+  color: var(--text);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(201, 164, 74, 0.65) inset,
+    0 0 16px rgba(var(--rp-accent-rgb), 0.55),
+    0 0 32px rgba(var(--rp-accent-rgb), 0.22);
+}
+.ranking-pill--submit:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(var(--rp-accent-rgb), 0.55),
+    0 0 0 1px rgba(201, 164, 74, 0.65) inset;
+}
+.ranking-pill--submit:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+/* Live status strip — a quiet line above Submit that previews what the
+   current selection will do. Reads as a stage marker, not a result. */
+.ranking-panel__status {
+  margin-top: 14px;
+  padding: 8px 12px 6px;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.6);
+  border-top: 1px dashed rgba(201, 164, 74, 0.2);
+  letter-spacing: 0.04em;
+  transition: color 200ms ease;
+}
+.ranking-panel__status strong {
+  font-style: normal;
+  color: var(--rp-accent);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin: 0 2px;
+}
+
+/* Selected (toggled-on, pre-submit) row — gentle accent halo so the player
+   sees which card their decision is currently parked on without it blowing
+   up like the burn flash. */
+.ranking-panel__row.is-selected {
+  background: rgba(var(--rp-accent-rgb), 0.06);
+  border-left-color: var(--rp-accent);
+  box-shadow: inset 0 0 0 1px rgba(var(--rp-accent-rgb), 0.18);
+}
+
 @media (max-width: 480px) {
-  .sense-ranking__row {
+  .ranking-panel__row {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
   }
-  .sense-ranking__chips {
+  .ranking-panel__chips {
     justify-content: center;
   }
-  .sense-chip { width: 34px; height: 34px; }
+  .ranking-chip { width: 34px; height: 34px; }
+  .ranking-pill { width: 100%; }
 }

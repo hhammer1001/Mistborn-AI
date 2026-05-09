@@ -6,6 +6,7 @@ import { CardPileOverlay } from "./CardPileOverlay";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { OpponentDetailPopup, CharacterCardPopup } from "./OpponentDetailPopup";
 import { MetalChoicePopup } from "./MetalChoicePopup";
+import { EyeIcon } from "./icons/EyeIcon";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 const CHARACTER_METAL: Record<string, number> = {
@@ -351,11 +352,3 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
   );
 }
 
-function EyeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}

@@ -22,7 +22,7 @@ interface Props {
   copyLabel?: string;
 }
 
-function UprightSprite({ sprite, width }: { sprite: CardSprite; width: number }) {
+export function UprightSprite({ sprite, width }: { sprite: CardSprite; width: number }) {
   const { sheet, col, row } = sprite;
   const cw = sheet.w / sheet.cols;
   const ch = sheet.h / sheet.rows;
@@ -66,7 +66,7 @@ function CroppedSprite({ sprite, width }: { sprite: CardSprite; width: number })
   );
 }
 
-function RotatedSprite({ sprite, width }: { sprite: CardSprite; width: number }) {
+export function RotatedSprite({ sprite, width }: { sprite: CardSprite; width: number }) {
   const { sheet, col, row } = sprite;
   const cw = sheet.w / sheet.cols;
   const ch = sheet.h / sheet.rows;
