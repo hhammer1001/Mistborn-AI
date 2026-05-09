@@ -247,6 +247,11 @@ export class GameSession {
    *  sense decision. resolveSense uses this to resume the original action
    *  after the defender chooses. */
   private _pending_advance_action: GameActionInternal | null = null;
+  /** True while resolveSense is driving _attemptAction. The sense_block log
+   *  entry is pushed by resolveSense in that case (where we have direct
+   *  knowledge of the defender's choice and the card they used), so the
+   *  post-detection inside _attemptAction must not push a duplicate. */
+  private _resolvingSense = false;
 
   // Snapshot-based prompt rollback and undo
   private _preActionSnapshot: GameSnapshot | null = null;
@@ -954,7 +959,9 @@ export class GameSession {
 
     if (action.type === "advance_mission") {
       const missionSpent = missionBefore - p.curMission;
-      if (missionSpent !== 1) {
+      // Skip when resolveSense is driving — it pushes the sense_block entry
+      // itself with direct knowledge of the chosen card, avoiding duplicates.
+      if (missionSpent !== 1 && !this._resolvingSense) {
         // Identify which opponent Sense card was auto-used (newly appeared in discard).
         const opp = this.players[1 - playerIndex];
         const before = this._oppDiscardIdsBefore;
@@ -1075,7 +1082,33 @@ export class GameSession {
       const attackerIndex = (1 - playerIndex) as 0 | 1;
       this.phase = "actions";
       this.activePlayer = attackerIndex;
+
+      // Identify the sense card the defender is about to use, before
+      // _attemptAction moves it from hand to discard. Logging from here
+      // (rather than _attemptAction's post-detection) means the entry is
+      // pushed regardless of whether the temp-var bookkeeping survives the
+      // pause/resume cycle.
+      let usedSenseCard: Action | undefined = undefined;
+      if (use && pending.type === "advance_mission") {
+        usedSenseCard = defender.deck.hand.find(
+          (c): c is Action => c instanceof Action && c.data[9] === "sense",
+        );
+      }
+
+      this._resolvingSense = true;
       const result = this._attemptAction(pending, attackerIndex);
+      this._resolvingSense = false;
+
+      if (usedSenseCard) {
+        const senseValue = parseInt(usedSenseCard.data[10], 10);
+        this._logs[playerIndex].push({
+          turn: this.game.turncount,
+          text: `Used ${usedSenseCard.name} to block mission advance (−${senseValue} mission)`,
+          card: usedSenseCard.toJSON() as CardData,
+          actionType: "sense_block",
+        });
+      }
+
       // Reset so the next advance_mission this turn prompts again.
       defender._sense_flag = null;
       return result;

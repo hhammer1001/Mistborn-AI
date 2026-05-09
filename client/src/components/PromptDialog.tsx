@@ -35,8 +35,12 @@ interface Props {
 
 /** Find the CardData for a given cardId by searching all visible locations. */
 function findCard(cardId: number, gameState: GameState): CardData | undefined {
-  const you = gameState.players[0];
-  const opp = gameState.players[1];
+  // players are serialized in their original order, so "you" depends on
+  // perspective — in MP you may be player 1. Looking up by hardcoded index
+  // would search the opponent's zones and miss your own discard.
+  const me = gameState.myPlayerIndex ?? 0;
+  const you = gameState.players[me];
+  const opp = gameState.players[1 - me];
   const byId = (c: CardData) => c.id === cardId;
   return (
     you.hand.find(byId) ||

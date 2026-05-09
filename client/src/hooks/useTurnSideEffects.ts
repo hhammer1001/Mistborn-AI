@@ -187,8 +187,19 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     }
 
     // 2. Turn transitions.
+    // sense_defense / cloud_defense flip activePlayer to the defender mid-opp-turn
+    // for a defensive prompt, then flip back. Those flips look like turn boundaries
+    // but aren't — treating them as such splits a single opp turn's recap in two.
+    const enteringDefenseInterrupt =
+      gameState.phase === "sense_defense" || gameState.phase === "cloud_defense";
+    const resumingFromDefenseInterrupt =
+      prev?.phase === "sense_defense" || prev?.phase === "cloud_defense";
+
     // MP: my → opp — snapshot turn-start state and fire opponent banner.
-    const oppTurnStartedMP = prev && prevIsMyTurn === true && !isMyTurn;
+    // Skip when resuming from a defense interrupt: the existing baseline (set at
+    // the real turn start) must be preserved so the final recap covers the whole turn.
+    const oppTurnStartedMP =
+      prev && prevIsMyTurn === true && !isMyTurn && !resumingFromDefenseInterrupt;
     if (oppTurnStartedMP) {
       turnStartStateRef.current = prev;
       turnStartBotLogLenRef.current = botLog.length;
@@ -198,7 +209,9 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     // Opp turn ended — compute cumulative recap.
     //   MP: opp → my transition (prev was false, now true).
     //   SP: isMyTurn stays true; detect via botLog growth (bot turn is atomic).
-    const oppTurnEndedMP = prev && prevIsMyTurn === false && isMyTurn;
+    // Skip when entering a defense interrupt: it's a mid-turn prompt, not a turn end.
+    const oppTurnEndedMP =
+      prev && prevIsMyTurn === false && isMyTurn && !enteringDefenseInterrupt;
     const oppTurnEndedSP =
       prev && prevIsMyTurn === true && isMyTurn && botLog.length > seenLen;
 
