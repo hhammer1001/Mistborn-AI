@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { BOT_TYPES, VICTORY_TYPES, type BotType, type VictoryType } from "../data/ministrySigils";
+import { BOT_TYPES, BOT_TYPE_LABELS, VICTORY_TYPES, type BotType, type VictoryType } from "../data/ministrySigils";
 import type { LogFilter, LogMode } from "../hooks/useMinistryPrefs";
 
 interface Props {
@@ -73,7 +73,7 @@ export function SettingsPopover({ open, anchorSelector, filter, onFilterChange, 
           {BOT_TYPES.map((b) => (
             <label key={b} className="ms-check-item">
               <input type="checkbox" checked={filter.bots.includes(b)} onChange={() => toggleBot(b)} />
-              <span>{b}</span>
+              <span>{BOT_TYPE_LABELS[b]}</span>
             </label>
           ))}
         </div>

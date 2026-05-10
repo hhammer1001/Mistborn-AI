@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BOT_TYPES, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
+import { BOT_TYPES, BOT_TYPE_LABELS, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
 import type { BotSetupConfig, FirstPlayerChoice } from "../hooks/useMinistryPrefs";
 import type { Room } from "../hooks/useLobby";
 
@@ -54,7 +54,7 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
       c.firstPlayer === "you" ? "you first" :
       c.firstPlayer === "bot" ? "bot first" :
       "random first";
-    return { self, opp, bot: c.botType, first };
+    return { self, opp, bot: BOT_TYPE_LABELS[c.botType], first };
   };
   const p = previewText(config);
 
@@ -97,7 +97,7 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
               value={draft.botType}
               onChange={(e) => setDraft({ ...draft, botType: e.target.value as BotType })}
             >
-              {BOT_TYPES.map((b) => <option key={b} value={b}>{b}</option>)}
+              {BOT_TYPES.map((b) => <option key={b} value={b}>{BOT_TYPE_LABELS[b]}</option>)}
             </select>
           </label>
           <label>Who goes first

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
 import { GameSession, opponentTypeToKind } from "../engine/session";
+import { botLabel } from "../data/ministrySigils";
 import { resetCardIds } from "../engine/card";
 import { useTurnSideEffects, computeRecap, type TurnRecap } from "./useTurnSideEffects";
 import { saveMatchRecord, botIdentity, type MatchIdentity } from "../lib/matchLog";
@@ -152,7 +153,7 @@ export function useGame() {
       rawLogRef.current = [];
       clearRecapEntries();
       playerName.current = pName;
-      botName.current = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
+      botName.current = botLabel(opponentType);
 
       // Reset match-log guard + capture start metadata for end-of-game write.
       matchWrittenRef.current = false;
@@ -169,7 +170,7 @@ export function useGame() {
         const session = new GameSession({
           players: [
             { kind: "human", name: pName, character },
-            { kind: botKind, name: `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`, character: opponentCharacter },
+            { kind: botKind, name: botLabel(opponentType), character: opponentCharacter },
           ],
           firstPlayer: botFirst ? 1 : 0,
           testDeck,
@@ -182,7 +183,7 @@ export function useGame() {
         const { botLogDelta } = session.consumeLogDeltas(0);
 
         const initLog: LogEntry[] = [{ turn: 1, text: "Game started" }];
-        const bName = `${opponentType.charAt(0).toUpperCase() + opponentType.slice(1)} Bot`;
+        const bName = botLabel(opponentType);
         if (botLogDelta.length > 0) {
           if (botLogDelta.some(isRealBotTurnEntry)) {
             initLog.push({ turn: 1, text: `${bName}'s turn`, isBot: true });

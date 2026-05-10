@@ -27,6 +27,22 @@ export const MINISTRY_SYMBOL_SRC = "/ministry/symbol.png";
 export const BOT_TYPES = ["hulk", "squashV2", "zoom", "squash", "twonky", "synergy", "random"] as const;
 export type BotType = (typeof BOT_TYPES)[number];
 
+/** Display label for each bot type (shown in menus, logs, opponent name). */
+export const BOT_TYPE_LABELS: Record<BotType, string> = {
+  hulk:     "Hulk X90",
+  squashV2: "Hammer Bot",
+  zoom:     "Zoom Bot",
+  squash:   "Squash Bot",
+  twonky:   "Twonky",
+  synergy:  "Synergy Bot",
+  random:   "Random Bot",
+};
+
+export function botLabel(t: string): string {
+  return (BOT_TYPE_LABELS as Record<string, string>)[t]
+    ?? (t.charAt(0).toUpperCase() + t.slice(1) + " Bot");
+}
+
 export const VICTORY_TYPES = ["Mission", "Combat", "Confrontation", "Forfeit"] as const;
 export type VictoryType = (typeof VICTORY_TYPES)[number];
 
