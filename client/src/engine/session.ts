@@ -632,17 +632,9 @@ export class GameSession {
     for (const event of this.game.deckEvents) {
       if (event.amount <= 0) continue;
       const owner = event.playerIndex as 0 | 1;
-      if (event.type === "draw") {
-        const noun = `card${event.amount === 1 ? "" : "s"}`;
-        this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
-        this._logs[1 - owner].push({ turn, text: `Opponent drew ${event.amount} ${noun}` });
-      } else if (event.type === "damage") {
-        this._logs[owner].push({ turn, text: `Gained ${event.amount} damage` });
-        this._logs[1 - owner].push({ turn, text: `Opponent gained ${event.amount} damage` });
-      } else if (event.type === "mission") {
-        this._logs[owner].push({ turn, text: `Gained ${event.amount} mission` });
-        this._logs[1 - owner].push({ turn, text: `Opponent gained ${event.amount} mission` });
-      }
+      const noun = `card${event.amount === 1 ? "" : "s"}`;
+      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
+      this._logs[1 - owner].push({ turn, text: `Opponent drew ${event.amount} ${noun}` });
     }
     this.game.deckEvents = [];
     for (let i = 0; i < this.players.length; i++) {

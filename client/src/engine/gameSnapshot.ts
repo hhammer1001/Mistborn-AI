@@ -72,8 +72,8 @@ export interface GameStateSnap {
    * the rng past where it'd be without lookahead, polluting actual play. */
   gameRng: Rng;
   botRngs: Rng[];
-  /** Captured so bot-lookahead simulations don't leak in-sim events (draws,
-   *  damage/mission gains) into the real activity log after restoreGame. */
+  /** Captured so bot-lookahead simulations don't leak in-sim deck events
+   *  (ad-hoc draws, reshuffles) into the real activity log after restoreGame. */
   deckEvents: DeckEvent[];
 }
 

@@ -229,23 +229,13 @@ export class Player {
 
   // ── Basic effects ──
 
-  damage(amount: number) {
-    this.curDamage += amount;
-    if (amount > 0) {
-      this.game.deckEvents.push({ type: "damage", playerIndex: this.turnOrder, amount });
-    }
-  }
+  damage(amount: number) { this.curDamage += amount; }
   money(amount: number) { this.curMoney += amount; }
   heal(amount: number) {
     this.curHealth += amount;
     if (this.curHealth > 40) this.curHealth = 40;
   }
-  mission(amount: number) {
-    this.curMission += amount;
-    if (amount > 0) {
-      this.game.deckEvents.push({ type: "mission", playerIndex: this.turnOrder, amount });
-    }
-  }
+  mission(amount: number) { this.curMission += amount; }
   draw(amount: number) {
     const beforeHand = this.deck.hand.length;
     this.deck.draw(amount, this);
