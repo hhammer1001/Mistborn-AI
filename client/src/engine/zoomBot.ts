@@ -48,6 +48,17 @@ export class ZoomBot extends SquashBot {
    * lookahead from over-trusting noisy follow-up estimates. */
   static followupWeight = 0.6;
 
+  // Per-turn lethal-cache + invocation cap — same as SquashV2Bot. Without it,
+  // late-game turns where opp HP is low can spend many seconds re-running the
+  // 12-step greedy lookahead per selectAction call. Empirically cap=3 is
+  // robust; 4+ hangs on certain (Kelsier-Marsh, etc.) seeds when chain
+  // lookahead K=2 is also active.
+  private lethalSearchedTurn = -1;
+  private lethalSearchedCurDamage = -1;
+  private lethalCallsThisTurn = 0;
+  private lethalCallsTurn = -1;
+  private static MAX_LETHAL_CALLS_PER_TURN = 3;
+
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Zoom Bot", character = "Marsh") {
     super(deck, game, turnOrder, name, character);
   }
@@ -66,13 +77,40 @@ export class ZoomBot extends SquashBot {
       return super.selectAction(actions, game);
     }
 
+    // Total wallclock budget for one decision (hard backstop).
+    const decisionStart = Date.now();
+    const decisionBudgetMs = 250;
+
     // Lethal solver: when opp HP is in striking range, do a greedy depth
     // search for kill sequences. If lethal exists, return the next step on
     // the kill path. Cheap & effective — research-doc-recommended pattern.
+    //
+    // Per-turn cache + invocation cap to prevent unbounded re-search when
+    // the solver returns non-damage-producing first actions (use_boxing,
+    // burn_card) that don't grow curDamage but still get performed. See
+    // SquashV2Bot for the same fix.
     const opp = game.players[(this.turnOrder + 1) % 2];
     if (opp.curHealth > 0 && opp.curHealth <= ZoomBot.lethalThreshold) {
-      const lethal = this.findLethalAction(actions, game);
-      if (lethal) return lethal;
+      if (this.lethalCallsTurn !== game.turncount) {
+        this.lethalCallsTurn = game.turncount;
+        this.lethalCallsThisTurn = 0;
+      }
+      const cacheValid =
+        this.lethalSearchedTurn === game.turncount &&
+        this.lethalSearchedCurDamage >= this.curDamage;
+      const overCap = this.lethalCallsThisTurn >= ZoomBot.MAX_LETHAL_CALLS_PER_TURN;
+      if (!cacheValid && !overCap) {
+        this.lethalCallsThisTurn += 1;
+        const lethal = this.findLethalAction(actions, game);
+        this.lethalSearchedTurn = game.turncount;
+        this.lethalSearchedCurDamage = this.curDamage;
+        if (lethal) return lethal;
+      }
+    }
+
+    // Bail if lethal already used up the budget.
+    if (Date.now() - decisionStart > decisionBudgetMs) {
+      return super.selectAction(actions, game);
     }
 
     // Heuristic scoring narrows the candidate set.
@@ -83,12 +121,17 @@ export class ZoomBot extends SquashBot {
     let bestAction: GameActionInternal = candidates[0].action;
     let bestValue = -Infinity;
 
+    // Chain-lookahead wall-clock budget — same fix as SquashV2.
+    const chainStart = Date.now();
+    const chainBudgetMs = Math.max(20, decisionBudgetMs - (chainStart - decisionStart));
+
     // Mark this bot as simulating so the session's performAction wrapper
     // skips logging during candidate evaluation. Cleared after the loop.
     const self = this as Player & { _simulating?: boolean };
     self._simulating = true;
     try {
       for (const cand of candidates) {
+        if (Date.now() - chainStart > chainBudgetMs) break;
         const action = cand.action;
         let value: number = cand.score;
 
@@ -164,6 +207,12 @@ export class ZoomBot extends SquashBot {
     );
     if (damageCandidates.length === 0) return null;
 
+    // Wall-clock budget. Some pathological card-set states (lots of atium-burn
+    // options × 12-depth × ~15 candidates) blow past expected runtime. Bail
+    // and fall back to the heuristic for the rest of the turn.
+    const startTime = Date.now();
+    const budgetMs = 50;
+
     const stateBefore = snapshotGame(game);
     let lethalFirstAction: GameActionInternal | null = null;
     let bestLethalDamage = -Infinity;
@@ -178,6 +227,7 @@ export class ZoomBot extends SquashBot {
 
     try {
       for (const first of damageCandidates) {
+        if (Date.now() - startTime > budgetMs) break;
         try {
           this.performAction(first, game);
           if (game.winner === this) {
@@ -189,6 +239,7 @@ export class ZoomBot extends SquashBot {
           // or no more damage moves.
           let damageBuilt = this.curDamage;
           for (let depth = 0; depth < 12; depth++) {
+            if (Date.now() - startTime > budgetMs) break;
             const next = this.availableActions(game);
             // Prefer actions that build curDamage
             const damaging = next.filter((a) => a.type !== "end_actions" && a.type !== "buy_boxing");
