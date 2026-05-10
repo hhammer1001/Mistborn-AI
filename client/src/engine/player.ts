@@ -487,11 +487,11 @@ export class Player {
     const idx = this.game.market.discard.indexOf(choices[choice]);
     if (idx !== -1) this.game.market.discard.splice(idx, 1);
   }
-  special10() { // Precise Shot: gain any eliminated card
+  special10() { // Precise Shot: gain any eliminated card to hand
     const choices = this.game.market.discard;
     const choice = this.soarIn(choices);
     if (choice === -1) return;
-    this.deck.discard.push(choices[choice]);
+    this.deck.hand.push(choices[choice]);
     this.game.market.discard.splice(choice, 1);
   }
   special11() { // Maelstrom: kill all opponent allies + clear market
