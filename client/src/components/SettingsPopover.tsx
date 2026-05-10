@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { BOT_TYPES, BOT_TYPE_LABELS, VICTORY_TYPES, type BotType, type VictoryType } from "../data/ministrySigils";
-import type { LogFilter, LogMode } from "../hooks/useMinistryPrefs";
+import type { LogFilter, LogMode, FirstPlayerFilter } from "../hooks/useMinistryPrefs";
 
 interface Props {
   open: boolean;
@@ -35,6 +35,7 @@ export function SettingsPopover({ open, anchorSelector, filter, onFilterChange, 
   }, [open, anchorSelector, onClose]);
 
   const setMode = (mode: LogMode) => onFilterChange({ ...filter, mode });
+  const setFirstPlayer = (firstPlayer: FirstPlayerFilter) => onFilterChange({ ...filter, firstPlayer });
   const toggleBot = (b: BotType) => {
     const has = filter.bots.includes(b);
     onFilterChange({ ...filter, bots: has ? filter.bots.filter((x) => x !== b) : [...filter.bots, b] });
@@ -75,6 +76,21 @@ export function SettingsPopover({ open, anchorSelector, filter, onFilterChange, 
               <input type="checkbox" checked={filter.bots.includes(b)} onChange={() => toggleBot(b)} />
               <span>{BOT_TYPE_LABELS[b]}</span>
             </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="section">
+        <div className="section-label">Went first</div>
+        <div className="ms-seg-row">
+          {(["all", "me", "opp"] as FirstPlayerFilter[]).map((fp) => (
+            <button
+              key={fp}
+              className={filter.firstPlayer === fp ? "active" : ""}
+              onClick={() => setFirstPlayer(fp)}
+            >
+              {fp === "all" ? "All" : fp === "me" ? "You" : "Opponent"}
+            </button>
           ))}
         </div>
       </div>

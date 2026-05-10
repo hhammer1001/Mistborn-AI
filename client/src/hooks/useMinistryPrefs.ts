@@ -25,17 +25,20 @@ export const DEFAULT_BOT_CONFIG: BotSetupConfig = {
 };
 
 export type LogMode = "all" | "bot" | "human";
+export type FirstPlayerFilter = "all" | "me" | "opp";
 
 export interface LogFilter {
   mode: LogMode;
   bots: BotType[];
   victories: VictoryType[];
+  firstPlayer: FirstPlayerFilter;
 }
 
 export const DEFAULT_FILTER: LogFilter = {
   mode: "all",
   bots: [...BOT_TYPES],
   victories: [...VICTORY_TYPES],
+  firstPlayer: "all",
 };
 
 function readJSON<T>(key: string, fallback: T): T {

@@ -66,6 +66,7 @@ function filterEntries(all: ChronicleEntry[], f: LogFilter): ChronicleEntry[] {
     if (f.mode === "human" && e.kind !== "mp")  return false;
     if (e.kind === "bot" && e.botType && !f.bots.includes(e.botType)) return false;
     if (!f.victories.includes(e.victory)) return false;
+    if (f.firstPlayer !== "all" && e.firstPlayer !== f.firstPlayer) return false;
     return true;
   });
 }
