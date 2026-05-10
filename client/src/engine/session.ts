@@ -174,7 +174,7 @@ function diffToText(before: PSnap, after: PSnap): string[] {
 }
 
 import type { CardData } from "../types/game";
-interface LogEntry { turn: number; text: string; card?: CardData; actionType?: string; metalIndex?: number }
+interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number }
 
 // ── Structured action log (for replay + post-game review) ──
 
@@ -1119,46 +1119,56 @@ export class GameSession {
     return this.getState(playerIndex);
   }
 
-  resolveCloud(playerIndex: number, cardId: number): Record<string, unknown> {
+  /** Resolve cloud defense for a single damage event with the defender's
+   *  full set of cloud-card commits. Empty array = "take the damage." All
+   *  cards are validated up front, then applied atomically; the phase
+   *  always exits afterward, so one popup = one decision per damage event. */
+  resolveCloud(playerIndex: number, cardIds: number[]): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "cloud_defense") return { error: `Cannot resolve cloud in phase: ${this.phase}` };
 
-    this._pushActionEvent("cloud", playerIndex, { cardId });
+    this._pushActionEvent("cloud", playerIndex, { cardIds });
 
     const p = this.players[playerIndex];
     const attackerIndex = (1 - playerIndex) as 0 | 1;
 
-    if (cardId === -1) {
-      if (this.game.winner) this.phase = "game_over";
-      else this._postAttackCleanup(attackerIndex);
-      return this.getState(playerIndex);
+    const cards: Action[] = [];
+    const seen = new Set<number>();
+    for (const cardId of cardIds) {
+      if (seen.has(cardId)) continue;
+      seen.add(cardId);
+      const card = p.deck.hand.find(
+        (c): c is Action => c instanceof Action && c.id === cardId && c.data[9] === "cloudP",
+      );
+      if (!card) return { error: `Cloud card ${cardId} not found in hand` };
+      cards.push(card);
     }
 
-    let card: Action | null = null;
-    for (const c of p.deck.hand) {
-      if (c.id === cardId && c instanceof Action && c.data[9] === "cloudP") { card = c; break; }
+    for (const card of cards) {
+      const reduction = parseInt(card.data[10], 10);
+      p.curHealth = Math.min(p.curHealth + reduction, 40);
+      const idx = p.deck.hand.indexOf(card);
+      if (idx !== -1) p.deck.hand.splice(idx, 1);
+      p.deck.discard.push(card);
     }
-    if (!card) return { error: "Cloud card not found in hand" };
 
-    const reduction = parseInt(card.data[10], 10);
-    p.curHealth = Math.min(p.curHealth + reduction, 40);
-    const idx = p.deck.hand.indexOf(card);
-    if (idx !== -1) p.deck.hand.splice(idx, 1);
-    p.deck.discard.push(card);
-
-    const cloudCardData = card.toJSON() as CardData;
-    this._logs[playerIndex].push({
-      turn: this.game.turncount,
-      text: `${card.name} blocked ${reduction} damage`,
-      card: cloudCardData,
-      actionType: "cloud_block",
-    });
-    this._logs[attackerIndex].push({
-      turn: this.game.turncount,
-      text: `Opponent's ${card.name} blocked ${reduction} damage`,
-      card: cloudCardData,
-      actionType: "cloud_block",
-    });
+    if (cards.length > 0) {
+      const totalReduction = cards.reduce((sum, c) => sum + parseInt(c.data[10], 10), 0);
+      const cardNames = cards.map((c) => c.name).join(" + ");
+      const cardsData = cards.map((c) => c.toJSON() as CardData);
+      this._logs[playerIndex].push({
+        turn: this.game.turncount,
+        text: `${cardNames} blocked ${totalReduction} damage`,
+        cards: cardsData,
+        actionType: "cloud_block",
+      });
+      this._logs[attackerIndex].push({
+        turn: this.game.turncount,
+        text: `Opponent's ${cardNames} blocked ${totalReduction} damage`,
+        cards: cardsData,
+        actionType: "cloud_block",
+      });
+    }
 
     if (p.curHealth > 0) {
       p.alive = true;
@@ -1168,11 +1178,8 @@ export class GameSession {
       }
     }
 
-    const remaining = p.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
-    if (remaining.length === 0) {
-      if (this.game.winner) this.phase = "game_over";
-      else this._postAttackCleanup(attackerIndex);
-    }
+    if (this.game.winner) this.phase = "game_over";
+    else this._postAttackCleanup(attackerIndex);
     return this.getState(playerIndex);
   }
 
@@ -1211,7 +1218,7 @@ export class GameSession {
       // If the defender is a bot, auto-skip cloud defense (bot's cloudP already
       // returns false; matching prior single-player behavior).
       if (this._isBot(oi)) {
-        this.resolveCloud(oi, -1);
+        this.resolveCloud(oi, []);
       }
       return;
     }
@@ -1422,7 +1429,7 @@ export class GameSession {
       // If the opp is also a bot (shouldn't happen in normal single/multiplayer
       // but cheap to handle), auto-skip.
       if (this._isBot(oi)) {
-        this.resolveCloud(oi, -1);
+        this.resolveCloud(oi, []);
       }
       return;
     }

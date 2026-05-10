@@ -26,6 +26,9 @@ export interface LogEntry {
   text: string;
   isBot?: boolean;
   card?: import("../types/game").CardData;
+  /** Multiple cards behind a single combined event (e.g. multi-cloud block).
+   *  Popups should render all of them; the text already names them. */
+  cards?: import("../types/game").CardData[];
   actionType?: string;
   metalIndex?: number;
   recap?: TurnRecap;
@@ -185,7 +188,7 @@ export function useGame() {
             initLog.push({ turn: 1, text: `${bName}'s turn`, isBot: true });
           }
           for (const entry of botLogDelta) {
-            initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
           // Flashes are derived declaratively by useTurnSideEffects from the
           // initial gameState. Recap has no prior snapshot to diff against, so
@@ -266,9 +269,9 @@ export function useGame() {
         if (playerLogDelta.length > 0) {
           for (const entry of playerLogDelta) {
             if (entry.turn > prevTurn) {
-              newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+              newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
             } else {
-              newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+              newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
             }
           }
         }
@@ -279,7 +282,7 @@ export function useGame() {
             newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
           for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
@@ -367,7 +370,7 @@ export function useGame() {
 
         if (playerLogDelta.length > 0) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
@@ -377,7 +380,7 @@ export function useGame() {
             newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
           for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
@@ -426,7 +429,7 @@ export function useGame() {
 
         if (playerLogDelta.length > 0) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
@@ -436,7 +439,7 @@ export function useGame() {
             newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
           for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
 
@@ -477,7 +480,7 @@ export function useGame() {
 
         if (playerLogDelta.length) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
         if (botLogDelta.length) {
@@ -486,7 +489,7 @@ export function useGame() {
             newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
           }
           for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {
@@ -502,12 +505,12 @@ export function useGame() {
   );
 
   const resolveCloud = useCallback(
-    (cardId: number) => {
+    (cardIds: number[]) => {
       const session = sessionRef.current;
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveCloud(0, cardId) as SessionResult;
+        const data = session.resolveCloud(0, cardIds) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
@@ -517,12 +520,12 @@ export function useGame() {
 
         if (playerLogDelta.length) {
           for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
         if (botLogDelta.length) {
           for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
         }
         if ((data.turnCount ?? 0) > gameState.turnCount) {

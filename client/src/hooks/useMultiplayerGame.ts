@@ -82,10 +82,10 @@ export function useMultiplayerGame(
     if (!gameState) return [];
     const entries: LogEntry[] = [];
     for (const entry of gameState.playerLog ?? []) {
-      entries.push({ turn: entry.turn, text: entry.text, isBot: false, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+      entries.push({ turn: entry.turn, text: entry.text, isBot: false, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
     }
     for (const entry of gameState.botLog ?? []) {
-      entries.push({ turn: entry.turn, text: entry.text, isBot: true, card: entry.card, actionType: entry.actionType, metalIndex: entry.metalIndex });
+      entries.push({ turn: entry.turn, text: entry.text, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
     }
     entries.push(...recapEntries);
     entries.sort((a, b) => a.turn - b.turn);
@@ -138,7 +138,7 @@ export function useMultiplayerGame(
           session.resolveSense(pi, pending.use as boolean);
           break;
         case "cloud":
-          session.resolveCloud(pi, pending.cardId as number);
+          session.resolveCloud(pi, pending.cardIds as number[]);
           break;
         case "forfeit":
           session.forfeit(pi);
@@ -308,12 +308,12 @@ export function useMultiplayerGame(
   );
 
   const resolveCloud = useCallback(
-    (cardId: number) => {
+    (cardIds: number[]) => {
       if (myPlayerIndex === null) return;
       if (isHost) {
-        _hostAction((s) => s.resolveCloud(myPlayerIndex, cardId));
+        _hostAction((s) => s.resolveCloud(myPlayerIndex, cardIds));
       } else {
-        _guestAction({ actionType: "cloud", cardId });
+        _guestAction({ actionType: "cloud", cardIds });
       }
     },
     [isHost, myPlayerIndex, _hostAction, _guestAction]

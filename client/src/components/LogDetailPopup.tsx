@@ -133,6 +133,19 @@ export function LogDetailPopup({ entry, source, onClose }: Props) {
         </div>
       </div>
     );
+  } else if (entry.cards && entry.cards.length > 0) {
+    // Combined event (e.g. multi-cloud block) — render all cards side by side.
+    const baseWidth = entry.cards.length === 1 ? 260 : entry.cards.length === 2 ? 200 : 160;
+    body = (
+      <div className="log-popup-card-wrap">
+        {tag && <div className="log-popup-tag">{tag}</div>}
+        <div className="log-popup-cards-row">
+          {entry.cards.map((c, i) => (
+            <Card key={i} card={c} baseWidth={baseWidth} noTypeBorder />
+          ))}
+        </div>
+      </div>
+    );
   } else if (entry.card) {
     body = (
       <div className="log-popup-card-wrap">

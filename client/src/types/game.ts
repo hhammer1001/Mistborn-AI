@@ -105,6 +105,9 @@ export interface BotLogEntry {
   turn: number;
   text: string;
   card?: CardData;
+  /** Multiple cards behind a single combined event — currently used by
+   *  cloud_block when multiple cloud cards resolve a single damage event. */
+  cards?: CardData[];
   actionType?: string;
   metalIndex?: number;
 }

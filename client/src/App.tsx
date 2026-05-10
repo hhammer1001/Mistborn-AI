@@ -382,7 +382,7 @@ function GameBoard({
   advanceAllMission: (name: string) => void;
   assignDamage: (targetIndex: number) => unknown;
   resolveSense: (use: boolean) => unknown;
-  resolveCloud: (cardId: number) => unknown;
+  resolveCloud: (cardIds: number[]) => unknown;
   respondToPrompt: (type: string, value: number) => unknown;
   onMainMenu: () => void;
   onForfeit?: () => void | Promise<void>;
@@ -541,10 +541,9 @@ function GameBoard({
             }}
             onSubmit={(ids) => {
               if (loading) return;
-              // Engine consumes exactly one cloud per damage event; if multiple
-              // are toggled we send the first. Subsequent damage events will
-              // re-prompt (the panel's pool/left math now makes that legible).
-              resolveCloud(ids.length === 0 ? -1 : ids[0]);
+              // Engine applies all selected clouds in one resolve and exits the
+              // phase. Empty array = take the damage.
+              resolveCloud(ids);
             }}
           />
         </div>
