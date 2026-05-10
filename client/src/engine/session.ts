@@ -600,6 +600,38 @@ export class GameSession {
     }
   }
 
+  /** Action methods finish by calling this so the activity log gets the
+   *  draws/shuffles that happened along the way before the new state goes
+   *  out to clients. */
+  private _returnState(playerIndex: number): Record<string, unknown> {
+    this._drainDeckEvents();
+    return this.getState(playerIndex);
+  }
+
+  /** Drain accumulated deck events (ad-hoc draws + reshuffles) into the
+   *  per-player activity logs. Called at the end of every public action
+   *  method so the log reflects everything the action triggered. */
+  private _drainDeckEvents() {
+    const turn = this.game.turncount;
+    for (const event of this.game.deckEvents) {
+      if (event.amount <= 0) continue;
+      const owner = event.playerIndex as 0 | 1;
+      const noun = `card${event.amount === 1 ? "" : "s"}`;
+      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
+      this._logs[1 - owner].push({ turn, text: `Opponent drew ${event.amount} ${noun}` });
+    }
+    this.game.deckEvents = [];
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
+      if (p.deck.shuffleOccurred) {
+        const oi = (1 - i) as 0 | 1;
+        this._logs[i].push({ turn, text: "Shuffled deck" });
+        this._logs[oi].push({ turn, text: "Opponent shuffled deck" });
+        p.deck.shuffleOccurred = false;
+      }
+    }
+  }
+
   // ── State for clients ──
 
   getState(perspective: number = this.activePlayer): Record<string, unknown> {
@@ -748,7 +780,7 @@ export class GameSession {
       this._preActionSnapshot = null;
       this._playerSnapBefore = null;
       this._undoStack = [];
-      return this.getState(playerIndex);
+      return this._returnState(playerIndex);
     }
 
     this._preActionSnapshot = this._takeSnapshot();
@@ -781,7 +813,7 @@ export class GameSession {
         this._pending_advance_action = action;
         this.phase = "sense_defense";
         this.activePlayer = oppIndex;
-        return this.getState(playerIndex);
+        return this._returnState(playerIndex);
       }
     }
     this._pending_action_index = actionIndex;
@@ -863,7 +895,7 @@ export class GameSession {
       const result = this.playAction(playerIndex, actionIdx);
       if (result && (result as { error?: string }).error) break;
     }
-    return this.getState(playerIndex);
+    return this._returnState(playerIndex);
   }
 
   private _attemptAction(action: GameActionInternal, playerIndex: number): Record<string, unknown> {
@@ -878,7 +910,7 @@ export class GameSession {
         this._cached_raw = null;
         const [, raw] = p.serializeActions(this.game);
         this._cached_raw = raw;
-        return this.getState(playerIndex);
+        return this._returnState(playerIndex);
       }
       throw e;
     }
@@ -997,7 +1029,7 @@ export class GameSession {
       this._undoStack = [];
     }
     this._cached_raw = null;
-    return this.getState(playerIndex);
+    return this._returnState(playerIndex);
   }
 
   respondToPrompt(playerIndex: number, promptType: string, value: number | boolean): Record<string, unknown> {
@@ -1036,14 +1068,14 @@ export class GameSession {
     const p = this.players[playerIndex];
     if (targetIndex === -1) {
       this._executeAttackAndTransition(playerIndex);
-      return this.getState(playerIndex);
+      return this._returnState(playerIndex);
     }
     if (targetIndex === -2) {
       // Skip face-hit: zero damage and transition. Used when the opponent has
       // a defender (face-hit blocked) or when the attacker chooses not to.
       p.curDamage = 0;
       this._executeAttackAndTransition(playerIndex);
-      return this.getState(playerIndex);
+      return this._returnState(playerIndex);
     }
 
     const [targets, opp] = this.game.validTargets(p);
@@ -1064,7 +1096,7 @@ export class GameSession {
     if (newTargets.length === 0 && p.curDamage === 0) {
       this._executeAttackAndTransition(playerIndex);
     }
-    return this.getState(playerIndex);
+    return this._returnState(playerIndex);
   }
 
   resolveSense(playerIndex: number, use: boolean): Record<string, unknown> {
@@ -1116,7 +1148,7 @@ export class GameSession {
 
     // Fallback for callers still using the legacy pre-turn prompt path.
     this._startNextTurn(this._next_player_after_sense);
-    return this.getState(playerIndex);
+    return this._returnState(playerIndex);
   }
 
   /** Resolve cloud defense for a single damage event with the defender's
@@ -1180,7 +1212,7 @@ export class GameSession {
 
     if (this.game.winner) this.phase = "game_over";
     else this._postAttackCleanup(attackerIndex);
-    return this.getState(playerIndex);
+    return this._returnState(playerIndex);
   }
 
   forfeit(playerIndex: number): Record<string, unknown> {
@@ -1189,7 +1221,7 @@ export class GameSession {
     this.game.winner = this.players[winnerIndex];
     this.game.victoryType = "F";
     this.phase = "game_over";
-    return this.getState(playerIndex);
+    return this._returnState(playerIndex);
   }
 
   // ── Turn flow internals ──

@@ -236,7 +236,16 @@ export class Player {
     if (this.curHealth > 40) this.curHealth = 40;
   }
   mission(amount: number) { this.curMission += amount; }
-  draw(amount: number) { this.deck.draw(amount, this); }
+  draw(amount: number) {
+    const beforeHand = this.deck.hand.length;
+    this.deck.draw(amount, this);
+    // Ad-hoc draws (ability-driven; not the cleanUp end-of-turn deferred
+    // draw, which calls deck.draw directly). Surface to the activity log.
+    const drew = this.deck.hand.length - beforeHand;
+    if (drew > 0) {
+      this.game.deckEvents.push({ type: "draw", playerIndex: this.turnOrder, amount: drew });
+    }
+  }
   gainAtium(amount: number) { this.atium += amount; }
   extraBurn(amount: number) { this.burns += amount; }
   permDraw(amount: number) { this.handSize += amount; }

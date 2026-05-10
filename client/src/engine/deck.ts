@@ -30,6 +30,9 @@ export class Deck {
   /** Stream used for mid-game reshuffles. Set by subclass constructors;
    *  cloned decks (Object.create) must copy this from the original. */
   rng!: Rng;
+  /** Set whenever a mid-game reshuffle happens (discard → draw pile, then
+   *  shuffled). Session drains this into the activity log and clears it. */
+  shuffleOccurred = false;
 
   draw(amount: number) {
     for (let i = 0; i < amount; i++) {
@@ -37,6 +40,7 @@ export class Deck {
         this.cards = this.discard;
         this.discard = [];
         shuffle(this.cards, this.rng);
+        this.shuffleOccurred = true;
         if (this.cards.length === 0) return;
       }
       this.hand.push(this.cards.shift()!);
@@ -87,6 +91,7 @@ export class PlayerDeck extends Deck {
         this.cards = this.discard;
         this.discard = [];
         shuffle(this.cards, this.rng);
+        this.shuffleOccurred = true;
         if (this.cards.length === 0) return;
       }
       const card = this.cards.shift()!;
