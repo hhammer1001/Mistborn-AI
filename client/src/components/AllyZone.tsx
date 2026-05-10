@@ -3,9 +3,11 @@ import { createPortal } from "react-dom";
 import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
 import { METAL_ICONS } from "../data/metalIcons";
+import { MetalChoicePopup } from "./MetalChoicePopup";
 import { copyLabelsForHand, nameWithCopy } from "../utils/copyLabels";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
+const ATIUM_ICON = "/cards/atium%20token.png";
 
 interface CompositeAllyAction {
   textBefore: string;
@@ -15,6 +17,11 @@ interface CompositeAllyAction {
   title: string;
   firstActionIndex: number;
   secondMatch: { code: number; cardIds?: number[] };
+  // When present, clicking the composite opens a MetalChoicePopup instead
+  // of firing immediately; chosen metal → first action index via this map.
+  // Used for atium-metal allies (Inquisitor, Kandra) so the player can
+  // pick what metal to burn atium as, mirroring the Ability III flow.
+  metalChoice?: Record<number, number>;
 }
 
 interface Props {
@@ -34,7 +41,51 @@ function getCompositeAllyActions(
 ): CompositeAllyAction[] {
   const composites: CompositeAllyAction[] = [];
   const metal = ally.metal;
-  if (metal < 0 || metal >= 8) return composites; // no metal allies (Noble, Hazekillers, Crewleader)
+  if (metal < 0) return composites; // no metal allies (Noble, Hazekillers, Crewleader)
+
+  // Atium-metal allies (Inquisitor, Kandra): ability is gated by
+  // metalBurned[8]. Any "burn atium" path satisfies it while also giving a
+  // metal kick of the player's choice — so present a metal-choice popup,
+  // mirroring the Ability III "Burn atium + Ab III" flow.
+  if (metal === 8) {
+    const hasAbility1 = ally.available1 && player.metalBurned[8] === 0;
+    const hasAbility2 = ally.available2 && player.metalBurned[8] === 1;
+    if (!hasAbility1 && !hasAbility2) return composites;
+
+    const burnAtiumAction = actions.find((a) => a.code === 5 && a.metalIndex === 8);
+    const atiumAsActions = actions.filter((a) => a.code === 12);
+    if (!burnAtiumAction && atiumAsActions.length === 0) return composites;
+
+    const resolver: Record<number, number> = {};
+    for (const a of atiumAsActions) {
+      if (a.metalIndex !== undefined) resolver[a.metalIndex] = a.index;
+    }
+    if (burnAtiumAction) resolver[8] = burnAtiumAction.index;
+
+    if (hasAbility1) {
+      composites.push({
+        textBefore: "Burn atium",
+        textAfter: "+ Ability 1",
+        metalIcon: ATIUM_ICON,
+        title: `Burn atium as your choice of metal and use ${ally.name}'s first ability`,
+        firstActionIndex: -1,
+        secondMatch: { code: 8, cardIds: [ally.id] },
+        metalChoice: resolver,
+      });
+    }
+    if (hasAbility2) {
+      composites.push({
+        textBefore: "Burn atium",
+        textAfter: "+ Ability 2",
+        metalIcon: ATIUM_ICON,
+        title: `Burn atium as your choice of metal and use ${ally.name}'s second ability`,
+        firstActionIndex: -1,
+        secondMatch: { code: 9, cardIds: [ally.id] },
+        metalChoice: resolver,
+      });
+    }
+    return composites;
+  }
 
   const metalName = METAL_NAMES[metal];
   const icon = metalName ? METAL_ICONS[metalName]?.flat : undefined;
@@ -142,11 +193,12 @@ function getCompositeAllyActions(
   return composites;
 }
 
-function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, onClose, anchorRef }: {
+function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, onMetalChoice, onClose, anchorRef }: {
   allyActions: GameAction[];
   composites: CompositeAllyAction[];
   onAction: (index: number) => void;
   onCompositeAction: (firstIndex: number, secondMatch: { code: number; cardIds?: number[] }) => void;
+  onMetalChoice: (composite: CompositeAllyAction) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -202,7 +254,15 @@ function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, 
         <button
           key={`composite-${i}`}
           className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
-          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.secondMatch); onClose(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (c.metalChoice) {
+              onMetalChoice(c);
+            } else {
+              onCompositeAction(c.firstActionIndex, c.secondMatch);
+            }
+            onClose();
+          }}
           title={c.title}
         >
           <span className={c.isFlare ? "flare-text" : ""}>{c.textBefore}</span>
@@ -218,6 +278,7 @@ function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, 
 
 export function AllyZone({ allies, actions, player, onAction, onCompositeAction, label }: Props) {
   const [selectedAlly, setSelectedAlly] = useState<number | null>(null);
+  const [metalChoice, setMetalChoice] = useState<{ allyId: number; composite: CompositeAllyAction } | null>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   if (allies.length === 0) return null;
@@ -253,8 +314,22 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
                   composites={composites}
                   onAction={onAction}
                   onCompositeAction={onCompositeAction!}
+                  onMetalChoice={(composite) => setMetalChoice({ allyId: ally.id, composite })}
                   onClose={() => setSelectedAlly(null)}
                   anchorRef={{ current: cardRefs.current.get(ally.id) ?? null }}
+                />
+              )}
+              {metalChoice?.allyId === ally.id && isInteractive && (
+                <MetalChoicePopup
+                  title="Burn atium as..."
+                  anchorRef={{ current: cardRefs.current.get(ally.id) ?? null }}
+                  onChoose={(metalIndex) => {
+                    const idx = metalChoice.composite.metalChoice?.[metalIndex];
+                    if (idx !== undefined) {
+                      onCompositeAction!(idx, metalChoice.composite.secondMatch);
+                    }
+                  }}
+                  onClose={() => setMetalChoice(null)}
                 />
               )}
               {/* Fallback for opponent zone or no composites: inline buttons */}

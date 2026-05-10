@@ -69,7 +69,7 @@ export function useMultiplayerGame(
   // banner; before/after state diff on turn boundary → recap).
   const {
     flashQueue, recap, banner, recapEntries,
-    consumeFlash, consumeRecap, consumeBanner,
+    consumeFlash, consumeRecap, consumeBanner, skipTurnAnimations,
   } = useTurnSideEffects({
     gameState,
     perspective: myPlayerIndex ?? 0,
@@ -217,13 +217,17 @@ export function useMultiplayerGame(
   const playAction = useCallback(
     (actionIndex: number) => {
       if (myPlayerIndex === null) return;
+      // Player is acting — drop in-flight opponent-turn animations (flashes
+      // and recap modal) so they don't ambush mid-turn. Recap log entry
+      // remains pinned at end of the opponent's turn.
+      skipTurnAnimations();
       if (isHost) {
         _hostAction((s) => s.playAction(myPlayerIndex, actionIndex));
       } else {
         _guestAction({ actionType: "action", actionIndex });
       }
     },
-    [isHost, myPlayerIndex, _hostAction, _guestAction]
+    [isHost, myPlayerIndex, _hostAction, _guestAction, skipTurnAnimations]
   );
 
   const advanceAllMission = useCallback(

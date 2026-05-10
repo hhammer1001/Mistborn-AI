@@ -229,13 +229,23 @@ export class Player {
 
   // ── Basic effects ──
 
-  damage(amount: number) { this.curDamage += amount; }
+  damage(amount: number) {
+    this.curDamage += amount;
+    if (amount > 0) {
+      this.game.deckEvents.push({ type: "damage", playerIndex: this.turnOrder, amount });
+    }
+  }
   money(amount: number) { this.curMoney += amount; }
   heal(amount: number) {
     this.curHealth += amount;
     if (this.curHealth > 40) this.curHealth = 40;
   }
-  mission(amount: number) { this.curMission += amount; }
+  mission(amount: number) {
+    this.curMission += amount;
+    if (amount > 0) {
+      this.game.deckEvents.push({ type: "mission", playerIndex: this.turnOrder, amount });
+    }
+  }
   draw(amount: number) {
     const beforeHand = this.deck.hand.length;
     this.deck.draw(amount, this);
@@ -895,7 +905,10 @@ export class Player {
       case "refresh_metal":
         return { type: action.type, code, index: action.index, description: `Use ${action.card.name} to refresh ${METAL_NAMES[action.metalIndex]}`, cardId: action.card.id, metalIndex: action.metalIndex };
       case "use_metal":
-        return { type: action.type, code, index: action.index, description: `Put metal towards abilities of ${action.card.name}`, cardId: action.card.id };
+        // serializeAction is called by the bot wrapper BEFORE the action is
+        // performed, so metalUsed reflects the pre-action count. The ability
+        // about to fire is metalUsed + 1.
+        return { type: action.type, code, index: action.index, description: `Used ability ${(action.card as Action).metalUsed + 1} of ${action.card.name}`, cardId: action.card.id };
       case "burn_metal":
         return { type: action.type, code, index: action.index, description: `Burn ${METAL_NAMES[action.metalIndex]}`, metalIndex: action.metalIndex };
       case "flare_metal":

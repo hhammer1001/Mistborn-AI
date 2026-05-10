@@ -36,9 +36,14 @@ export class Game {
   /** Per-bot streams, indexed by player turnOrder. Bots that opt in read
    *  from these for exploration / tie-breaking. */
   botRngs: Rng[];
-  /** Buffered deck events (ad-hoc draws + reshuffles) that the session
-   *  drains into per-player logs after each action. Cleared by drain. */
-  deckEvents: Array<{ type: "draw"; playerIndex: number; amount: number }> = [];
+  /** Buffered events (ad-hoc draws, reshuffles, damage/mission gains) that
+   *  the session drains into per-player logs after each action. Cleared by
+   *  drain. The name predates the addition of non-deck events; kept as-is. */
+  deckEvents: Array<
+    | { type: "draw"; playerIndex: number; amount: number }
+    | { type: "damage"; playerIndex: number; amount: number }
+    | { type: "mission"; playerIndex: number; amount: number }
+  > = [];
 
   constructor(opts: {
     names?: string[];

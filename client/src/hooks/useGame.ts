@@ -112,7 +112,7 @@ export function useGame() {
   // diffs → recap. End-turn fires the "opponent" banner imperatively below
   // because there is no isMyTurn=false interval for it to observe.
   const sideEffects = useTurnSideEffects({ gameState, perspective: 0, isMyTurn: true });
-  const { flashQueue, recap, banner, recapEntries, consumeFlash, consumeRecap, consumeBanner, clearRecapEntries, setBanner, pushRecap, flagExpectYourBanner } = sideEffects;
+  const { flashQueue, recap, banner, recapEntries, consumeFlash, consumeRecap, consumeBanner, clearRecapEntries, setBanner, pushRecap, flagExpectYourBanner, skipTurnAnimations } = sideEffects;
 
   /** Commit a state update either immediately or behind the opponent-turn
    *  banner. Used whenever a session call may have run the bot's turn inline. */
@@ -237,6 +237,10 @@ export function useGame() {
     (actionIndex: number, descOverride?: string) => {
       const session = sessionRef.current;
       if (!session || !gameState) return null;
+      // The player is acting — cut any in-flight opponent-turn animations
+      // (card flashes, recap modal) immediately. The recap log entry is
+      // already pinned at the end of the bot's turn and stays.
+      skipTurnAnimations();
       // descOverride lets a caller (e.g. playTwoActions) supply a description
       // it already resolved against fresher availableActions. Inside the same
       // event handler, gameState in this closure is still the pre-first-action
@@ -304,7 +308,7 @@ export function useGame() {
         return null;
       }
     },
-    [gameState, appendLog, applyBehindBanner]
+    [gameState, appendLog, applyBehindBanner, skipTurnAnimations]
   );
 
   const advanceAllMission = useCallback(

@@ -11,6 +11,7 @@
  */
 
 import type { Game } from "./game";
+type DeckEvent = Game["deckEvents"][number];
 import { Action, Ally, Card } from "./card";
 import type { Player } from "./player";
 import type { Rng } from "./rng";
@@ -71,6 +72,9 @@ export interface GameStateSnap {
    * the rng past where it'd be without lookahead, polluting actual play. */
   gameRng: Rng;
   botRngs: Rng[];
+  /** Captured so bot-lookahead simulations don't leak in-sim events (draws,
+   *  damage/mission gains) into the real activity log after restoreGame. */
+  deckEvents: DeckEvent[];
 }
 
 function allCards(game: Game): Card[] {
@@ -128,6 +132,7 @@ export function snapshotGame(game: Game): GameStateSnap {
     cardStates,
     gameRng: game.gameRng.clone(),
     botRngs: game.botRngs.map((r) => r.clone()),
+    deckEvents: game.deckEvents.map((e) => ({ ...e })),
   };
 }
 
@@ -197,4 +202,5 @@ export function restoreGame(game: Game, snap: GameStateSnap): void {
     const p = game.players[i] as Player & { rng?: Rng };
     if (p.rng) p.rng = game.botRngs[i];
   }
+  game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));
 }

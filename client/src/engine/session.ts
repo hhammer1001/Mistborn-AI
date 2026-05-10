@@ -122,6 +122,10 @@ interface GameSnapshot {
   /** Length of the structured action-event log at snapshot time. Undo trims
    *  the action log back to this so undone moves are not persisted. */
   actionEventsLength: number;
+  /** Pending deck/damage/mission events captured at snapshot time. Restored
+   *  on rollback so events emitted by a partial action (e.g. one that threw
+   *  PromptNeeded mid-way) don't leak into the activity log after restore. */
+  deckEvents: Game["deckEvents"];
   /** Optional bookkeeping value the caller can attach to a snapshot via
    *  `setNextSnapshotData`. Used by the hook to record its own pre-action
    *  log length so undo can roll back UI state alongside engine state. */
@@ -397,6 +401,7 @@ export class GameSession {
       hiddenCardIds: this._hiddenCardIds(this.activePlayer),
       logLengths: [this._logs[0].length, this._logs[1].length],
       actionEventsLength: this._actionEvents.length,
+      deckEvents: this.game.deckEvents.map((e) => ({ ...e })),
       ...(externalData !== null ? { externalData } : {}),
     };
   }
@@ -448,6 +453,7 @@ export class GameSession {
         c.availableRiot = s.availableRiot ?? false;
       }
     }
+    this.game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));
   }
 
   private _allCards(): Card[] {
@@ -581,7 +587,7 @@ export class GameSession {
     const p = this.players[playerIndex];
     switch (action.type) {
       case "burn_card": return `${action.card.name} (burn)`;
-      case "use_metal": return action.card.name;
+      case "use_metal": return `Used ability ${(action.card as Action).metalUsed} of ${action.card.name}`;
       case "burn_metal": return `Burn ${METAL_NAMES[action.metalIndex]}`;
       case "flare_metal": return `Flare ${METAL_NAMES[action.metalIndex]}`;
       case "use_atium": return `Burn atium as ${METAL_NAMES[action.metalIndex]}`;
@@ -616,9 +622,17 @@ export class GameSession {
     for (const event of this.game.deckEvents) {
       if (event.amount <= 0) continue;
       const owner = event.playerIndex as 0 | 1;
-      const noun = `card${event.amount === 1 ? "" : "s"}`;
-      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
-      this._logs[1 - owner].push({ turn, text: `Opponent drew ${event.amount} ${noun}` });
+      if (event.type === "draw") {
+        const noun = `card${event.amount === 1 ? "" : "s"}`;
+        this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
+        this._logs[1 - owner].push({ turn, text: `Opponent drew ${event.amount} ${noun}` });
+      } else if (event.type === "damage") {
+        this._logs[owner].push({ turn, text: `Gained ${event.amount} damage` });
+        this._logs[1 - owner].push({ turn, text: `Opponent gained ${event.amount} damage` });
+      } else if (event.type === "mission") {
+        this._logs[owner].push({ turn, text: `Gained ${event.amount} mission` });
+        this._logs[1 - owner].push({ turn, text: `Opponent gained ${event.amount} mission` });
+      }
     }
     this.game.deckEvents = [];
     for (let i = 0; i < this.players.length; i++) {

@@ -138,6 +138,15 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
   /** Drop all collected recap log entries — call when starting a new game. */
   const clearRecapEntries = useCallback(() => setRecapEntries([]), []);
 
+  /** Drop any queued card flashes and the recap modal. Call when the player
+   *  takes an action: they're playing now and shouldn't be ambushed mid-turn
+   *  by leftover opponent-turn animations. The recap log entry (already
+   *  pinned at the end of the bot's turn) is preserved. */
+  const skipTurnAnimations = useCallback(() => {
+    setFlashQueue([]);
+    setRecap(null);
+  }, []);
+
   /** Imperatively push a turn recap + log entry + flag for your-turn banner.
    *  Used for SP bot-first where no prior snapshot exists to diff against. */
   const pushRecap = useCallback((r: TurnRecap, turn: number, oppName: string) => {
@@ -286,5 +295,6 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     setBanner,
     pushRecap,
     flagExpectYourBanner,
+    skipTurnAnimations,
   };
 }
