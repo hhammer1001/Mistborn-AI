@@ -77,11 +77,109 @@ import V_vsP from "./data/zoom_vs_prodigy/Vin.json";
 import M_vsP from "./data/zoom_vs_prodigy/Marsh.json";
 import P_vsP from "./data/zoom_vs_prodigy/Prodigy.json";
 
+// SquashV2 weights: going-first specialist trained on seat-0-only data.
+import Kelsier_v2sp from "./data/squashV2_weights/Kelsier.json";
+import Shan_v2sp from "./data/squashV2_weights/Shan.json";
+import Vin_v2sp from "./data/squashV2_weights/Vin.json";
+import Marsh_v2sp from "./data/squashV2_weights/Marsh.json";
+import Prodigy_v2sp from "./data/squashV2_weights/Prodigy.json";
+
+import Kelsier_v2t from "./data/squashV2_timing/Kelsier.json";
+import Shan_v2t from "./data/squashV2_timing/Shan.json";
+import Vin_v2t from "./data/squashV2_timing/Vin.json";
+import Marsh_v2t from "./data/squashV2_timing/Marsh.json";
+import Prodigy_v2t from "./data/squashV2_timing/Prodigy.json";
+
+// Per-opp-character lift data for SquashV2 (seat 0 vs Zoom seat 1, recording
+// only seat-0 outcomes). Mirrors the zoom_vs_<oppChar>/<zoomChar>.json layout
+// but the role is reversed: "<oppChar>" here is the seat-1 (Zoom) opp's char,
+// "<v2Char>" is SquashV2's own char.
+import K_v2vsK from "./data/squashV2_vs_kelsier/Kelsier.json";
+import S_v2vsK from "./data/squashV2_vs_kelsier/Shan.json";
+import V_v2vsK from "./data/squashV2_vs_kelsier/Vin.json";
+import M_v2vsK from "./data/squashV2_vs_kelsier/Marsh.json";
+import P_v2vsK from "./data/squashV2_vs_kelsier/Prodigy.json";
+
+import K_v2vsS from "./data/squashV2_vs_shan/Kelsier.json";
+import S_v2vsS from "./data/squashV2_vs_shan/Shan.json";
+import V_v2vsS from "./data/squashV2_vs_shan/Vin.json";
+import M_v2vsS from "./data/squashV2_vs_shan/Marsh.json";
+import P_v2vsS from "./data/squashV2_vs_shan/Prodigy.json";
+
+import K_v2vsV from "./data/squashV2_vs_vin/Kelsier.json";
+import S_v2vsV from "./data/squashV2_vs_vin/Shan.json";
+import V_v2vsV from "./data/squashV2_vs_vin/Vin.json";
+import M_v2vsV from "./data/squashV2_vs_vin/Marsh.json";
+import P_v2vsV from "./data/squashV2_vs_vin/Prodigy.json";
+
+import K_v2vsM from "./data/squashV2_vs_marsh/Kelsier.json";
+import S_v2vsM from "./data/squashV2_vs_marsh/Shan.json";
+import V_v2vsM from "./data/squashV2_vs_marsh/Vin.json";
+import M_v2vsM from "./data/squashV2_vs_marsh/Marsh.json";
+import P_v2vsM from "./data/squashV2_vs_marsh/Prodigy.json";
+
+import K_v2vsP from "./data/squashV2_vs_prodigy/Kelsier.json";
+import S_v2vsP from "./data/squashV2_vs_prodigy/Shan.json";
+import V_v2vsP from "./data/squashV2_vs_prodigy/Vin.json";
+import M_v2vsP from "./data/squashV2_vs_prodigy/Marsh.json";
+import P_v2vsP from "./data/squashV2_vs_prodigy/Prodigy.json";
+
 type SelfPlayWeights = Record<string, number[]>;
 type TimingBucket = "1-3" | "4-8" | "9-15" | "16+";
 type TimingWeights = Record<string, Record<TimingBucket, number[]>>;
 
-export type BotProfile = "squash" | "zoom";
+export type BotProfile = "squash" | "zoom" | "squashV2";
+
+// ── SquashV2 mutable lever config ──
+// Exposed as a mutable export so ablation harnesses (and the
+// SquashV2Bot class) can flip individual levers on/off without editing this
+// file. After mutating any field that affects rating computation
+// (selfPlayBlend, vsOppBlend*, baselineNormalize), call `recomputeSquashV2Ratings()`
+// to rebuild RATINGS_BY_PROFILE.squashV2 / VS_OPP_LIFTS_SQUASHV2 in place.
+//
+// Default values reflect the best-known config from ablation sweeps
+// (~70% vs Zoom going-second, 5-seed n=20000 avg=69.98%):
+// - atiumBankingMode: "zoomCurve" (+0.78pp over flat)
+// - buyBufferOverride: 5.0 across all chars (+3pp from default 1.5)
+// - selfPlayBlend: 40 (+0.9pp over 80, peak in sweep)
+// - shanCardTunings: false (mirroring zoom-Shan card boosts hurts -0.5pp)
+export const SquashV2Config = {
+  /** Anti-correlate victory path with opponent (zoom-style). Going first
+   * normally sets the agenda — default off. ABLATION TARGET. */
+  antiCorrelation: false,
+  /** Penalize advancing missions where opp leads ≥2 ranks. Universal idea —
+   * default on. ABLATION TARGET. */
+  oppLeadAwareness: true,
+  /** Boost cap=2/3 cards and atium-using cards when missions reward T or A.
+   * Universal game-mechanics insight — default on. ABLATION TARGET. */
+  missionRewardSynergy: true,
+  /** Atium-use cost varies with opp HP (zoom curve) vs flat (squash). Going
+   * first has tempo so banking is less critical — but ablation showed
+   * zoomCurve adds +0.78pp here too. Default zoomCurve. */
+  atiumBankingMode: "zoomCurve" as "flat" | "zoomCurve",
+  /** Per-character buy-buffer overrides (0 = use default from BASE_BUFFERS).
+   * Empirically all chars at 5.0 adds +3pp over BASE_BUFFERS (~1.5-1.8). */
+  buyBufferOverride: { Kelsier: 5.0, Shan: 5.0, Vin: 5.0, Marsh: 5.0, Prodigy: 5.0 } as Record<string, number>,
+  /** Self-play blend strength used by the squashV2 profile. Sweep: 0=64.4,
+   * 10=66.4, 20=68.4, 30=69.4, 40=70.3, 50=70.2, 80=69.4, 100=66.3. */
+  selfPlayBlend: 40,
+  /** Default per-opp lift blend strength. */
+  vsOppBlend: 40,
+  /** Per-zoom-char overrides. Empty for V2 (per-char overrides regressed
+   * unlike zoom). */
+  vsOppBlendByChar: {} as Record<string, number>,
+  /** Whether to baseline-normalize squashV2 ratings (subtract per-char winrate
+   * baseline). seat-0-only data is asymmetric — default ON. Ablation showed
+   * disabling costs -26pp (critical). */
+  baselineNormalize: true,
+  /** Apply Shan-specific card tunings (mirror zoom-Shan: +15 to Pierce/Unveil,
+   * etc.). For V2 going first this hurt -0.5pp in Shan-only sweep — default
+   * OFF (opposite of zoom). */
+  shanCardTunings: false,
+  /** Mission victory path multiplier for Shan-V2. Zoom uses 1.8; V2 sweep
+   * showed mission-mult is essentially noise (1.0–4.0 all ~55%). Default 1.2. */
+  shanMissionMult: 1.2,
+};
 
 const SELFPLAY_WEIGHTS_BY_PROFILE: Record<BotProfile, Record<string, SelfPlayWeights>> = {
   squash: {
@@ -97,6 +195,44 @@ const SELFPLAY_WEIGHTS_BY_PROFILE: Record<BotProfile, Record<string, SelfPlayWei
     Vin: Vin_zsp as SelfPlayWeights,
     Marsh: Marsh_zsp as SelfPlayWeights,
     Prodigy: Prodigy_zsp as SelfPlayWeights,
+  },
+  squashV2: {
+    Kelsier: Kelsier_v2sp as SelfPlayWeights,
+    Shan: Shan_v2sp as SelfPlayWeights,
+    Vin: Vin_v2sp as SelfPlayWeights,
+    Marsh: Marsh_v2sp as SelfPlayWeights,
+    Prodigy: Prodigy_v2sp as SelfPlayWeights,
+  },
+};
+
+// Per-opp-character supplemental lift weights for SquashV2. Same shape as
+// ZOOM_VS_OPP_WEIGHTS but trained from the opposite seat (SquashV2 seat 0 vs
+// Zoom seat 1, recording only seat-0 outcomes).
+const SQUASHV2_VS_OPP_WEIGHTS: Record<string, Record<string, SelfPlayWeights>> = {
+  Kelsier: {
+    Kelsier: K_v2vsK as SelfPlayWeights, Shan: S_v2vsK as SelfPlayWeights,
+    Vin: V_v2vsK as SelfPlayWeights, Marsh: M_v2vsK as SelfPlayWeights,
+    Prodigy: P_v2vsK as SelfPlayWeights,
+  },
+  Shan: {
+    Kelsier: K_v2vsS as SelfPlayWeights, Shan: S_v2vsS as SelfPlayWeights,
+    Vin: V_v2vsS as SelfPlayWeights, Marsh: M_v2vsS as SelfPlayWeights,
+    Prodigy: P_v2vsS as SelfPlayWeights,
+  },
+  Vin: {
+    Kelsier: K_v2vsV as SelfPlayWeights, Shan: S_v2vsV as SelfPlayWeights,
+    Vin: V_v2vsV as SelfPlayWeights, Marsh: M_v2vsV as SelfPlayWeights,
+    Prodigy: P_v2vsV as SelfPlayWeights,
+  },
+  Marsh: {
+    Kelsier: K_v2vsM as SelfPlayWeights, Shan: S_v2vsM as SelfPlayWeights,
+    Vin: V_v2vsM as SelfPlayWeights, Marsh: M_v2vsM as SelfPlayWeights,
+    Prodigy: P_v2vsM as SelfPlayWeights,
+  },
+  Prodigy: {
+    Kelsier: K_v2vsP as SelfPlayWeights, Shan: S_v2vsP as SelfPlayWeights,
+    Vin: V_v2vsP as SelfPlayWeights, Marsh: M_v2vsP as SelfPlayWeights,
+    Prodigy: P_v2vsP as SelfPlayWeights,
   },
 };
 
@@ -163,6 +299,13 @@ const TIMING_WEIGHTS_BY_PROFILE: Record<BotProfile, Record<string, TimingWeights
     Vin: Vin_zt as TimingWeights,
     Marsh: Marsh_zt as TimingWeights,
     Prodigy: Prodigy_zt as TimingWeights,
+  },
+  squashV2: {
+    Kelsier: Kelsier_v2t as TimingWeights,
+    Shan: Shan_v2t as TimingWeights,
+    Vin: Vin_v2t as TimingWeights,
+    Marsh: Marsh_v2t as TimingWeights,
+    Prodigy: Prodigy_v2t as TimingWeights,
   },
 };
 
@@ -383,8 +526,12 @@ export function buildSnapshot(
   }
 
   // Zoom seat 2: anti-correlate with opponent's expected strategy, biased by
-  // own deck composition.
-  if (profile === "zoom" && player.turnOrder === 1) {
+  // own deck composition. SquashV2 seat 0: anti-correlation is gated by
+  // SquashV2Config.antiCorrelation (default off — going first sets the agenda).
+  const useAntiCorrelation =
+    (profile === "zoom" && player.turnOrder === 1) ||
+    (profile === "squashV2" && player.turnOrder === 0 && SquashV2Config.antiCorrelation);
+  if (useAntiCorrelation) {
     const oppIsKelsier = opp.character === "Kelsier";
     const strongMissionDeck = myMissionEngineCount >= 2;
     const strongDamageDeck = myDamageEngineCount >= 2;
@@ -401,12 +548,11 @@ export function buildSnapshot(
   }
 
   // Flip based on actual progress when one path is clearly ahead. Skip
-  // this flip for Zoom seat 2 — anti-correlation is the strategy, don't let
-  // mid-game progress pull us back onto opp's axis.
+  // this flip when anti-correlation is in play — the orthogonal axis is the
+  // strategy; don't let mid-game progress pull us back onto opp's axis.
   const missionProgress = missions.reduce((sum, m) => sum + m.myRank / 12, 0) / 3;
   const damageProgress = (1 - opp.curHealth / 40) + player.pDamage * 0.1;
-  const isZoomSeat2 = profile === "zoom" && player.turnOrder === 1;
-  if (!isZoomSeat2) {
+  if (!useAntiCorrelation) {
     if (victoryPath === "mission" && damageProgress > missionProgress + 0.3) {
       victoryPath = "damage";
     } else if (victoryPath === "damage" && missionProgress > damageProgress + 0.3) {
@@ -757,10 +903,13 @@ const ALL_CARD_DEFS = [...MARKET_DECK, ...STARTER_DECKS];
 function computeAllRatings(
   selfPlayWeights: Record<string, SelfPlayWeights>,
   /** When true, subtract per-character baseline winrate before blending. Set
-   * for asymmetric data (zoom seat-2-only) where the baseline is meaningfully
-   * non-zero. Skipped for symmetric mirror data (squash) — baseline ≈ 0 there
-   * and subtraction would just shift Squash's tuned buy thresholds. */
+   * for asymmetric data (zoom seat-2-only, squashV2 seat-0-only) where the
+   * baseline is meaningfully non-zero. Skipped for symmetric mirror data
+   * (squash) — baseline ≈ 0 there and subtraction would shift Squash's tuned
+   * buy thresholds. */
   baselineNormalize: boolean,
+  /** Blend strength override (defaults to module-level SELFPLAY_BLEND_STRENGTH). */
+  blendStrength: number = SELFPLAY_BLEND_STRENGTH,
 ): {
   ratings: Record<string, Record<string, number>>;
   cardData: Record<string, AnalyticalCardData>;
@@ -913,7 +1062,7 @@ function computeAllRatings(
       const spData = charSelfPlay[cardName];
       if (spData && spData[1] >= SELFPLAY_MIN_SAMPLES) {
         const lift = spData[2] - baseline;
-        selfPlayAdjust = lift * SELFPLAY_BLEND_STRENGTH;
+        selfPlayAdjust = lift * blendStrength;
       }
 
       charRatings[cardName] = baseRating + bonus + selfPlayAdjust;
@@ -934,12 +1083,16 @@ const _zoomBuilt = computeAllRatings(SELFPLAY_WEIGHTS_BY_PROFILE.zoom, /*baselin
 const RATINGS_BY_PROFILE: Record<BotProfile, Record<string, Record<string, number>>> = {
   squash: _squashBuilt.ratings,
   zoom: _zoomBuilt.ratings,
+  // squashV2 ratings are computed via recomputeSquashV2Ratings() — call it
+  // before benchmarking after mutating SquashV2Config.selfPlayBlend or
+  // SquashV2Config.baselineNormalize.
+  squashV2: {} as Record<string, Record<string, number>>,
 };
 
 const ANALYTICAL_RATINGS = RATINGS_BY_PROFILE.squash;
 const CARD_DATA = _squashBuilt.cardData;
 
-// Precompute per-opp-character lifts: oppChar → zoomChar → cardName → lift × strength.
+// Precompute per-opp-character lifts for ZOOM: oppChar → zoomChar → cardName → lift × strength.
 // Lift is winrate − per-(opp,zoomChar) baseline. Applied additively in
 // dynamicCardRating when snap.oppCharacter matches.
 const VS_OPP_LIFTS: Record<string, Record<string, Record<string, number>>> = {};
@@ -947,7 +1100,6 @@ for (const [oppChar, weightsByZoomChar] of Object.entries(ZOOM_VS_OPP_WEIGHTS)) 
   VS_OPP_LIFTS[oppChar] = {};
   for (const charName of CHARACTERS) {
     const cards = weightsByZoomChar[charName] ?? {};
-    // Compute baseline (avg winrate across well-sampled cards in this matchup)
     let samples = 0, wins = 0;
     for (const data of Object.values(cards)) {
       if (data && data[1] >= VS_OPP_MIN_SAMPLES) {
@@ -967,6 +1119,51 @@ for (const [oppChar, weightsByZoomChar] of Object.entries(ZOOM_VS_OPP_WEIGHTS)) 
     VS_OPP_LIFTS[oppChar][charName] = lifts;
   }
 }
+
+// SquashV2 vs-opp lifts. Computed via recomputeSquashV2VsOppLifts() so
+// SquashV2Config.vsOppBlend / vsOppBlendByChar can be ablated dynamically.
+const VS_OPP_LIFTS_SQUASHV2: Record<string, Record<string, Record<string, number>>> = {};
+
+/** Rebuild SquashV2 self-play ratings from current SquashV2Config. */
+export function recomputeSquashV2Ratings(): void {
+  const built = computeAllRatings(
+    SELFPLAY_WEIGHTS_BY_PROFILE.squashV2,
+    SquashV2Config.baselineNormalize,
+    SquashV2Config.selfPlayBlend,
+  );
+  RATINGS_BY_PROFILE.squashV2 = built.ratings;
+}
+
+/** Rebuild SquashV2 per-opp lift table from current SquashV2Config. */
+export function recomputeSquashV2VsOppLifts(): void {
+  for (const oppChar of Object.keys(VS_OPP_LIFTS_SQUASHV2)) delete VS_OPP_LIFTS_SQUASHV2[oppChar];
+  for (const [oppChar, weightsByV2Char] of Object.entries(SQUASHV2_VS_OPP_WEIGHTS)) {
+    VS_OPP_LIFTS_SQUASHV2[oppChar] = {};
+    for (const charName of CHARACTERS) {
+      const cards = weightsByV2Char[charName] ?? {};
+      let samples = 0, wins = 0;
+      for (const data of Object.values(cards)) {
+        if (data && data[1] >= VS_OPP_MIN_SAMPLES) {
+          samples += data[1];
+          wins += data[0];
+        }
+      }
+      const baseline = samples > 0 ? wins / samples : 0;
+      const blend = SquashV2Config.vsOppBlendByChar[charName] ?? SquashV2Config.vsOppBlend;
+      const lifts: Record<string, number> = {};
+      for (const [name, data] of Object.entries(cards)) {
+        if (data && data[1] >= VS_OPP_MIN_SAMPLES) {
+          lifts[name] = (data[2] - baseline) * blend;
+        }
+      }
+      VS_OPP_LIFTS_SQUASHV2[oppChar][charName] = lifts;
+    }
+  }
+}
+
+// Initial population (uses SquashV2Config defaults).
+recomputeSquashV2Ratings();
+recomputeSquashV2VsOppLifts();
 
 export { ANALYTICAL_RATINGS, CARD_DATA };
 export type { AnalyticalCardData };
@@ -1008,6 +1205,7 @@ function computeTimingBaselines(
 const TIMING_BASELINES_BY_PROFILE: Record<BotProfile, Record<string, Record<TimingBucket, number>>> = {
   squash: computeTimingBaselines(TIMING_WEIGHTS_BY_PROFILE.squash),
   zoom: computeTimingBaselines(TIMING_WEIGHTS_BY_PROFILE.zoom),
+  squashV2: computeTimingBaselines(TIMING_WEIGHTS_BY_PROFILE.squashV2),
 };
 
 const TIMING_BASELINES = TIMING_BASELINES_BY_PROFILE.squash;
@@ -1117,29 +1315,42 @@ export function dynamicCardRating(
         cardName === "Keeper" || cardName === "Soar"
       ) adjust -= 12;
     }
+  } else if (snap.profile === "squashV2") {
+    const oppLifts = VS_OPP_LIFTS_SQUASHV2[snap.oppCharacter]?.[character];
+    if (oppLifts) {
+      adjust += oppLifts[cardName] ?? 0;
+    }
+
+    // Shan-V2 tunings: structurally weakest character (49.9% avg vs Zoom).
+    // Mirrors zoom-Shan's Pierce/Unveil/Hyperaware boost — going first
+    // doesn't change Shan's engine bottleneck, just gives her +1 turn.
+    // Toggle via SquashV2Config.shanCardTunings (default true).
+    if (character === "Shan" && SquashV2Config.shanCardTunings) {
+      if (cardName === "Pierce") adjust += 15;
+      else if (cardName === "Unveil") adjust += 15;
+      else if (cardName === "Hyperaware") adjust += 8;
+      else if (cardName === "Pursue") adjust += 5;
+      else if (cardName === "Strategize") adjust += 5;
+      else if (
+        cardName === "Coppercloud" || cardName === "Pickpocket" ||
+        cardName === "Ironpull" || cardName === "Strike" ||
+        cardName === "Reposition" || cardName === "Brawl" ||
+        cardName === "Keeper" || cardName === "Soar"
+      ) adjust -= 12;
+    }
   }
 
-  // Mission-reward synergy (zoom-only):
-  //   1. Base layer (rt): T/A reward exists somewhere in mission set →
-  //      small boost to cap≥2 / atium-using cards.
-  //   2. Context layer (committed): T/A reward is in a mission Zoom is
-  //      ACTIVELY PROGRESSING (rank ≥ 4 AND ≥ opp rank). Larger boost
-  //      because zoom is plausibly going to claim that reward.
-  //
-  // Context-awareness avoids the failure mode where Zoom buys cap-3 cards
-  // for a training mission it's not racing — those rewards go to opp, not us.
-  if (snap.profile === "zoom") {
+  // Mission-reward synergy: T/A reward in mission set → boost cap=2/3 cards
+  // and atium-using cards. Universal game-mechanics insight; on for both
+  // zoom and squashV2 (squashV2 boost is gated by SquashV2Config flag for
+  // ablation).
+  if (snap.profile === "zoom" || (snap.profile === "squashV2" && SquashV2Config.missionRewardSynergy)) {
     const rt = snap.missionFlags?.rewardTypes;
     if (rt && (rt.has("T") || rt.has("A"))) {
       if (cd.capacity === 2) adjust += 0.5;
       else if (cd.capacity === 3) adjust += 1.0;
       if (cd.metal === 8) adjust += 0.6;
     }
-    // Note: tested a context-aware "committed-reward" extra boost (only fire
-    // synergy when zoom is rank≥4 and leading on the mission). Neutral-to-
-    // negative on n=10000 seeded — the rank≥4 condition rarely triggers
-    // early enough to influence buys, and once it does the bot is already
-    // buying those cards anyway.
   }
 
   return base + adjust;
@@ -1283,6 +1494,13 @@ export function dynamicBuffer(character: string, snap: GameStateSnapshot): numbe
   // money + shallow draws make every dilution costly. SBUF=3.5 won a sweep
   // (n=4000): 24.07% vs 22.20% at default 1.7. Net global +0.14pp on 40k.
   if (snap.profile === "zoom" && character === "Shan") buffer = 3.5;
+
+  // SquashV2 per-character buffer overrides (set via SquashV2Config.buyBufferOverride
+  // for ablation). Empty by default — uses BASE_BUFFERS.
+  if (snap.profile === "squashV2") {
+    const override = SquashV2Config.buyBufferOverride[character];
+    if (override !== undefined && override > 0) buffer = override;
+  }
 
   if (snap.gamePhase === "early") buffer -= 0.3;
   if (snap.curMoney >= 8) buffer -= 0.2;

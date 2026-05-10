@@ -9,14 +9,16 @@ import { Game, type PlayerFactory } from "./game";
 import { createTwonky } from "./bot";
 import { createSquashBot } from "./squashBot";
 import { createZoomBot } from "./zoomBot";
+import { createSquashV2Bot } from "./squashV2Bot";
 import { createSynergyBotPrime } from "./synergyBot";
 import { resetCardIds } from "./card";
 
-type BotName = "V1" | "Squash" | "Zoom" | "Synergy";
+type BotName = "V1" | "Squash" | "Zoom" | "SquashV2" | "Synergy";
 const BOT_FACTORIES: Record<BotName, PlayerFactory> = {
   V1: createTwonky as PlayerFactory,
   Squash: createSquashBot as PlayerFactory,
   Zoom: createZoomBot as PlayerFactory,
+  SquashV2: createSquashV2Bot as PlayerFactory,
   Synergy: createSynergyBotPrime as PlayerFactory,
 };
 
@@ -288,6 +290,88 @@ function zoomSecondSeatBench(
   console.log("Victory type distribution:", vt, "\n");
 }
 
+// ── SquashV2 going-first specialist benchmark ──
+// SquashV2 is trained to specialize in seat 0. Pin SquashV2 to seat 0 every
+// game and run against the named opponent in seat 1, across all asymmetric
+// pairings. Reports SquashV2-going-first win rate against the chosen opp.
+
+function squashV2FirstSeatBench(
+  opponent: BotName,
+  numGamesPerMatchup: number,
+  firstSeatBot: BotName = "SquashV2",
+  seedOffset = 0,
+) {
+  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+  const fOpp = BOT_FACTORIES[opponent];
+  const fFirst = BOT_FACTORIES[firstSeatBot];
+
+  let totalFirstWins = 0;
+  let totalGames = 0;
+  const vt: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };
+
+  console.log(`\n${firstSeatBot} (going first) vs ${opponent} (going second) — ${numGamesPerMatchup} games per matchup` + (seedOffset > 0 ? ` [seedOffset=${seedOffset}]` : ""));
+  console.log(`(${numGamesPerMatchup * chars.length * (chars.length - 1)} total)\n`);
+  console.log("Matchup".padEnd(25) + `${firstSeatBot} Win%`.padStart(13) + `${firstSeatBot} Wins`.padStart(14) + "Avg Turns".padStart(12) + "  Victory Distribution");
+  console.log("-".repeat(95));
+
+  let matchupIdx = 0;
+  for (const cFirst of chars) {
+    for (const cSecond of chars) {
+      if (cFirst === cSecond) continue;
+
+      let wins = 0;
+      let total = 0;
+      let totalTurns = 0;
+      const mVt: Record<string, number> = { M: 0, D: 0, C: 0, T: 0 };
+
+      for (let i = 0; i < numGamesPerMatchup; i++) {
+        try {
+          resetCardIds();
+          // Deterministic seed when seedOffset > 0: reproducible across runs
+          // so different bot configs produce comparable results from same games.
+          const seed = seedOffset > 0 ? seedOffset + matchupIdx * 1000003 + i : undefined;
+          const game = new Game({
+            playerFactories: [fFirst, fOpp],
+            names: [firstSeatBot, opponent],
+            chars: [cFirst, cSecond],
+            seed,
+          });
+          const winner = game.play();
+          total++;
+          totalTurns += game.turncount;
+          if (winner.name === firstSeatBot) wins++;
+          if (game.victoryType in mVt) mVt[game.victoryType]++;
+        } catch (e) {
+          console.error(`  Error in ${cFirst} vs ${cSecond} game ${i}: ${e}`);
+        }
+      }
+      matchupIdx++;
+
+      totalFirstWins += wins;
+      totalGames += total;
+      for (const k of Object.keys(vt)) vt[k] += mVt[k];
+
+      const winPct = total > 0 ? (wins / total * 100).toFixed(1) : "N/A";
+      const avgTurns = total > 0 ? (totalTurns / total).toFixed(0) : "N/A";
+      const vtDist = Object.entries(mVt).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v}`).join(" ");
+
+      console.log(
+        `${cFirst} vs ${cSecond}`.padEnd(25) +
+        `${winPct}%`.padStart(13) +
+        `${wins}/${total}`.padStart(14) +
+        `${avgTurns}`.padStart(12) +
+        `  ${vtDist}`,
+      );
+    }
+  }
+
+  console.log("-".repeat(95));
+  const overallPct = totalGames > 0 ? (totalFirstWins / totalGames * 100).toFixed(1) : "N/A";
+  console.log(`\n${firstSeatBot} (going first) vs ${opponent} (going second) overall: ${totalFirstWins}/${totalGames} (${overallPct}%)`);
+  console.log("Victory type distribution:", vt, "\n");
+  return { wins: totalFirstWins, total: totalGames, pct: overallPct };
+}
+
 // ── Baseline: V1 vs V1 sanity check ──
 
 function baseline(numGames: number) {
@@ -332,6 +416,25 @@ if (mode === "baseline") {
     process.exit(1);
   }
   zoomSecondSeatBench(opp, isNaN(n) ? 20 : n, second);
+} else if (mode === "v2") {
+  // npx tsx benchmark.ts v2 [opponent=Zoom] [games=20] [firstSeatBot=SquashV2] [seedOffset=0]
+  const opp = (args[1] as BotName) || "Zoom";
+  const n = parseInt(args[2] || "20", 10);
+  const first = ((args[3] as BotName) || "SquashV2");
+  const seedOffset = parseInt(args[4] || "0", 10);
+  if (!BOT_FACTORIES[opp] || !BOT_FACTORIES[first]) {
+    console.error(`Usage: v2 <V1|Squash|Zoom|Synergy> [games] [SquashV2|Squash|Zoom] [seedOffset]`);
+    process.exit(1);
+  }
+  // Apply combo_v5_all50 settings before benching (so v2 uses tuned config).
+  if (process.argv.includes("--with-tunings")) {
+    const { SquashV2Config, recomputeSquashV2Ratings, recomputeSquashV2VsOppLifts } = require("./squashBotEval");
+    const { SquashV2Bot } = require("./squashV2Bot");
+    SquashV2Config.atiumBankingMode = "zoomCurve";
+    SquashV2Config.buyBufferOverride = { Kelsier: 5.0, Shan: 5.0, Vin: 5.0, Marsh: 5.0, Prodigy: 5.0 };
+    void SquashV2Bot; void recomputeSquashV2Ratings; void recomputeSquashV2VsOppLifts;
+  }
+  squashV2FirstSeatBench(opp, isNaN(n) ? 20 : n, first, isNaN(seedOffset) ? 0 : seedOffset);
 } else if (mode === "synergy") {
   const n = parseInt(args[1] || "20", 10);
   const games = isNaN(n) ? 20 : n;

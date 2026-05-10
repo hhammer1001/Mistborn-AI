@@ -630,3 +630,180 @@ Fix lives in `Game.constructor` ([game.ts](game.ts) ~line 107): `36 + 2 * i` per
 - **Always run on at least 2 disjoint seed ranges** before declaring a win. Fresh seeds at 10M+ caught several false positives in this session.
 - **Bench at the right HP**. After this session's `Game.constructor` fix, benches mirror real games. Pre-fix benches understated Zoom by ~3pp.
 - **Counter-intuitive gains are real.** The Shan SBUF=3.5 result wouldn't have been found without the user pushing the variance-max hypothesis — it was the *opposite* of what we expected, and it required actually testing both directions to find.
+
+---
+
+# SquashV2 — Going-FIRST Specialist
+
+SquashV2 is the seat-0 sibling of Zoom. Same architecture (action-scoring + lookahead + lethal solver) but trained on seat-0-only data and tuned for the tempo-advantage seat. Final win rate vs Zoom-going-second: **~70.5%** (n=10000 seed-deterministic, 5-seed avg 69.98%).
+
+## Headline matchup
+
+| Matchup | Win rate (n=10000) |
+|---|---|
+| SquashV2 1st vs Zoom 2nd | **70.53%** |
+| SquashV2 1st vs Squash 2nd | 76.35% (n=4000) |
+| SquashV2 1st vs V1 2nd | 89.25% (n=4000) |
+
+For comparison, plain Squash going-first vs Zoom going-second is ~61% (inferred from BOT_NOTES "Zoom 2nd vs Squash 1st = 38.88%"). SquashV2 adds **~9pp** over plain Squash in the going-first seat.
+
+## Architecture
+
+- **`squashV2Bot.ts`** — `class SquashV2Bot extends SquashBot` overriding `evalProfile = "squashV2"`. Lookahead+lethal solver gated on `turnOrder === 0` (mirror of Zoom's `=== 1` gate).
+- **`squashBotEval.ts`** — adds `BotProfile = "squash" | "zoom" | "squashV2"`. Mirrors Zoom's data plumbing: own self-play weights, timing, per-opp lifts, baseline normalization for asymmetric seat-0 data. Mutable `SquashV2Config` exports baked-in best defaults.
+- **`selfplaySquashV2.ts`** — mirror Squash-V2-vs-Squash-V2 games, recording seat 0 only.
+- **`selfplaySquashV2Timed.ts`** — phase-aware timing data, seat 0 only.
+- **`selfplaySquashV2VsZoom.ts`** — asymmetric V2-vs-Zoom for per-opp lifts.
+- **`squashV2Ablation.ts`** — single-config-per-invocation ablation harness.
+- **`benchmark.ts v2 <opp> <n> <bot> <seedOffset>`** — seeded benchmark.
+
+## Engine bug fixed: Maelstrom infinite loop
+
+`Player.special11()` (Maelstrom card's tier-3 effect) was an infinite loop. The intent was "trash all market cards", but the implementation iterated `while (market.hand.length > 0)` calling `market.buy()` each pass — and `market.buy()` always refills hand via `draw(1)`. Net hand size stayed constant; loop ran until process kill.
+
+Reproduced inline: 101 buys in 1ms with no termination signal. Fix in [player.ts](player.ts) `special11()`: snapshot hand contents, clear `market.hand`, push to discard, then `market.draw(originalCount)` once. Bounded by hand size (~5).
+
+This bug masked the entire session's training/benchmark pipeline:
+- Zoom going-second avoids it because Zoom's heuristic plays Maelstrom less often when behind.
+- SquashV2 going-first picks Maelstrom more aggressively. Lethal solver simulating Maelstrom triggered the loop within snapshot/restore — caught by selectAction wallclock budget eventually but bench games still hung 5-30+ minutes per problematic seed.
+
+Identified by isolating `seed=2000056` in Kelsier-vs-Marsh, tracing each `selectAction` and `performAction`, and seeing a single `use_metal Maelstrom` in lookahead simulation never returning.
+
+## Defensive levers added (kept)
+
+To prevent similar pathologies surfacing later:
+
+- **Lethal-solver per-turn cap** (cap=3) + cache by (turn, curDamage). Lethal solver chains can return non-damaging first actions (use_boxing, burn_card) that don't grow curDamage but still get performed — without a cap, lethal re-runs forever each `selectAction`.
+- **Wall-clock budgets** at 3 levels: 50ms per `findLethalAction` invocation, 100ms (or remaining decision-budget) per chain lookahead, 250ms total decision budget. Beyond budget → fall back to heuristic-only via `super.selectAction`.
+- These are also ported to ZoomBot for parity.
+
+## Ablation findings (what mattered)
+
+Empirically with full training data (50k mirror, 10k timing, 30k/pair asym vs Zoom):
+
+| Lever | Δ vs baseline | Status |
+|---|---|---|
+| `baselineNormalize` (seat-0 data is asymmetric) | **+26pp critical** | always on |
+| Lookahead | +6pp | on, K=2 |
+| Per-opp lifts (vs-Zoom training) | +6pp | on, blend=40 |
+| Per-char buy buffer = 5.0 (was 1.5–1.8) | +3pp | on |
+| Self-play blend = 40 (was 80) | +0.9pp | on |
+| `atiumBankingMode = zoomCurve` | +0.78pp | on |
+| Lethal solver | +1.3pp | on |
+| Mission-reward synergy | ≈0 | on (universal) |
+| Anti-correlation | ≈0 | off (going-first commits) |
+| Shan card tunings (zoom-Shan style) | -0.5pp | OFF (opposite of zoom) |
+| Shan mission mult > 1.2 | noise | 1.2 (zoom uses 1.8) |
+| Lookahead K (1, 2, 3, 4, 5) | K=2 best | 2 |
+| Followup weight (0.4–1.0) | 0.6 best | 0.6 |
+| 2-ply lookahead | -0.4pp | off |
+| Per-char vsOpp blend (zoom-style) | -1.5pp | off |
+
+## What did NOT push past ~70%
+
+Asymptote at ~70.5% across many ablation cycles. Tried (none broke through):
+
+1. Buy buffer values 2.0–10.0, per-char and global. Plateau at 5.0.
+2. Self-play blend 0–160. Peak at 40.
+3. vs-Opp blend 20–120 globally and per-char. Default 40 wins.
+4. Lookahead K=1–5. K=2 wins.
+5. Followup weight 0.4–1.0. 0.6 wins.
+6. 2-ply lookahead (recursive on top followup). Slight regression.
+7. Anti-correlation toggle. Off wins.
+8. Atium curve toggle. zoomCurve wins by 0.78pp.
+9. Shan-specific card tunings (mirroring zoom). Hurt -0.5pp.
+10. Shan mission multiplier 1.0–4.0. All within noise.
+11. Per-character buy buffer asymmetry. Symmetric 5.0 wins.
+12. Mirror training scaling 1k → 50k/char. +1pp 1k→20k, plateau after.
+13. Asymmetric vs-Zoom scaling 1.5k → 30k/pair. +7pp 1.5k→5k, plateau after.
+
+## Per-character matchup analysis (final config)
+
+Best config breakdown (n=4000 each):
+
+| V2 char | avg vs all Zoom chars |
+|---|---|
+| Kelsier | 78.6% |
+| Shan | 54.3% ← weakest |
+| Vin | 72.1% |
+| Marsh | 72.6% |
+| Prodigy | 73.9% |
+
+Weakest individual matchups: Shan vs Kelsier (43%), Shan vs Vin (52%). Shan is structurally weak (matching zoom's findings — but going-first only lifts her 49.9% → 54.3% even with all tunings, ~30pp below other chars).
+
+Shan-as-V2 was extensively swept (buffer 3–10, missionMult 1.0–4.0, card tunings on/off) — none of these levers broke through the ~55% Shan ceiling.
+
+## Critical training-pipeline rules
+
+Discovered while iterating:
+
+1. **`selfplaySquashV2VsZoom.ts` had a feedback-loop bug.** Default `vsOppBlend=40` during training meant the bot's choices were biased by previous-iteration data → self-confirming, non-generalizing weights. 5k/pair → 68.5%, 20k/pair → regressed to 58%. Fix: rebenchmark with fresh stubs.
+2. **Don't use `--blend-zero` for asymmetric training.** Setting `vsOppBlend=0` during V2-vs-Zoom training makes V2 play out-of-equilibrium (no per-opp signal) against trained-Zoom. 20k/pair clean → 64.5% (worse than dirty 5k/pair at 68.5%). The right thing is to use runtime-equilibrium blend with fresh stubs. (Mirror training is different — `selfPlayBlend=0` is correct for mirror because both seats are V2 so symmetry holds.)
+3. **Train timing IMMEDIATELY after self-play.** Same rule as zoom — timing baselines must come from the same bot snapshot the self-play data did.
+
+## Final hyperparameter snapshot
+
+In `squashBotEval.ts SquashV2Config`:
+```
+atiumBankingMode = "zoomCurve"
+buyBufferOverride = { all chars: 5.0 }
+selfPlayBlend = 40           (vs squash's 80, zoom's 80)
+vsOppBlend = 40
+vsOppBlendByChar = {}        (per-char regressed for V2)
+baselineNormalize = true
+shanCardTunings = false      (opposite of zoom)
+shanMissionMult = 1.2        (zoom uses 1.8)
+oppLeadAwareness = true
+missionRewardSynergy = true
+antiCorrelation = false
+```
+
+In `squashV2Bot.ts`:
+```
+lookaheadEnabled = true
+lethalThreshold = 14
+lookaheadTopK = 2
+followupWeight = 0.6
+lookaheadDepth = 1
+MAX_LETHAL_CALLS_PER_TURN = 3
+```
+
+## Scripts
+
+```bash
+# Reset weights and train from scratch
+for c in Kelsier Shan Vin Marsh Prodigy; do
+  echo "{}" > client/src/engine/data/squashV2_weights/$c.json
+  echo "{}" > client/src/engine/data/squashV2_timing/$c.json
+  for d in kelsier shan vin marsh prodigy; do
+    echo "{}" > client/src/engine/data/squashV2_vs_$d/$c.json
+  done
+done
+
+# Train mirror (50k/char) — uses --blend-zero by default for fresh runs
+npx tsx client/src/engine/selfplaySquashV2.ts 50000
+
+# Train timing (10k/char) — IMMEDIATELY after mirror
+npx tsx client/src/engine/selfplaySquashV2Timed.ts 10000
+
+# Train asymmetric vs Zoom (10k/pair × 25 = 250k games)
+npx tsx client/src/engine/selfplaySquashV2VsZoom.ts 10000
+
+# Bench (n=200 per matchup × 20 matchups = 4000 games, ~50s under load)
+npx tsx client/src/engine/benchmark.ts v2 Zoom 200 SquashV2 1
+
+# Single-config ablation (CSV output)
+npx tsx client/src/engine/squashV2Ablation.ts <configName> Zoom 500 1
+```
+
+## Open paths beyond 70% (untried in this session)
+
+The asymptote at ~70.5% suggests something fundamental needs to change to push higher. Options not attempted:
+
+1. **MCTS / ISMCTS** — proper game-tree search instead of 1-ply heuristic chain. Estimated +5-10pp, heavy engineering.
+2. **Provincial-style co-evolved buy menus** — genetic algorithm over `(card, count)` ordered lists. Sidesteps the buy-buffer plateau. Significant engineering.
+3. **NN value function** — train a small NN on (state, action, outcome). Could replace the analytical+blend formula entirely. Expensive setup.
+4. **Mission-set conditional training** — separate weight sets per (oppChar, mission-set). 25× dimensionality, much more training cost.
+5. **Opp-deck modeling** — estimate Zoom's deck composition from observable signals (allies in play, public discard) and adapt strategy. Currently V2 only conditions on opp character.
+6. **Heuristic improvements** — `estimateEffectValue` and the "special1-special16" handlers may have undervalued cards. Worth a careful audit, especially for Shan whose ceiling we couldn't break with config tuning alone.
+

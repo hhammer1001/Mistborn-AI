@@ -19,6 +19,7 @@ import {
   dynamicBuffer,
   ANALYTICAL_RATINGS,
   MISSION_INTRINSIC,
+  SquashV2Config,
   type GameStateSnapshot,
   type BotProfile,
 } from "./squashBotEval";
@@ -185,8 +186,12 @@ export class SquashBot extends Player {
 
     // Per-mission opp-lead awareness: penalize advancing a mission opp leads
     // by significant margin. Don't waste actions catching up; focus on
-    // missions where Zoom can win the race or share progress with no loss.
-    if (snap.profile === "zoom" && snap.turnOrder === 1) {
+    // missions where the bot can win the race or share progress with no loss.
+    // Zoom: always on. SquashV2: gated by config flag (default on).
+    const oppLeadAware =
+      (snap.profile === "zoom" && snap.turnOrder === 1) ||
+      (snap.profile === "squashV2" && snap.turnOrder === 0 && SquashV2Config.oppLeadAwareness);
+    if (oppLeadAware) {
       const lead = mSnap.oppRank - mSnap.myRank;
       if (lead >= 4) score -= 12;       // opp dominates — hard to recover
       else if (lead >= 2) score -= 5;   // opp ahead — diminishing returns
@@ -219,7 +224,10 @@ export class SquashBot extends Player {
     if (snap.victoryPath === "mission") {
       // Shan-zoom is ~20% win rate; commit harder to mission as her one
       // viable path. Plateau at 1.8+ in Shan-focused sweep (n=4000).
-      const m = snap.profile === "zoom" && this.character === "Shan" ? 1.8 : 1.2;
+      // Shan-V2 also weakest (49.9% avg vs Zoom) — uses configurable mult.
+      let m = 1.2;
+      if (snap.profile === "zoom" && this.character === "Shan") m = 1.8;
+      else if (snap.profile === "squashV2" && this.character === "Shan") m = SquashV2Config.shanMissionMult;
       score *= m;
     }
 
@@ -409,19 +417,22 @@ export class SquashBot extends Player {
     action: GameActionInternal & { type: "use_atium" },
     snap: GameStateSnapshot,
   ): number {
-    // For Zoom seat 2: atium-banking. Atium is rare and valuable for late-
-    // game burst. Higher use cost when opp is far from death (save it),
-    // lower when opp is in killing range (cash it in).
+    // Atium-banking: atium is rare and valuable for late-game burst.
+    // Higher cost when opp is far from death (save it); lower when opp is in
+    // killing range (cash it in). Zoom: always uses curve (Shan special).
+    // SquashV2: opt-in via SquashV2Config.atiumBankingMode === "zoomCurve".
     let cost = 2;
-    if (snap.profile === "zoom" && snap.turnOrder === 1) {
-      if (this.character === "Shan") {
+    const useZoomCurve =
+      (snap.profile === "zoom" && snap.turnOrder === 1) ||
+      (snap.profile === "squashV2" && snap.turnOrder === 0 && SquashV2Config.atiumBankingMode === "zoomCurve");
+    if (useZoomCurve) {
+      if (snap.profile === "zoom" && this.character === "Shan") {
         // Shan-zoom is mission/status-focused; atium is more valuable saved
-        // for late-game flexibility than for damage. Plateau at cost ≥ 6 in
-        // sweep, settled on 8 as a stable midpoint.
+        // for late-game flexibility than for damage.
         cost = 8;
       } else if (snap.oppHealth > 25) cost = 6;       // save atium — opp is healthy
-      else if (snap.oppHealth > 15) cost = 4;  // moderate
-      else if (snap.oppHealth <= 8) cost = 0;  // burn for the kill
+      else if (snap.oppHealth > 15) cost = 4;         // moderate
+      else if (snap.oppHealth <= 8) cost = 0;         // burn for the kill
     }
     return metalUnlockValue(action.metalIndex, this, snap) - cost;
   }
