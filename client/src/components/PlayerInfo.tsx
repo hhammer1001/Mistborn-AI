@@ -215,49 +215,51 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
         </div>
       </div>
       {onAction && (
-        <div className="player-action-btns">
-          {(() => {
-            const buyBoxing = actions?.find((a) => a.code === 15);
-            const useBoxing = actions?.find((a) => a.code === 16);
-            return (
-              <div className="boxing-btns">
+        <>
+          <div className="player-action-btns">
+            {(() => {
+              const buyBoxing = actions?.find((a) => a.code === 15);
+              const useBoxing = actions?.find((a) => a.code === 16);
+              return (
+                <div className="boxing-btns">
+                  <button
+                    className={`action-btn boxing-btn${!buyBoxing ? " disabled" : ""}`}
+                    onClick={buyBoxing ? () => onAction(buyBoxing.index) : undefined}
+                    disabled={!buyBoxing}
+                    title="Spend 2 money to gain 1 boxing"
+                  >
+                    Buy Boxing
+                  </button>
+                  <button
+                    className={`action-btn boxing-btn${!useBoxing ? " disabled" : ""}`}
+                    onClick={useBoxing ? () => onAction(useBoxing.index) : undefined}
+                    disabled={!useBoxing}
+                    title="Spend 1 boxing to gain 1 money"
+                  >
+                    Use Boxing
+                  </button>
+                </div>
+              );
+            })()}
+            {discard && marketDiscard && (
+              <div className="pile-btns">
                 <button
-                  className={`action-btn boxing-btn${!buyBoxing ? " disabled" : ""}`}
-                  onClick={buyBoxing ? () => onAction(buyBoxing.index) : undefined}
-                  disabled={!buyBoxing}
-                  title="Spend 2 money to gain 1 boxing"
+                  className={`action-btn pile-btn${discard.length === 0 ? " disabled" : ""}`}
+                  onClick={discard.length > 0 ? () => setShowDiscard(true) : undefined}
+                  disabled={discard.length === 0}
                 >
-                  Buy Boxing
+                  Discard ({discard.length})
                 </button>
                 <button
-                  className={`action-btn boxing-btn${!useBoxing ? " disabled" : ""}`}
-                  onClick={useBoxing ? () => onAction(useBoxing.index) : undefined}
-                  disabled={!useBoxing}
-                  title="Spend 1 boxing to gain 1 money"
+                  className={`action-btn pile-btn${marketDiscard.length === 0 ? " disabled" : ""}`}
+                  onClick={marketDiscard.length > 0 ? () => setShowTrash(true) : undefined}
+                  disabled={marketDiscard.length === 0}
                 >
-                  Use Boxing
+                  Trash ({marketDiscard.length})
                 </button>
               </div>
-            );
-          })()}
-          {discard && marketDiscard && (
-            <div className="pile-btns">
-              <button
-                className={`action-btn pile-btn${discard.length === 0 ? " disabled" : ""}`}
-                onClick={discard.length > 0 ? () => setShowDiscard(true) : undefined}
-                disabled={discard.length === 0}
-              >
-                Discard ({discard.length})
-              </button>
-              <button
-                className={`action-btn pile-btn${marketDiscard.length === 0 ? " disabled" : ""}`}
-                onClick={marketDiscard.length > 0 ? () => setShowTrash(true) : undefined}
-                disabled={marketDiscard.length === 0}
-              >
-                Trash ({marketDiscard.length})
-              </button>
-            </div>
-          )}
+            )}
+          </div>
           {(() => {
             const metal1 = parseInt(player.ability1metal);
             const burnCount = player.metalTokens.slice(0, 8).filter((t: number) => t === 1).length + player.metalTokens[8];
@@ -340,7 +342,7 @@ export function PlayerInfo({ player, isOpponent, actions, onAction, onCompositeA
               </div>
             );
           })()}
-        </div>
+        </>
       )}
       {showDiscard && discard && (
         <CardPileOverlay title="Your Discard" cards={discard} onClose={() => setShowDiscard(false)} />

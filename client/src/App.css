@@ -1592,6 +1592,25 @@ h3 {
     min-height: 0;
     margin-bottom: 3rem;
   }
+
+  /* Market: 2 columns × 3 rows instead of a single wrapping flex row,
+     so the 6 market slots form a compact grid on phones. */
+  .market-zone .card-row {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    grid-auto-flow: row;
+    justify-content: center;
+  }
+
+  /* Lift Ability I/III buttons above the stats grid (and below the
+     player name). Uses flex order on .player-info.you's direct
+     children — see the matching JSX restructure in PlayerInfo.tsx
+     that pulls .char-abilities out of .player-action-btns. */
+  .player-info.you > .character-card-thumb { order: 1; }
+  .player-info.you > .player-header        { order: 2; }
+  .player-info.you > .char-abilities       { order: 3; margin-top: 0; margin-bottom: 0.3rem; }
+  .player-info.you > .player-stats-grid    { order: 4; }
+  .player-info.you > .player-action-btns   { order: 5; }
 }
 
 /* ─── Damage Phase ────────────────────────────────────────────────── */
@@ -2380,6 +2399,22 @@ h3 {
 
 .player-info.you {
   border-left: 3px solid var(--blue);
+  display: flex;
+  flex-direction: column;
+}
+
+/* In a flex container, margins don't collapse — so .player-action-btns'
+   own margin-top would add to .player-stats-grid's margin-bottom. Drop
+   it here so the visual gap matches the pre-flex (collapsed) layout. */
+.player-info.you > .player-action-btns {
+  margin-top: 0;
+}
+
+/* When .char-abilities is rendered (above training threshold), it sits
+   right after .player-action-btns. Match the 0.25rem gap that existed
+   when it was a child of .player-action-btns. */
+.player-info.you > .char-abilities {
+  margin-top: 0.25rem;
 }
 
 .character-card-thumb {
