@@ -31,7 +31,7 @@ interface Props {
 }
 
 export function TrainingTrack({ training, character }: Props) {
-  const maxDisplay = 18;
+  const maxDisplay = 21;
   const color = CHARACTER_COLORS[character] ?? "#c9a44a";
   const fillPct = Math.min((training / maxDisplay) * 100, 100);
 
@@ -58,6 +58,17 @@ export function TrainingTrack({ training, character }: Props) {
               boxShadow: `0 0 6px ${color}80`,
             }}
           />
+          {/* Past-top indicator: every train now grants +1 atium */}
+          {training >= 21 && (
+            <div
+              className="training-v-top-reward"
+              title="Training maxed: every train grants +1 atium"
+            >
+              <RewardIcon code="T" size={22} />
+              <span className="training-v-eq">=</span>
+              <RewardIcon code="A" size={22} />
+            </div>
+          )}
           {/* Milestone markers */}
           {TRAINING_MILESTONES.map((m) => {
             const pct = (m.level / maxDisplay) * 100;

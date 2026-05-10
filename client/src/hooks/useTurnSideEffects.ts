@@ -206,18 +206,30 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
       setBanner("opponent");
     }
 
+    // SP: capture turn-start baseline on first bot activity. Preserved across
+    // defense interrupts (sense_defense, cloud_defense) so the final recap
+    // covers the whole bot turn, not just the post-interrupt portion.
+    const spBotActivity =
+      prevIsMyTurn === true && isMyTurn && botLog.length > seenLen;
+    if (spBotActivity && turnStartStateRef.current === null && prev) {
+      turnStartStateRef.current = prev;
+      turnStartBotLogLenRef.current = seenLen;
+    }
+
     // Opp turn ended — compute cumulative recap.
     //   MP: opp → my transition (prev was false, now true).
-    //   SP: isMyTurn stays true; detect via botLog growth (bot turn is atomic).
+    //   SP: isMyTurn stays true; detect via botLog growth (bot turn is atomic
+    //       absent defense interrupts, multi-step otherwise).
     // Skip when entering a defense interrupt: it's a mid-turn prompt, not a turn end.
     const oppTurnEndedMP =
       prev && prevIsMyTurn === false && isMyTurn && !enteringDefenseInterrupt;
     const oppTurnEndedSP =
-      prev && prevIsMyTurn === true && isMyTurn && botLog.length > seenLen;
+      prev && prevIsMyTurn === true && isMyTurn && botLog.length > seenLen
+      && !enteringDefenseInterrupt;
 
     if (oppTurnEndedMP || oppTurnEndedSP) {
-      const baselineState = oppTurnEndedMP ? turnStartStateRef.current : prev;
-      const baseLogLen = oppTurnEndedMP ? turnStartBotLogLenRef.current : seenLen;
+      const baselineState = turnStartStateRef.current ?? prev;
+      const baseLogLen = turnStartStateRef.current ? turnStartBotLogLenRef.current : seenLen;
       if (baselineState) {
         const turnEntries = botLog.slice(baseLogLen);
         if (turnEntries.length) {
@@ -238,6 +250,12 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
       // Always flag your-turn banner — even if the opp's turn produced no
       // recap-worthy content, the banner should still greet the next turn.
       expectYourBannerRef.current = true;
+      // Clear SP turn-start snapshot now that we've consumed it. (MP retains
+      // the snapshot; it's overwritten on the next opp turn start.)
+      if (oppTurnEndedSP) {
+        turnStartStateRef.current = null;
+        turnStartBotLogLenRef.current = 0;
+      }
     }
 
     prevGameStateRef.current = gameState;

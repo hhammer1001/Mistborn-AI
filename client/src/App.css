@@ -1611,6 +1611,11 @@ h3 {
   .player-info.you > .char-abilities       { order: 3; margin-top: 0; margin-bottom: 0.3rem; }
   .player-info.you > .player-stats-grid    { order: 4; }
   .player-info.you > .player-action-btns   { order: 5; }
+
+  /* Hide the vertical metals strip on mobile — metal interactions are
+     surfaced inline via Hand/Ally cards, so the dedicated track is
+     redundant in the narrower layout. */
+  .metal-col-zone { display: none; }
 }
 
 /* ─── Damage Phase ────────────────────────────────────────────────── */
@@ -2848,6 +2853,31 @@ h3 {
 .training-v-marker.reached.marker-burn { background: var(--red); border-color: var(--red); }
 .training-v-marker.reached.marker-atium { background: var(--blue); border-color: var(--blue); }
 .training-v-marker.reached.marker-ability { background: var(--gold); border-color: var(--gold); color: var(--bg-deep); }
+
+.training-v-top-reward {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, 70%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  background: rgba(12, 12, 24, 0.92);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  z-index: 4;
+  white-space: nowrap;
+  box-shadow: 0 0 8px rgba(201, 164, 74, 0.6);
+}
+
+.training-v-eq {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+}
 
 .player-action-btns {
   display: flex;
