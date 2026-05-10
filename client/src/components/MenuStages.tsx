@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { BOT_TYPES, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
-import type { BotSetupConfig } from "../hooks/useMinistryPrefs";
+import type { BotSetupConfig, FirstPlayerChoice } from "../hooks/useMinistryPrefs";
 import type { Room } from "../hooks/useLobby";
+
+const FIRST_PLAYER_OPTIONS: { value: FirstPlayerChoice; label: string }[] = [
+  { value: "you", label: "You" },
+  { value: "bot", label: "Bot" },
+  { value: "random", label: "Random" },
+];
 
 // ── Main menu (4 buttons) ──────────────────────────────
 
@@ -44,7 +50,10 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
   const previewText = (c: BotSetupConfig) => {
     const self = c.myChar === "Random"  ? "random"  : c.myChar;
     const opp  = c.oppChar === "Random" ? "random"  : c.oppChar;
-    const first = c.youFirst ? "you first" : "bot first";
+    const first =
+      c.firstPlayer === "you" ? "you first" :
+      c.firstPlayer === "bot" ? "bot first" :
+      "random first";
     return { self, opp, bot: c.botType, first };
   };
   const p = previewText(config);
@@ -91,13 +100,15 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
               {BOT_TYPES.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={draft.youFirst}
-              onChange={(e) => setDraft({ ...draft, youFirst: e.target.checked })}
-            />
-            <span>You go first</span>
+          <label>Who goes first
+            <select
+              value={draft.firstPlayer}
+              onChange={(e) => setDraft({ ...draft, firstPlayer: e.target.value as FirstPlayerChoice })}
+            >
+              {FIRST_PLAYER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </label>
           <label className="checkbox-label">
             <input

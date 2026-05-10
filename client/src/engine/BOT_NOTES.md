@@ -807,3 +807,51 @@ The asymptote at ~70.5% suggests something fundamental needs to change to push h
 5. **Opp-deck modeling** — estimate Zoom's deck composition from observable signals (allies in play, public discard) and adapt strategy. Currently V2 only conditions on opp character.
 6. **Heuristic improvements** — `estimateEffectValue` and the "special1-special16" handlers may have undervalued cards. Worth a careful audit, especially for Shan whose ceiling we couldn't break with config tuning alone.
 
+---
+
+# Hulk X90 — composite seat-specialist bot (default for bot play)
+
+Hulk X90 is a one-line composition: pick the best-known specialist for each seat.
+
+```ts
+// hulkX90Bot.ts
+return turnOrder === 0
+  ? new SquashV2Bot(...)
+  : new ZoomBot(...);
+```
+
+Going first → SquashV2 (seat-0 specialist). Going second → Zoom (seat-2 specialist). The returned Player IS a real SquashV2Bot/ZoomBot, so session.ts, lookahead, lethal solver all work without changes.
+
+## Headline (n=2000 seeded, coin-flipped seats)
+
+| Matchup | Hulk win% |
+|---|---|
+| Hulk vs Twonky | **81.7%** |
+| Hulk vs Squash | **58.3%** |
+| Hulk vs Zoom | **53.3%** |
+| Hulk vs SquashV2 | **50.0%** |
+
+## Composition verification
+
+| Hulk seat | Opp | Hulk win% | Expected (= specialist alone) |
+|---|---|---|---|
+| 0 (= V2) | Squash 1 | 76.3% | V2 1st vs Squash 2nd = 76.4% ✓ |
+| 1 (= Zoom) | Squash 0 | 39.2% | Zoom 2nd vs Squash 1st = 39% ✓ |
+
+Numbers match the underlying specialists exactly — Hulk inherits each bot's seat-specific advantages without compromise.
+
+## Coin-flipped vs Hulk's components
+
+Vs SquashV2 head-to-head (50%): both Hulk-in-seat-0 and V2 are the same logic (V2), so Hulk-1st vs V2-2nd = V2 mirror ≈ 68%. Hulk-2nd (= Zoom) vs V2-1st = 29.6% (V2's strong matchup vs Zoom). Average ~49% — tied. V2 is just as strong as Hulk against itself because Hulk's only seat-1 substitution (Zoom) is actually weaker than V2 in seat 1 vs a V2-going-first opp (29.6% vs V2-mirror's ~32%). For most other opps Zoom-seat-2 is better than V2-seat-2.
+
+## Where Hulk's composition isn't perfect
+
+V2-seat-2 vs V2-seat-1 (mirror) wins 32%; Zoom-seat-2 vs V2-seat-1 wins 29.6%. So vs V2-going-first specifically, V2-as-seat-1 is the better choice — but Hulk uses Zoom there. Trade-off: Hulk is the strongest universal bot but loses ~2.4pp to V2-pure in the V2-mirror matchup. For real games vs anything other than V2, Hulk's Zoom-in-seat-1 is strictly better.
+
+## Wiring
+
+- [hulkX90Bot.ts](hulkX90Bot.ts) — factory dispatcher
+- [session.ts](session.ts) — `PlayerKind = ... | "bot_hulk"`, `makePlayerFactory("bot_hulk")`, `opponentTypeToKind("hulk")`
+- [benchmark.ts](benchmark.ts) — `BOT_FACTORIES.Hulk`
+- [data/ministrySigils.ts](../data/ministrySigils.ts) — `BOT_TYPES` includes "hulk"
+- [hooks/useMinistryPrefs.ts](../hooks/useMinistryPrefs.ts) — `DEFAULT_BOT_CONFIG.botType = "hulk"` (new default for UI bot play)

@@ -10,15 +10,17 @@ import { createTwonky } from "./bot";
 import { createSquashBot } from "./squashBot";
 import { createZoomBot } from "./zoomBot";
 import { createSquashV2Bot } from "./squashV2Bot";
+import { createHulkX90 } from "./hulkX90Bot";
 import { createSynergyBotPrime } from "./synergyBot";
 import { resetCardIds } from "./card";
 
-type BotName = "V1" | "Squash" | "Zoom" | "SquashV2" | "Synergy";
+type BotName = "V1" | "Squash" | "Zoom" | "SquashV2" | "Hulk" | "Synergy";
 const BOT_FACTORIES: Record<BotName, PlayerFactory> = {
   V1: createTwonky as PlayerFactory,
   Squash: createSquashBot as PlayerFactory,
   Zoom: createZoomBot as PlayerFactory,
   SquashV2: createSquashV2Bot as PlayerFactory,
+  Hulk: createHulkX90 as PlayerFactory,
   Synergy: createSynergyBotPrime as PlayerFactory,
 };
 

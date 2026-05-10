@@ -18,6 +18,8 @@ import { WebPlayer } from "./webPlayer";
 import { Twonky } from "./bot";
 import { SquashBot } from "./squashBot";
 import { ZoomBot } from "./zoomBot";
+import { SquashV2Bot } from "./squashV2Bot";
+import { createHulkX90 } from "./hulkX90Bot";
 import { SynergyBotPrime } from "./synergyBot";
 import { RandomBot } from "./randomBot";
 import { PromptNeeded } from "./prompt";
@@ -26,7 +28,7 @@ import { METAL_NAMES } from "./types";
 
 // ── Player kinds ──
 
-export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_zoom" | "bot_synergy" | "bot_random";
+export type PlayerKind = "human" | "bot_twonky" | "bot_squash" | "bot_squashV2" | "bot_zoom" | "bot_hulk" | "bot_synergy" | "bot_random";
 
 export interface PlayerConfig {
   kind: PlayerKind;
@@ -40,8 +42,14 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
       return (deck, game, to, name, char) => new WebPlayer(deck, game, to, name, char);
     case "bot_squash":
       return (deck, game, to, name, char) => new SquashBot(deck, game, to, name, char);
+    case "bot_squashV2":
+      return (deck, game, to, name, char) => new SquashV2Bot(deck, game, to, name, char);
     case "bot_zoom":
       return (deck, game, to, name, char) => new ZoomBot(deck, game, to, name, char);
+    case "bot_hulk":
+      // Composite: SquashV2 in seat 0, Zoom in seat 1. Picks best-known
+      // specialist for each seat → strongest overall bot.
+      return (deck, game, to, name, char) => createHulkX90(deck, game, to, name, char);
     case "bot_synergy":
       return (deck, game, to, name, char) => new SynergyBotPrime(deck, game, to, name, char);
     case "bot_random":
@@ -55,7 +63,9 @@ function makePlayerFactory(kind: PlayerKind): PlayerFactory {
 /** Map the legacy opponentType strings from the UI to a PlayerKind. */
 export function opponentTypeToKind(opponentType: string): PlayerKind {
   if (opponentType === "squash") return "bot_squash";
+  if (opponentType === "squashV2") return "bot_squashV2";
   if (opponentType === "zoom") return "bot_zoom";
+  if (opponentType === "hulk") return "bot_hulk";
   if (opponentType === "synergy") return "bot_synergy";
   if (opponentType === "random") return "bot_random";
   return "bot_twonky";

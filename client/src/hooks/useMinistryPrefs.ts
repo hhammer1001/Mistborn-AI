@@ -6,19 +6,21 @@ const KEY_FLARED   = "ministry.flared";
 const KEY_FILTER   = "ministry.filter";
 const KEY_BOT_CFG  = "mistborn.botConfig";
 
+export type FirstPlayerChoice = "you" | "bot" | "random";
+
 export interface BotSetupConfig {
   myChar: string;
   oppChar: string;
   botType: BotType;
-  youFirst: boolean;
+  firstPlayer: FirstPlayerChoice;
   testDeck: boolean;
 }
 
 export const DEFAULT_BOT_CONFIG: BotSetupConfig = {
   myChar: "Random",
   oppChar: "Random",
-  botType: "zoom",
-  youFirst: false,
+  botType: "hulk",
+  firstPlayer: "random",
   testDeck: false,
 };
 
@@ -50,11 +52,18 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
+/** Migrate older saved configs (pre-multi-option firstPlayer) so existing
+ *  localStorage doesn't break. youFirst:bool → firstPlayer:"you"|"bot". */
+function migrateBotConfig(c: BotSetupConfig & { youFirst?: boolean }): BotSetupConfig {
+  if (c.firstPlayer) return c;
+  return { ...c, firstPlayer: c.youFirst ? "you" : "bot" };
+}
+
 export function useMinistryPrefs() {
   const [sigil, setSigilState]   = useState<string>(() => localStorage.getItem(KEY_SIGIL)  ?? "steel");
   const [flared, setFlaredState] = useState<boolean>(() => localStorage.getItem(KEY_FLARED) === "true");
   const [botConfig, setBotConfigState] = useState<BotSetupConfig>(() =>
-    readJSON<BotSetupConfig>(KEY_BOT_CFG, DEFAULT_BOT_CONFIG),
+    migrateBotConfig(readJSON<BotSetupConfig>(KEY_BOT_CFG, DEFAULT_BOT_CONFIG)),
   );
   const [filter, setFilterState] = useState<LogFilter>(() =>
     readJSON<LogFilter>(KEY_FILTER, DEFAULT_FILTER),
@@ -85,7 +94,7 @@ export function useMinistryPrefs() {
     const onStorage = (ev: StorageEvent) => {
       if (ev.key === KEY_SIGIL && ev.newValue)  setSigilState(ev.newValue);
       if (ev.key === KEY_FLARED)                setFlaredState(ev.newValue === "true");
-      if (ev.key === KEY_BOT_CFG && ev.newValue) setBotConfigState(readJSON<BotSetupConfig>(KEY_BOT_CFG, DEFAULT_BOT_CONFIG));
+      if (ev.key === KEY_BOT_CFG && ev.newValue) setBotConfigState(migrateBotConfig(readJSON<BotSetupConfig>(KEY_BOT_CFG, DEFAULT_BOT_CONFIG)));
       if (ev.key === KEY_FILTER && ev.newValue)  setFilterState(readJSON<LogFilter>(KEY_FILTER, DEFAULT_FILTER));
     };
     window.addEventListener("storage", onStorage);

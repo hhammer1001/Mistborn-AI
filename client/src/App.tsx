@@ -79,7 +79,11 @@ function App() {
       userId:    auth.user?.id ?? "",
       name:      displayName,
     };
-    botGame.createGame(displayName, myChar, cfg.botType, oppChar, !cfg.youFirst, cfg.testDeck, humanIdentity);
+    const botFirst =
+      cfg.firstPlayer === "bot" ? true :
+      cfg.firstPlayer === "you" ? false :
+      Math.random() < 0.5;  // "random"
+    botGame.createGame(displayName, myChar, cfg.botType, oppChar, botFirst, cfg.testDeck, humanIdentity);
     setMode("bot_game");
   };
 
