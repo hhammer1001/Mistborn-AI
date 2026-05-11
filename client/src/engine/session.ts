@@ -633,16 +633,16 @@ export class GameSession {
       if (event.amount <= 0) continue;
       const owner = event.playerIndex as 0 | 1;
       const noun = `card${event.amount === 1 ? "" : "s"}`;
+      // Only push to the owner's log. Each UI renders the opponent's log
+      // with the opponent's name prefixed (Bot/Player-X), so a single entry
+      // shows up correctly from both perspectives without duplication.
       this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
-      this._logs[1 - owner].push({ turn, text: `Opponent drew ${event.amount} ${noun}` });
     }
     this.game.deckEvents = [];
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i];
       if (p.deck.shuffleOccurred) {
-        const oi = (1 - i) as 0 | 1;
         this._logs[i].push({ turn, text: "Shuffled deck" });
-        this._logs[oi].push({ turn, text: "Opponent shuffled deck" });
         p.deck.shuffleOccurred = false;
       }
     }
