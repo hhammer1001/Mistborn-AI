@@ -1286,6 +1286,9 @@ export class GameSession {
     if (!this._isBot(pi)) {
       p.deck.cleanUp(p, this.game.market);
       for (const ally of p.allies) ally.reset();
+      // Drain before _startNextTurn advances turncount so the new-hand draw
+      // + any shuffle land in this player's turn block, not the next one.
+      this._drainDeckEvents();
     }
 
     if (this.game.winner) { this.phase = "game_over"; return; }
@@ -1381,6 +1384,10 @@ export class GameSession {
         text: `Training reward (level ${p.training}): ${effects.join(", ")}`,
       });
     }
+    // Training rewards can include "C" (draw) — drain now so the draw entry
+    // appears in this turn's log block, not deferred to the next player's
+    // first action.
+    this._drainDeckEvents();
   }
 
   /** Run a bot's full turn (training already resolved). Handles logging,
@@ -1432,7 +1439,13 @@ export class GameSession {
         },
         annotation ?? undefined,
       );
-      return originalPerform(action, g);
+      const result = originalPerform(action, g);
+      // Drain now so deck events (cleanup-driven draws, reshuffles) land in
+      // the log under the bot's current turncount and interleaved with the
+      // bot's own action entries — not after _startNextTurn has advanced
+      // turncount to the next player.
+      this._drainDeckEvents();
+      return result;
     };
 
     try {
