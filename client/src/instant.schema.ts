@@ -116,20 +116,20 @@ const _schema = i.schema({
       hostId: i.string().indexed().optional(),
       hostName: i.string().optional(),
       hostReady: i.boolean().optional(),
-      sessionId: i.any().optional(),
+      sessionId: i.string().optional(),
       status: i.string().indexed().optional(),
     }),
     landsGames: i.entity({
-      roomId: i.any().optional(),
-      p0Id: i.string().optional(),
-      p1Id: i.string().optional(),
+      roomId: i.string().indexed().optional(),
+      p0Id: i.string().indexed().optional(),
+      p1Id: i.string().indexed().optional(),
       /** Public state shipped to player 0 (their hand visible; opponent hand redacted). */
       p0State: i.any().optional(),
       /** Public state shipped to player 1 (mirror). */
       p1State: i.any().optional(),
       /** Guest's pending action request, processed by host then cleared. */
       pendingAction: i.any().optional(),
-      phase: i.string().optional(),
+      phase: i.string().indexed().optional(),
       activePlayer: i.number().optional(),
       turnCount: i.number().optional(),
       winner: i.number().optional(),
