@@ -42,6 +42,9 @@ interface Props {
   onSignOut: () => void;
   onOpenFeedback: () => void;
   onOpenSettings: (anchorId: string) => void;
+  // Hidden "Lands" easter-egg toggle (Steel Ministry stamp is the trigger).
+  landsUnlocked?: boolean;
+  onToggleLandsUnlocked?: () => void;
 }
 
 function toRoman(n: number): string {
@@ -84,6 +87,8 @@ export function MinistrySidebar({
   onSignOut,
   onOpenFeedback,
   onOpenSettings,
+  landsUnlocked,
+  onToggleLandsUnlocked,
 }: Props) {
   const { src: sigilImgSrc, label: sigilLabel } = sigilSrc(sigil, flared);
 
@@ -106,8 +111,18 @@ export function MinistrySidebar({
           <span className="main">RECORDS</span>
         </div>
         <span
-          className="stamp"
+          className={`stamp${landsUnlocked ? " is-active" : ""}`}
+          role={onToggleLandsUnlocked ? "button" : undefined}
+          tabIndex={onToggleLandsUnlocked ? 0 : undefined}
           aria-label="Steel Ministry"
+          aria-pressed={onToggleLandsUnlocked ? !!landsUnlocked : undefined}
+          onClick={onToggleLandsUnlocked}
+          onKeyDown={onToggleLandsUnlocked ? (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggleLandsUnlocked();
+            }
+          } : undefined}
           style={{ backgroundImage: `url(${MINISTRY_SYMBOL_SRC})` }}
         />
       </div>

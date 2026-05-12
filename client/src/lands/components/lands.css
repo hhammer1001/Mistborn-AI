@@ -1,0 +1,1509 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LANDS — "The Almanac" theme.
+   A 19th-century naturalist's compendium: parchment paper, sepia ink,
+   editorial serif typography, hand-set ornaments. Self-contained — all
+   classes prefixed `lands-` so nothing leaks into the Mistborn board.
+
+   Fonts:
+     Display — Fraunces (variable serif, characterful, optical sizing)
+     Body   — Newsreader (variable serif, refined editorial)
+     Mono   — Iosevka stack (tabular numerals)
+   Palette: warm cream paper, ink-brown text, worn gold accents,
+            five mana colors as decisive splashes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..900,0..100&family=Newsreader:opsz,wght,ital@6..72,300..700,0;6..72,300..700,1&display=swap');
+
+.lands-root {
+  --paper:       #f3e7cc;
+  --paper-warm:  #efdfb7;
+  --paper-deep:  #e3d0a3;
+  --paper-cool:  #ecdfc6;
+  --paper-bright:#faf1da;
+
+  --ink:         #2a1f15;
+  --ink-mid:     #5a4631;
+  --ink-soft:    #8a7558;
+  --ink-faint:   #b0997a;
+
+  --rule:        #b9a479;
+  --rule-dim:    #d3c096;
+  --rule-strong: #6f5938;
+
+  --gilt:        #a8772e;
+  --gilt-bright: #cf9a3a;
+  --gilt-deep:   #6f4b1a;
+
+  --ember:       #a8391b;
+  --ember-soft:  #d56a3e;
+
+  --mana-w: #c9a23c;
+  --mana-u: #2f6390;
+  --mana-b: #4b3853;
+  --mana-r: #ad3f24;
+  --mana-g: #4b7837;
+
+  position: fixed;
+  inset: 0;
+  background-color: var(--paper);
+  /* Parchment atmosphere: faint radial vignette + SVG noise grain to break
+     up the flatness of a solid color. The grain is encoded inline so we
+     don't ship an extra asset. */
+  background-image:
+    radial-gradient(ellipse 120% 90% at 50% 20%, var(--paper-bright) 0%, transparent 55%),
+    radial-gradient(ellipse 140% 110% at 50% 110%, #d3bd87 0%, transparent 50%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.12  0 0 0 0 0.07  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/></svg>");
+  background-blend-mode: normal, multiply, multiply;
+  background-size: auto, auto, 240px 240px;
+  color: var(--ink);
+  font-family: 'Newsreader', 'Iowan Old Style', 'Georgia', serif;
+  font-weight: 420;
+  font-size: 17px;
+  line-height: 1.45;
+  font-feature-settings: "kern", "liga", "calt";
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Typography primitives
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-root h1,
+.lands-root h2,
+.lands-root h3 {
+  font-family: 'Fraunces', 'Iowan Old Style', 'Georgia', serif;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* Selection: warm gilt highlight on ink */
+.lands-root ::selection { background: var(--gilt-bright); color: var(--paper-bright); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Buttons — letterpress-style ink-on-paper
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-root button {
+  font-family: 'Fraunces', 'Newsreader', serif;
+  font-variation-settings: "opsz" 24, "SOFT" 30;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 1.25rem;
+  border-radius: 1px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper-bright);
+  cursor: pointer;
+  transition: transform 140ms ease, background-color 140ms ease, color 140ms ease, box-shadow 200ms ease;
+  /* Letterpress: tiny inset highlight + ink "weight" shadow below */
+  box-shadow:
+    inset 0 1px 0 #ffffff18,
+    inset 0 -1px 0 #00000040,
+    0 2px 0 var(--gilt-deep);
+  text-transform: uppercase;
+}
+.lands-root button:hover:not(:disabled) {
+  background: #1d130a;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 #ffffff22,
+    inset 0 -1px 0 #00000050,
+    0 3px 0 var(--gilt),
+    0 4px 12px #00000022;
+}
+.lands-root button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 2px #00000060,
+    0 0 0 var(--gilt);
+}
+.lands-root button:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.lands-root button.lands-secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--ink-mid);
+  box-shadow:
+    inset 0 1px 0 #ffffff40,
+    0 2px 0 var(--rule);
+}
+.lands-root button.lands-secondary:hover:not(:disabled) {
+  background: #e8d4a888;
+  color: var(--ink);
+  box-shadow:
+    inset 0 1px 0 #ffffff60,
+    0 3px 0 var(--rule-strong);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Start screen — composed like a title page
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-start-panel {
+  margin: auto;
+  max-width: 740px;
+  width: calc(100% - 4rem);
+  padding: 3rem 3.4rem 2.6rem;
+  background:
+    linear-gradient(180deg, #fbf3dc 0%, #f3e7cc 50%, #ead8af 100%);
+  border: 1px solid var(--rule-strong);
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px #ffffff80,
+    inset 0 0 60px #c3a87440,
+    0 30px 60px -20px #00000060,
+    0 8px 20px -8px #00000040;
+  /* Antique book-cover feel: subtle border ornament via outline */
+  outline: 1px solid var(--rule-dim);
+  outline-offset: 6px;
+}
+/* Corner ornaments — small filigrees in the four corners of the title page. */
+.lands-start-panel::before,
+.lands-start-panel::after {
+  position: absolute;
+  font-family: 'Fraunces', serif;
+  font-size: 1.6rem;
+  color: var(--gilt);
+  line-height: 1;
+  pointer-events: none;
+}
+.lands-start-panel::before {
+  content: "❦";
+  top: 0.7rem;
+  left: 0.9rem;
+}
+.lands-start-panel::after {
+  content: "❦";
+  top: 0.7rem;
+  right: 0.9rem;
+  transform: scaleX(-1);
+}
+
+.lands-titleblock {
+  text-align: center;
+  margin-bottom: 1.6rem;
+}
+.lands-eyebrow {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 12, "SOFT" 0;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-mid);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  margin-bottom: 0.45rem;
+}
+.lands-title {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 144, "SOFT" 0;
+  font-weight: 800;
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 0.95;
+  margin: 0 auto 0.5rem;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.lands-title-rule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  color: var(--gilt);
+  font-size: 0.9rem;
+  margin: 0.8rem 0 0;
+}
+.lands-title-rule::before,
+.lands-title-rule::after {
+  content: "";
+  display: block;
+  width: 4rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--rule), transparent);
+}
+.lands-subtitle {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  color: var(--ink-mid);
+  font-size: 1.05rem;
+  margin: 0.8rem 0 0;
+  text-align: center;
+}
+
+.lands-rules {
+  background: #f7ecd170;
+  padding: 1rem 1.5rem 1.1rem;
+  margin: 1.8rem 0 1.6rem;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+.lands-rules h3 {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 24;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  margin: 0 0 0.6rem;
+  text-align: center;
+}
+.lands-rules ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink);
+  columns: 1;
+}
+.lands-rules li {
+  margin: 0.35rem 0;
+  padding-left: 1.1rem;
+  position: relative;
+}
+.lands-rules li::before {
+  content: "⁂";
+  position: absolute;
+  left: 0;
+  color: var(--gilt);
+  font-size: 0.85rem;
+  top: 0.1rem;
+}
+.lands-rules li strong {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lands-start-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.lands-start-actions button {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* ── Lobby states ── */
+
+.lands-lobby-error {
+  color: var(--ember);
+  text-align: center;
+  font-style: italic;
+  margin: 0.4rem 0 0;
+}
+.lands-lobby-back {
+  margin-top: 1rem;
+  border-top: 1px solid var(--rule-dim);
+  padding-top: 1rem;
+}
+.lands-lobby-back button { flex: 0 0 auto; min-width: 140px; margin: 0 auto; }
+
+.lands-lobby-join {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin: 0.6rem 0;
+}
+.lands-lobby-code-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: 'Fraunces', serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  align-items: center;
+}
+.lands-lobby-code-input {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  padding: 0.5rem 0.6rem 0.5rem 1rem;
+  background: var(--paper-bright);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  /* Wide enough to comfortably fit 4 uppercase letters with the heavy
+     letter-spacing applied above. */
+  width: 13rem;
+  text-transform: uppercase;
+  outline: none;
+}
+.lands-lobby-code-input:focus {
+  border-color: var(--gilt);
+  box-shadow: 0 0 0 1px var(--gilt);
+}
+
+.lands-lobby-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.6rem 0 0.4rem;
+}
+.lands-lobby-code-display {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: var(--paper-bright);
+  border: 1px solid var(--rule-strong);
+  padding: 0.6rem 1.2rem;
+}
+.lands-lobby-code-text {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 2.2rem;
+  letter-spacing: 0.4em;
+  color: var(--ink);
+}
+
+.lands-lobby-readycheck {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0.6rem 0;
+}
+.lands-lobby-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: 'Fraunces', serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+}
+.lands-lobby-field select {
+  font-family: 'Newsreader', serif;
+  font-size: 1rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--paper-bright);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.lands-lobby-ready-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Newsreader', serif;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.lands-lobby-ready-toggle input { transform: scale(1.2); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Board layout
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-board {
+  flex: 1;
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.7rem 1.2rem 0.8rem;
+  overflow: hidden;
+  min-height: 0;
+}
+.lands-board-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+  min-height: 0;
+}
+.lands-board-right {
+  width: 22rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Player rows: plates set in a manuscript page. Use ink rules instead of
+   rounded boxes — feels printed, not boxed-in. */
+.lands-player-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem 0.4rem;
+  background:
+    linear-gradient(180deg, #f8eed4cc 0%, #efe1bdcc 100%);
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule-strong);
+  /* Doubled rule effect via inset shadow */
+  box-shadow:
+    inset 0 1px 0 #ffffff70,
+    inset 0 -1px 0 #ffffff50,
+    inset 0 0 0 1px #00000005;
+  position: relative;
+  min-height: 0;
+}
+/* Opposite-side tint: cooler for the opponent, warmer for you */
+.lands-opp {
+  background: linear-gradient(180deg, #e9dbb6cc 0%, #ddc99ccc 100%);
+}
+.lands-me {
+  background: linear-gradient(180deg, #f8eed4cc 0%, #efe1bdcc 100%);
+}
+
+.lands-player-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.lands-player-name {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 60, "SOFT" 20;
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+  /* Display-style with a tiny decorative dot before */
+  position: relative;
+  padding-left: 1.2rem;
+}
+.lands-player-name::before {
+  content: "❀";
+  position: absolute;
+  left: 0;
+  top: 0.05rem;
+  color: var(--gilt);
+  font-size: 0.85rem;
+}
+.lands-opp .lands-player-name::before { color: var(--mana-r); }
+.lands-me  .lands-player-name::before { color: var(--mana-g); }
+
+.lands-status {
+  margin-left: auto;
+  color: var(--ink-mid);
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Count badges — five mana symbols in the player header
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-counts {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+.lands-count-badge {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 24;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.15rem 0.55rem 0.15rem 0.32rem;
+  border-radius: 999px;
+  background: #f7eed4cc;
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  box-shadow: inset 0 1px 0 #ffffff80, 0 1px 1px #00000018;
+}
+
+/* Mana icons: native Scryfall SVG colors with a fine ink ring for definition
+   against the cream paper. */
+.lands-mana-icon {
+  display: block;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px var(--ink),
+    inset 0 0 0 1px #ffffff60,
+    0 1px 2px #00000028;
+}
+
+/* Type-tinted borders on the badges (subtle accent — keeps it elegant) */
+.lands-count-plains   { border-color: #b89a3aaa; }
+.lands-count-island   { border-color: #3a608aaa; }
+.lands-count-swamp    { border-color: #4a3550aa; }
+.lands-count-mountain { border-color: #a04020aa; }
+.lands-count-forest   { border-color: #406030aa; }
+
+/* Near-win pulse — warm amber, like an ember catching fire, not red alarm */
+.lands-count-warn {
+  background: #f8d999;
+  border-color: var(--ember) !important;
+  color: var(--ember) !important;
+  animation: lands-ember 1.6s infinite ease-in-out;
+}
+@keyframes lands-ember {
+  0%, 100% {
+    box-shadow: inset 0 1px 0 #ffffff80, 0 0 0 0 #d4673e80;
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: inset 0 1px 0 #ffffff80, 0 0 0 6px #d4673e10, 0 0 12px #d4673e60;
+    transform: translateY(-1px);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   In-play + piles
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-zone-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+  min-height: 0;
+}
+.lands-inplay {
+  flex: 1;
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 0.5rem 0.7rem;
+  min-height: 7.1rem;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, #00000005 8px 9px),
+    #fbf3dc66;
+  border: 1px solid var(--rule);
+  box-shadow:
+    inset 0 0 0 3px transparent,
+    inset 0 0 0 4px #ffffff30,
+    inset 0 1px 3px #00000010;
+}
+.lands-piles {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+.lands-pile-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.lands-pile-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.08rem 0.18rem;
+  width: 4.4rem;
+  justify-items: center;
+  align-items: center;
+  padding: 0.22rem 0.15rem;
+  background: #f9f0d8;
+  border: 1px solid var(--rule);
+  box-shadow: inset 0 1px 0 #ffffffa0, 0 1px 1px #00000014;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+.lands-pile-strip-icon { display: flex; align-items: center; }
+.lands-pile-strip-count {
+  font-family: 'Fraunces', serif;
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Clickable discard pile: warm gilt outline on hover */
+.lands-pile-clickable { cursor: pointer; outline: none; }
+.lands-pile-clickable:hover .lands-card,
+.lands-pile-clickable:focus-visible .lands-card {
+  transform: translateY(-2px) rotate(-0.6deg);
+  box-shadow:
+    0 0 0 1px var(--gilt-bright),
+    0 8px 18px -4px #00000033,
+    0 2px 4px #00000022;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.lands-stack {
+  display: flex;
+  flex-direction: row;
+}
+.lands-stack-card { position: relative; }
+
+.lands-empty-msg {
+  color: var(--ink-soft);
+  font-style: italic;
+  font-family: 'Newsreader', serif;
+  font-size: 0.92rem;
+  align-self: center;
+  margin: auto;
+  letter-spacing: 0.04em;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Hand row (your hand)
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-hand-row {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.7rem 0.9rem;
+  background:
+    linear-gradient(180deg, #efddb6 0%, #d8c08a 100%);
+  border-top: 1px solid var(--rule-strong);
+  box-shadow:
+    inset 0 1px 0 #ffffff60,
+    inset 0 6px 14px -8px #00000040,
+    inset 0 -1px 0 #00000020;
+  /* Slight wood-shelf feel via stacked subtle gradients */
+  position: relative;
+}
+.lands-hand-row::before {
+  /* Thin gold rule above */
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gilt) 30%, var(--gilt) 70%, transparent);
+  opacity: 0.55;
+}
+.lands-hand {
+  flex: 1;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  /* Horizontal scroll when the hand can't fit on screen. overflow-y stays
+     hidden (CSS doesn't let us mix auto/visible), so the wrapper has vertical
+     padding to keep the hover lift from getting clipped. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0.2rem 0.4rem;
+  min-height: 9rem;
+}
+/* Stacked copies inside the hand: overlap with negative margin, just like
+   the in-play area. Hovered cards lift to the top of the z-order so the
+   right edge of the card stays clickable. */
+.lands-hand-stack {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+.lands-hand-stack-card {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.lands-hand-stack-card:hover,
+.lands-hand-stack-card:focus-within {
+  z-index: 10;
+}
+
+/* Cream-tinted scrollbar for both hand containers. */
+.lands-hand::-webkit-scrollbar,
+.lands-opp-hand::-webkit-scrollbar { height: 6px; }
+.lands-hand::-webkit-scrollbar-thumb,
+.lands-opp-hand::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
+.lands-hand::-webkit-scrollbar-track,
+.lands-opp-hand::-webkit-scrollbar-track { background: transparent; }
+.lands-hand-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.lands-pass-btn { min-width: 130px; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Log — journal column on the right
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-log-panel {
+  background:
+    linear-gradient(180deg, #f9efd6 0%, #ecdaae 100%);
+  border: 1px solid var(--rule-strong);
+  box-shadow:
+    inset 0 0 0 1px #ffffff60,
+    0 12px 30px -16px #00000040;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+.lands-log-header {
+  padding: 0.8rem 1rem 0.55rem;
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 36, "SOFT" 20;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule);
+  text-align: center;
+  position: relative;
+}
+.lands-log-header::before,
+.lands-log-header::after {
+  content: "❦";
+  color: var(--gilt);
+  margin: 0 0.6rem;
+  font-size: 0.7rem;
+  position: relative;
+  top: -1px;
+}
+.lands-log-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.7rem 1rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  font-family: 'Newsreader', serif;
+  font-size: 0.92rem;
+  line-height: 1.42;
+  color: var(--ink);
+}
+.lands-log-scroll::-webkit-scrollbar { width: 6px; }
+.lands-log-scroll::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: 0;
+}
+.lands-log-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lands-log-entry {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.45rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px dashed #b9a47966;
+  animation: lands-log-in 240ms cubic-bezier(0.2, 0.6, 0.2, 1) both;
+}
+.lands-log-entry:last-child { border-bottom: 0; padding-bottom: 0; }
+@keyframes lands-log-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.lands-log-turn {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 24;
+  font-weight: 700;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  text-align: right;
+  font-size: 0.85rem;
+  padding-top: 0.05rem;
+}
+.lands-log-text {
+  min-width: 0;
+  word-wrap: break-word;
+}
+.lands-log-p0 { color: var(--ink); }
+.lands-log-p1 { color: var(--mana-r); font-style: italic; }
+.lands-log-pnone { color: var(--ink-soft); font-style: italic; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Cards
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-card {
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--ink-mid);
+  /* Warm sepia shadow rather than cool gray — pasted illustration look */
+  box-shadow:
+    0 1px 1px #00000018,
+    0 4px 10px -3px #4d33188a,
+    inset 0 0 0 1px #ffffff60;
+  position: relative;
+  flex-shrink: 0;
+  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 200ms ease, border-color 180ms ease;
+}
+.lands-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lands-card-sm { width: 4.4rem;  height: 6.1rem; }
+.lands-card-md { width: 6rem;    height: 8.4rem; }
+.lands-card-lg { width: 7.6rem;  height: 10.6rem; }
+
+.lands-card-clickable { cursor: pointer; }
+.lands-card-clickable:hover {
+  transform: translateY(-6px) rotate(-0.4deg);
+  border-color: var(--gilt-bright);
+  box-shadow:
+    0 0 0 1px var(--gilt-bright),
+    0 14px 24px -8px #4d3318cc,
+    0 4px 8px #00000030,
+    inset 0 0 0 1px #ffffff60;
+}
+.lands-card-selected {
+  border-color: var(--gilt-bright);
+  box-shadow:
+    0 0 0 2px var(--gilt-bright),
+    0 0 0 3px #cf9a3a44,
+    0 10px 22px -6px #4d3318a0,
+    inset 0 0 0 1px #ffffff60;
+}
+.lands-card-disabled {
+  opacity: 0.62;
+  filter: saturate(0.7);
+  cursor: default;
+}
+
+/* Eye icon: a small wax-seal stamp ("watched" mark) */
+.lands-card-eye {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 1.15rem;
+  height: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d4673e 0%, #8a2818 80%);
+  color: #fbf2dd;
+  box-shadow:
+    0 0 0 1px #2a1f1580,
+    0 0 0 2px #fbf2dd66,
+    0 1px 2px #00000033;
+  pointer-events: none;
+}
+.lands-card-eye svg { filter: drop-shadow(0 0 1px #00000060); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Opponent's hand row
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-opp-hand {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+  align-items: center;
+  padding: 0.45rem 0.6rem;
+  min-height: 7rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 8px, #00000005 8px 9px),
+    #efe1bdaa;
+  border: 1px solid var(--rule);
+  box-shadow: inset 0 0 0 1px #ffffff50, inset 0 1px 3px #00000010;
+}
+/* Stacked groups of revealed cards inside the opponent's hand — mirror the
+   player's hand-stack pattern, but at small card size. */
+.lands-opp-stack {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+.lands-opp-stack-card {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.lands-opp-stack-card:hover,
+.lands-opp-stack-card:focus-within {
+  z-index: 10;
+}
+.lands-opp-hand-empty {
+  color: var(--ink-soft);
+  font-style: italic;
+  font-family: 'Newsreader', serif;
+  font-size: 0.9rem;
+}
+/* Card-shaped "+N" placeholder shown at the end of the opponent's hand when
+   they hold more cards than will be displayed. */
+.lands-opp-hand-more {
+  width: 3rem;
+  height: 6.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 60;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--ink-mid);
+  background: #efe1bd;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 5px;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+  box-shadow: inset 0 1px 0 #ffffff70, 0 1px 2px #00000018;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Piles (face-down stacks)
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.lands-pile-stack { position: relative; }
+.lands-pile-back {
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--ink);
+  border-radius: 5px;
+  box-shadow:
+    0 1px 1px #00000018,
+    0 4px 10px -3px #4d33188a,
+    inset 0 0 0 1px #ffffff40;
+}
+.lands-pile-back-2 { position: absolute; top: 3px; left: 3px; }
+.lands-pile-back-3 { position: absolute; top: 6px; left: 6px; }
+.lands-pile-empty {
+  border: 1px dashed var(--rule);
+  background: #fbf3dc60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Pile count badge — gilt coin in the lower-right of the top card */
+.lands-pile-badge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  min-width: 1.45rem;
+  height: 1.25rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 30%, #f4d088 0%, var(--gilt) 60%, var(--gilt-deep) 100%);
+  color: var(--ink);
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 2px #fbf2dd88,
+    0 1px 2px #00000033;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Modals — opened book pages
+   ────────────────────────────────────────────────────────────────────────── */
+
+.lands-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, #1a0f08c0 0%, #1a0f08e0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 2rem;
+  animation: lands-fade-in 200ms ease both;
+}
+@keyframes lands-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.lands-modal {
+  position: relative;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 0%, #fbf2dc 0%, transparent 70%),
+    linear-gradient(180deg, #f4e8cf 0%, #e8d6aa 100%);
+  border: 1px solid var(--rule-strong);
+  outline: 1px solid var(--rule-dim);
+  outline-offset: 5px;
+  padding: 1.6rem 2rem 1.4rem;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow:
+    inset 0 0 60px #c3a87440,
+    0 30px 60px -20px #000000a0,
+    0 8px 20px -8px #00000080;
+  position: relative;
+  animation: lands-modal-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes lands-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+.lands-modal h2 {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 96, "SOFT" 20;
+  font-weight: 700;
+  font-size: 1.65rem;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  margin: 0 0 0.55rem;
+  text-align: center;
+  position: relative;
+  padding-bottom: 0.7rem;
+}
+.lands-modal h2::after {
+  content: "❦";
+  position: absolute;
+  bottom: -0.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--gilt);
+  font-size: 0.9rem;
+  background: var(--paper);
+  padding: 0 0.5rem;
+}
+.lands-modal h3 {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 24;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  margin: 1rem 0 0.45rem;
+}
+.lands-modal p {
+  font-family: 'Newsreader', serif;
+  color: var(--ink-mid);
+  font-size: 0.98rem;
+  margin: 0.3rem 0;
+}
+.lands-modal-actions {
+  margin-top: 1.4rem;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+.lands-counter-section { margin: 0.8rem 0; }
+
+/* ── Counter popup visual: played card [→/←] target card ── */
+
+.lands-counter-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  margin: 1rem 0 0.4rem;
+  padding: 1rem 0.5rem 0.6rem;
+  background: #fbf3dc70;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+.lands-counter-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.lands-counter-card-cap {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 24;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  text-align: center;
+  max-width: 7rem;
+  line-height: 1.2;
+}
+.lands-counter-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--gilt);
+  font-family: 'Fraunces', serif;
+  user-select: none;
+  padding-bottom: 1.4rem;
+}
+.lands-counter-arrow-glyph {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 700;
+}
+.lands-counter-arrow-verb {
+  font-style: italic;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+}
+
+.lands-modal-actions-spacer { flex: 1; }
+
+/* Corner "View Board" button — tucked into the top-right of any gameplay
+   modal so the player can temporarily look past the popup. */
+.lands-modal-view-btn {
+  position: absolute !important;
+  top: 0.45rem;
+  right: 0.45rem;
+  font-size: 0.68rem !important;
+  padding: 0.28rem 0.6rem !important;
+  letter-spacing: 0.14em !important;
+  font-weight: 600 !important;
+  z-index: 2;
+}
+
+/* ── View-only mode: counter popup hidden, board visible but inert. ── */
+
+.lands-board-viewonly {
+  pointer-events: none;
+}
+/* Keep scroll containers interactive so the player can scroll through hands
+   and the log. Cards inside the player's hand aren't clickable during a
+   counter window anyway (canPlay is false), so opening clicks back up is safe. */
+.lands-board-viewonly .lands-hand,
+.lands-board-viewonly .lands-opp-hand,
+.lands-board-viewonly .lands-log-scroll {
+  pointer-events: auto;
+}
+/* Tint and dim the locked board so it visually communicates "look only". */
+.lands-board-viewonly .lands-player-row,
+.lands-board-viewonly .lands-hand-row,
+.lands-board-viewonly .lands-log-panel {
+  opacity: 0.94;
+  filter: saturate(0.92);
+}
+
+/* Floating "Resume Counter Decision" button, anchored bottom-center.
+   The base button rule in this stylesheet also sets transform on :hover, so
+   every transform on this element uses !important to preserve the centering
+   translateX(-50%) — otherwise the more-specific global hover rule wins and
+   the button shoots half its width to the right. */
+.lands-counter-resume {
+  position: fixed;
+  bottom: 1.6rem;
+  left: 50%;
+  transform: translateX(-50%) !important;
+  z-index: 60;
+  font-family: 'Fraunces', serif !important;
+  font-variation-settings: "opsz" 36, "SOFT" 30;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em !important;
+  padding: 0.7rem 1.6rem !important;
+  font-size: 0.92rem !important;
+  background: linear-gradient(180deg, #c4592e 0%, #93391b 100%) !important;
+  border: 1px solid #4a1808 !important;
+  color: #fbf2dd !important;
+  box-shadow:
+    inset 0 1px 0 #ffffff30,
+    inset 0 -1px 0 #00000040,
+    0 3px 0 #4a1808,
+    0 8px 24px -6px #000000a0 !important;
+  animation: lands-resume-pulse 1.8s ease-in-out infinite;
+}
+.lands-counter-resume:hover {
+  background: linear-gradient(180deg, #d76538 0%, #a14123 100%) !important;
+  transform: translateX(-50%) translateY(-2px) !important;
+}
+.lands-counter-resume:active {
+  transform: translateX(-50%) translateY(1px) !important;
+}
+@keyframes lands-resume-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 #ffffff30, inset 0 -1px 0 #00000040, 0 3px 0 #4a1808, 0 8px 24px -6px #000000a0; }
+  50%      { box-shadow: inset 0 1px 0 #ffffff30, inset 0 -1px 0 #00000040, 0 3px 0 #4a1808, 0 8px 28px -4px #d4673e88, 0 0 0 4px #d4673e22; }
+}
+
+.lands-pick-row {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  min-height: 6rem;
+  padding: 0.7rem 0.6rem 0.5rem;
+  background: #fbf3dc70;
+  border: 1px solid var(--rule);
+}
+/* Stacked picker: identical-type cards overlap, hovered card lifts to top. */
+.lands-pick-stack {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+.lands-pick-stack-card {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.lands-pick-stack-card:hover,
+.lands-pick-stack-card:focus-within {
+  z-index: 10;
+}
+
+/* Wider modal variant — used by content that wraps two cards per row. */
+.lands-modal-wide { max-width: 960px; }
+
+/* ── End-of-match plate ─────────────────────────────────────────────── */
+/* Full-screen takeover styled as the concluding leaf of the compendium.
+   Win/loss variants share composition; differ in color treatment. */
+
+.lands-gameover {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  animation: lands-fade-in 420ms ease both;
+  /* Subtle grain over a warm wash. Variants override the wash below. */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.14  0 0 0 0 0.09  0 0 0 0 0.05  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>"),
+    radial-gradient(ellipse at center, transparent 0%, #1a0f08c0 100%),
+    linear-gradient(180deg, #f3e7cc 0%, #c9b283 100%);
+  background-size: 240px 240px, auto, auto;
+}
+.lands-gameover-win {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.14  0 0 0 0 0.09  0 0 0 0 0.05  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/></svg>"),
+    radial-gradient(ellipse 70% 55% at 50% 28%, #ffe19488 0%, transparent 70%),
+    radial-gradient(ellipse at center, transparent 0%, #2a1f0890 100%),
+    linear-gradient(180deg, #fbf2dc 0%, #c8932f 100%);
+}
+.lands-gameover-loss {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.14  0 0 0 0 0.09  0 0 0 0 0.05  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>"),
+    radial-gradient(ellipse 70% 55% at 50% 28%, #a83b1a55 0%, transparent 70%),
+    radial-gradient(ellipse at center, transparent 0%, #1a0f08d8 100%),
+    linear-gradient(180deg, #d8c08a 0%, #5b4631 100%);
+}
+
+.lands-gameover-panel {
+  position: relative;
+  background:
+    radial-gradient(ellipse 130% 80% at 50% 0%, #fbf2dc 0%, transparent 70%),
+    linear-gradient(180deg, #f4e8cf 0%, #e8d6aa 100%);
+  border: 1px solid var(--rule-strong);
+  outline: 1px solid var(--rule-dim);
+  outline-offset: 8px;
+  padding: 3rem 3.6rem 2.4rem;
+  max-width: 760px;
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  text-align: center;
+  box-shadow:
+    inset 0 0 80px #c3a87440,
+    0 40px 100px -20px #000000b0,
+    0 14px 30px -10px #00000060;
+  animation: lands-modal-in 480ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+/* Corner filigrees — match the start panel for visual rhyme. */
+.lands-gameover-panel::before,
+.lands-gameover-panel::after {
+  position: absolute;
+  font-family: 'Fraunces', serif;
+  font-size: 1.8rem;
+  color: var(--gilt);
+  line-height: 1;
+  pointer-events: none;
+}
+.lands-gameover-panel::before {
+  content: "❦";
+  top: 0.6rem;
+  left: 0.9rem;
+}
+.lands-gameover-panel::after {
+  content: "❦";
+  top: 0.6rem;
+  right: 0.9rem;
+  transform: scaleX(-1);
+}
+
+.lands-gameover-eyebrow {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-mid);
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  margin-bottom: 0.6rem;
+}
+.lands-gameover-title {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: "opsz" 144, "SOFT" 0;
+  font-weight: 800;
+  font-size: clamp(3.4rem, 8vw, 5.6rem);
+  line-height: 0.92;
+  letter-spacing: -0.005em;
+  margin: 0;
+  color: var(--ink);
+}
+.lands-gameover-win .lands-gameover-title {
+  color: var(--gilt-deep);
+  text-shadow:
+    0 1px 0 #ffffff80,
+    0 2px 1px #00000020,
+    0 0 18px #c8923c40;
+}
+.lands-gameover-loss .lands-gameover-title {
+  color: var(--ember);
+  text-shadow:
+    0 1px 0 #ffffff60,
+    0 2px 1px #00000020;
+}
+
+.lands-gameover-rule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  color: var(--gilt);
+  font-size: 1rem;
+  margin: 0.9rem 0 1rem;
+}
+.lands-gameover-rule::before,
+.lands-gameover-rule::after {
+  content: "";
+  display: block;
+  width: 6rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--rule), transparent);
+}
+
+.lands-gameover-reason {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  color: var(--ink-mid);
+  font-size: 1.1rem;
+  margin: 0 0 0.4rem;
+  line-height: 1.4;
+}
+.lands-gameover-reason strong {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* "Specimen plate" — bordered band with the winner's in-play composition. */
+.lands-gameover-plate {
+  margin: 1.6rem 0 1.2rem;
+  padding: 1rem 0.8rem 0.9rem;
+  background: #fbf3dc70;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.lands-gameover-plate-label {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  margin-bottom: 0.9rem;
+}
+.lands-gameover-cards {
+  display: flex;
+  gap: 0.9rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  min-height: 6.5rem;
+}
+.lands-gameover-stack {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+.lands-gameover-stack-card {
+  position: relative;
+}
+
+.lands-gameover-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.4rem;
+}
+.lands-gameover-actions button {
+  min-width: 220px;
+  font-size: 1rem !important;
+  padding: 0.75rem 2rem !important;
+  letter-spacing: 0.14em !important;
+}
+
+/* Discard peek modal */
+.lands-peek-modal { max-width: 880px; }
+.lands-peek-count {
+  color: var(--ink-soft);
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.lands-peek-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  gap: 0.6rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.7rem;
+  background: #fbf3dc70;
+  border: 1px solid var(--rule);
+}
+
+.lands-hint {
+  color: var(--ink-mid);
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  margin: 0.4rem 0 0.7rem;
+  text-align: center;
+}
+
+/* Island scry */
+.lands-scry-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem;
+}
+.lands-scry-keep,
+.lands-scry-discard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+}
+.lands-scry-controls {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+.lands-scry-controls button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  min-width: 0;
+  letter-spacing: 0.04em;
+}

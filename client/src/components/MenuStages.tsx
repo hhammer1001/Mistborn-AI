@@ -2,6 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { BOT_TYPES, BOT_TYPE_LABELS, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
 import type { BotSetupConfig, FirstPlayerChoice } from "../hooks/useMinistryPrefs";
 import type { Room } from "../hooks/useLobby";
+import type { LandsBotKind } from "../lands/hooks/useLandsGame";
+
+const LANDS_BOT_OPTIONS: { value: LandsBotKind; label: string; blurb: string }[] = [
+  { value: "random", label: "The Box", blurb: "A box that makes a legal decision at random." },
+  { value: "flowchart", label: "The Cartographer", blurb: "Follows a fixed flowchart: early Plains/Swamp, then fills the rainbow." },
+];
 
 const FIRST_PLAYER_OPTIONS: { value: FirstPlayerChoice; label: string }[] = [
   { value: "you", label: "You" },
@@ -17,9 +23,10 @@ interface MainMenuProps {
   onPickOnline: () => void;
   onPickCards: () => void;
   onPickLog: () => void;
+  onPickLands?: () => void;
 }
 
-export function MainMenuView({ onPickBot, onPickOnline, onPickCards, onPickLog }: MainMenuProps) {
+export function MainMenuView({ onPickBot, onPickOnline, onPickCards, onPickLog, onPickLands }: MainMenuProps) {
   return (
     <div className="ms-stage-view">
       <div className="ms-play-panel">
@@ -27,6 +34,7 @@ export function MainMenuView({ onPickBot, onPickOnline, onPickCards, onPickLog }
         <button onClick={onPickOnline}>Play Online</button>
         <button onClick={onPickCards}>View Card Gallery</button>
         <button onClick={onPickLog}>See Full Ministry Log</button>
+        {onPickLands && <button onClick={onPickLands}>Lands</button>}
       </div>
     </div>
   );
@@ -119,6 +127,60 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
             <span>Test deck</span>
           </label>
           <button className="start-btn" onClick={() => onStartCustom(draft)}>Start Match</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Lands setup (easter-egg replacement for BotSetupView) ──
+// Stripped-down: just a first-player picker and Start. The opponent is always
+// a random-decisions bot ("the Box").
+
+interface LandsBotSetupProps {
+  defaultFirstPlayer: FirstPlayerChoice;
+  onBack: () => void;
+  onStart: (firstPlayer: FirstPlayerChoice, botKind: LandsBotKind) => void;
+}
+
+export function LandsBotSetupView({ defaultFirstPlayer, onBack, onStart }: LandsBotSetupProps) {
+  const [firstPlayer, setFirstPlayer] = useState<FirstPlayerChoice>(defaultFirstPlayer);
+  const [botKind, setBotKind] = useState<LandsBotKind>("flowchart");
+  const selected = LANDS_BOT_OPTIONS.find((b) => b.value === botKind) ?? LANDS_BOT_OPTIONS[0];
+  return (
+    <div className="ms-stage-view">
+      <div className="ms-setup-card">
+        <div className="ms-setup-header">
+          <button className="ms-back-link" onClick={onBack}>← Back</button>
+          <div className="ms-setup-title">Play vs {selected.label}</div>
+        </div>
+
+        <div className="ms-qp-preview">{selected.blurb}</div>
+
+        <div className="ms-or-row"><span>setup</span></div>
+
+        <div className="ms-setup-form">
+          <label>Opponent
+            <select
+              value={botKind}
+              onChange={(e) => setBotKind(e.target.value as LandsBotKind)}
+            >
+              {LANDS_BOT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>Who goes first
+            <select
+              value={firstPlayer}
+              onChange={(e) => setFirstPlayer(e.target.value as FirstPlayerChoice)}
+            >
+              {FIRST_PLAYER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+          <button className="start-btn" onClick={() => onStart(firstPlayer, botKind)}>Start Match</button>
         </div>
       </div>
     </div>

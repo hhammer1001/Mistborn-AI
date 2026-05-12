@@ -102,6 +102,64 @@ const _schema = i.schema({
       finalDeck: i.any(),
       eliminatedCounts: i.any().optional(),
     }),
+    // ── Lands (side-project) multiplayer ──
+    // Mirrors `rooms`/`games` shape but kept separate so the two games can
+    // evolve independently. Fewer fields — Lands has no characters, missions,
+    // or per-player prompts.
+    landsRooms: i.entity({
+      code: i.string().unique().indexed().optional(),
+      createdAt: i.number().optional(),
+      firstPlayer: i.string().optional(), // "random" | "host" | "guest"
+      guestId: i.string().optional(),
+      guestName: i.string().optional(),
+      guestReady: i.boolean().optional(),
+      hostId: i.string().indexed().optional(),
+      hostName: i.string().optional(),
+      hostReady: i.boolean().optional(),
+      sessionId: i.any().optional(),
+      status: i.string().indexed().optional(),
+    }),
+    landsGames: i.entity({
+      roomId: i.any().optional(),
+      p0Id: i.string().optional(),
+      p1Id: i.string().optional(),
+      /** Public state shipped to player 0 (their hand visible; opponent hand redacted). */
+      p0State: i.any().optional(),
+      /** Public state shipped to player 1 (mirror). */
+      p1State: i.any().optional(),
+      /** Guest's pending action request, processed by host then cleared. */
+      pendingAction: i.any().optional(),
+      phase: i.string().optional(),
+      activePlayer: i.number().optional(),
+      turnCount: i.number().optional(),
+      winner: i.number().optional(),
+      winReason: i.string().optional(),
+      stateVersion: i.number().optional(),
+      updatedAt: i.number().optional(),
+    }),
+    landsMatches: i.entity({
+      kind: i.string().indexed().optional(),
+      botKind: i.string().optional(),
+      createdAt: i.number().indexed().optional(),
+      endedAt: i.number().optional(),
+      durationMs: i.number().optional(),
+      turnCount: i.number().optional(),
+      firstPlayerIndex: i.number().optional(),
+      winnerIndex: i.number().optional(),
+      winReason: i.string().optional(),
+    }),
+    landsMatchPlayers: i.entity({
+      matchId: i.string().indexed().optional(),
+      playerIndex: i.number().optional(),
+      profileId: i.string().indexed().optional(),
+      userId: i.string().indexed().optional(),
+      name: i.string().optional(),
+      isBot: i.boolean().optional(),
+      finalInPlayByType: i.any().optional(),
+      finalHandSize: i.number().optional(),
+      finalDeckSize: i.number().optional(),
+      finalDiscardSize: i.number().optional(),
+    }),
   },
   links: {
     $streams$files: {

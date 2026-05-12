@@ -4,7 +4,9 @@ import { AuthModal } from "./AuthModal";
 import { MetalSigilPicker } from "./MetalSigilPicker";
 import { SettingsPopover } from "./SettingsPopover";
 import { FeedbackModal } from "./FeedbackModal";
-import { MainMenuView, BotSetupView, OnlineSetupView } from "./MenuStages";
+import { MainMenuView, BotSetupView, OnlineSetupView, LandsBotSetupView } from "./MenuStages";
+import type { FirstPlayerChoice } from "../hooks/useMinistryPrefs";
+import type { LandsBotKind } from "../lands/hooks/useLandsGame";
 import { PWAUpdatePrompt } from "./PWAUpdatePrompt";
 import { useMinistryPrefs, type BotSetupConfig } from "../hooks/useMinistryPrefs";
 import { useMatchHistory } from "../hooks/useMatchHistory";
@@ -28,6 +30,14 @@ interface Props {
   onStartBot: (cfg: BotSetupConfig, displayName: string) => void;
   onViewCards: () => void;
   onViewMinistryLog: () => void;
+  onViewLands?: () => void;
+  /** Launch the Lands game directly with a chosen first player and opponent
+   *  bot (skips the Lands game's own start screen). Used when the easter-egg
+   *  toggle has swapped "Play vs Bot" for the Lands setup. */
+  onStartLandsBot?: (firstPlayer: FirstPlayerChoice, botKind: LandsBotKind) => void;
+  /** When BLG is enabled, "Play Online" routes to the Lands lobby instead of
+   *  the Mistborn online setup. */
+  onPickLandsOnline?: () => void;
   // Lobby actions
   room: Room | null;
   onCreateRoom: () => void | Promise<void>;
@@ -49,6 +59,9 @@ export function MenuShell({
   onStartBot,
   onViewCards,
   onViewMinistryLog,
+  onViewLands,
+  onStartLandsBot,
+  onPickLandsOnline,
   room,
   onCreateRoom,
   onJoinRoom,
@@ -116,6 +129,8 @@ export function MenuShell({
           setSettingsAnchor("#" + anchor);
           setSettingsOpen((v) => !v);
         }}
+        landsUnlocked={prefs.landsUnlocked}
+        onToggleLandsUnlocked={() => prefs.setLandsUnlocked(!prefs.landsUnlocked)}
       />
 
       <main className="ms-stage">
@@ -128,18 +143,40 @@ export function MenuShell({
           <MainMenuView
             isAuthed={isAuthed}
             onPickBot={() => setView("bot")}
-            onPickOnline={handleOnlineEntry}
+            onPickOnline={
+              prefs.landsEnabled && onPickLandsOnline
+                ? onPickLandsOnline
+                : handleOnlineEntry
+            }
             onPickCards={onViewCards}
             onPickLog={onViewMinistryLog}
+            // Lands shortcut button — only surfaces when the stamp is
+            // unlocked (glowing) AND the BLG setting is active. Toggling the
+            // stamp off auto-disables the setting (in useMinistryPrefs).
+            onPickLands={
+              prefs.landsUnlocked && prefs.landsEnabled ? onViewLands : undefined
+            }
           />
         )}
         {view === "bot" && (
-          <BotSetupView
-            config={prefs.botConfig}
-            onBack={() => setView("menu")}
-            onQuickPlay={quickPlay}
-            onStartCustom={startCustom}
-          />
+          prefs.landsEnabled && onStartLandsBot ? (
+            <LandsBotSetupView
+              defaultFirstPlayer={prefs.botConfig.firstPlayer}
+              onBack={() => setView("menu")}
+              onStart={(fp, bk) => {
+                // Reuse the same prefs slot for first-player so it persists.
+                prefs.setBotConfig({ ...prefs.botConfig, firstPlayer: fp });
+                onStartLandsBot(fp, bk);
+              }}
+            />
+          ) : (
+            <BotSetupView
+              config={prefs.botConfig}
+              onBack={() => setView("menu")}
+              onQuickPlay={quickPlay}
+              onStartCustom={startCustom}
+            />
+          )
         )}
         {view === "online" && (
           <OnlineSetupView
@@ -176,6 +213,9 @@ export function MenuShell({
         filter={prefs.filter}
         onFilterChange={prefs.setFilter}
         onClose={() => setSettingsOpen(false)}
+        landsUnlocked={prefs.landsUnlocked}
+        landsEnabled={prefs.landsEnabled}
+        onLandsEnabledChange={prefs.setLandsEnabled}
       />
 
       <AuthModal

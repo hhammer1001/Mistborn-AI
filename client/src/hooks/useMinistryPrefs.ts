@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { BOT_TYPES, VICTORY_TYPES, type BotType, type VictoryType } from "../data/ministrySigils";
 
-const KEY_SIGIL    = "ministry.sigil";
-const KEY_FLARED   = "ministry.flared";
-const KEY_FILTER   = "ministry.filter";
-const KEY_BOT_CFG  = "mistborn.botConfig";
+const KEY_SIGIL          = "ministry.sigil";
+const KEY_FLARED         = "ministry.flared";
+const KEY_FILTER         = "ministry.filter";
+const KEY_BOT_CFG        = "mistborn.botConfig";
+const KEY_LANDS_UNLOCKED = "mistborn.landsUnlocked";
+const KEY_LANDS_ENABLED  = "mistborn.landsEnabled";
 
 export type FirstPlayerChoice = "you" | "bot" | "random";
 
@@ -71,6 +73,12 @@ export function useMinistryPrefs() {
   const [filter, setFilterState] = useState<LogFilter>(() =>
     readJSON<LogFilter>(KEY_FILTER, DEFAULT_FILTER),
   );
+  const [landsUnlocked, setLandsUnlockedState] = useState<boolean>(
+    () => localStorage.getItem(KEY_LANDS_UNLOCKED) === "true",
+  );
+  const [landsEnabled, setLandsEnabledState] = useState<boolean>(
+    () => localStorage.getItem(KEY_LANDS_ENABLED) === "true",
+  );
 
   const setSigil = useCallback((k: string) => {
     setSigilState(k);
@@ -92,6 +100,22 @@ export function useMinistryPrefs() {
     localStorage.setItem(KEY_FILTER, JSON.stringify(f));
   }, []);
 
+  const setLandsUnlocked = useCallback((b: boolean) => {
+    setLandsUnlockedState(b);
+    localStorage.setItem(KEY_LANDS_UNLOCKED, String(b));
+    // Locking the easter egg also disables the swap, so the menu doesn't
+    // mysteriously stay swapped after the user re-hides the flag.
+    if (!b) {
+      setLandsEnabledState(false);
+      localStorage.setItem(KEY_LANDS_ENABLED, "false");
+    }
+  }, []);
+
+  const setLandsEnabled = useCallback((b: boolean) => {
+    setLandsEnabledState(b);
+    localStorage.setItem(KEY_LANDS_ENABLED, String(b));
+  }, []);
+
   // React to storage events so other tabs stay in sync.
   useEffect(() => {
     const onStorage = (ev: StorageEvent) => {
@@ -99,6 +123,8 @@ export function useMinistryPrefs() {
       if (ev.key === KEY_FLARED)                setFlaredState(ev.newValue === "true");
       if (ev.key === KEY_BOT_CFG && ev.newValue) setBotConfigState(migrateBotConfig(readJSON<BotSetupConfig>(KEY_BOT_CFG, DEFAULT_BOT_CONFIG)));
       if (ev.key === KEY_FILTER && ev.newValue)  setFilterState(readJSON<LogFilter>(KEY_FILTER, DEFAULT_FILTER));
+      if (ev.key === KEY_LANDS_UNLOCKED) setLandsUnlockedState(ev.newValue === "true");
+      if (ev.key === KEY_LANDS_ENABLED)  setLandsEnabledState(ev.newValue === "true");
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -109,5 +135,7 @@ export function useMinistryPrefs() {
     flared, setFlared,
     botConfig, setBotConfig,
     filter, setFilter,
+    landsUnlocked, setLandsUnlocked,
+    landsEnabled, setLandsEnabled,
   };
 }

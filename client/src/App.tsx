@@ -26,11 +26,25 @@ import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 import { GameOverScreen } from "./components/GameOverScreen";
 import { RankingPanel } from "./components/RankingPanel";
+import { LandsGame, Board as LandsBoard, type BoardGameApi as LandsBoardApi } from "./lands/components/LandsGame";
+import { LandsLobby } from "./lands/components/LandsLobby";
+import { useLandsLobby } from "./lands/hooks/useLandsLobby";
+import { useLandsMultiplayerGame } from "./lands/hooks/useLandsMultiplayerGame";
+import { LandsSession } from "./lands/engine/session";
+import type { LandsBotKind } from "./lands/hooks/useLandsGame";
 import { CHARACTERS } from "./data/ministrySigils";
 import type { BotSetupConfig } from "./hooks/useMinistryPrefs";
 import type { GameState } from "./types/game";
 
-type AppMode = "menu" | "gallery" | "bot_game" | "lobby" | "mp_game";
+type AppMode =
+  | "menu"
+  | "gallery"
+  | "bot_game"
+  | "lobby"
+  | "mp_game"
+  | "lands"
+  | "lands_lobby"
+  | "lands_mp_game";
 
 function pickRandomChar(): string {
   return CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
@@ -48,11 +62,21 @@ function resolveChar(c: string, avoid?: string): string {
 function App() {
   const [mode, setMode] = useState<AppMode>("menu");
   const [mpSessionId, setMpSessionId] = useState<string | null>(null);
+  /** When set, LandsGame skips its start screen and runs the configured match
+   *  immediately. Used by the easter-egg "Play vs The Box / Cartographer" flow. */
+  const [landsAutoStart, setLandsAutoStart] = useState<
+    { humanFirst: boolean; botKind: LandsBotKind } | null
+  >(null);
+  /** Lands multiplayer session id — set when a match is created and the room
+   *  transitions to "in_game". */
+  const [landsMpSessionId, setLandsMpSessionId] = useState<string | null>(null);
 
   const botGame = useGame();
   const auth    = useAuth();
   const lobby   = useLobby(auth.user?.id, auth.profile?.name);
   const mpGame  = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
+  const landsLobby = useLandsLobby(auth.user?.id, auth.profile?.name);
+  const landsMpGame = useLandsMultiplayerGame(landsMpSessionId, auth.user?.id ?? null);
 
   // Waiting rooms live inside the menu shell (OnlineSetupView shows the code).
   // Only promote to the dedicated Lobby view once a guest joins and we hit character select.
@@ -70,6 +94,73 @@ function App() {
       }
     }
   }, [mode, lobby.room?.status, lobby.room?.sessionId, mpSessionId]);
+
+  // Lands lobby transitions:
+  //   - Room dissolves (host left) → bounce back to menu.
+  //   - Status becomes "in_game" → promote to lands_mp_game with the session id.
+  useEffect(() => {
+    if (mode !== "lands_lobby") return;
+    if (!landsLobby.room) return; // room not yet created — stay in lobby entry
+    if (landsLobby.room.status === "in_game" && landsLobby.room.sessionId) {
+      if (landsMpSessionId !== landsLobby.room.sessionId) {
+        setLandsMpSessionId(landsLobby.room.sessionId);
+        setMode("lands_mp_game");
+      }
+    }
+  }, [mode, landsLobby.room?.status, landsLobby.room?.sessionId, landsMpSessionId, landsLobby.room]);
+
+  /** Host clicks "Start Match" in the Lands lobby: build a LandsSession,
+   *  write the initial payload + ids to landsGames, mark the room in_game.
+   *  Guests just observe the transition. */
+  const handleStartLandsMatch = async () => {
+    const room = landsLobby.room;
+    if (!room || !auth.user || landsLobby.myRole !== "host") return;
+    try {
+      const choice = room.firstPlayer ?? "random";
+      const firstPlayer: 0 | 1 =
+        choice === "host" ? 0
+        : choice === "guest" ? 1
+        : Math.random() < 0.5 ? 0 : 1;
+
+      const session = new LandsSession({
+        playerNames: [room.hostName, room.guestName],
+        firstPlayer,
+      });
+
+      // CRITICAL: pin the session into the hook BEFORE any DB writes. The
+      // room-status update below triggers the lobby's auto-transition
+      // useEffect, which switches mode to lands_mp_game. The MP hook's
+      // session-subscribe useEffect then runs — if sessionRef.current isn't
+      // set yet, it skips silently and the host never gets a listener
+      // installed (UI stays frozen on initial state, clicks appear no-op).
+      landsMpGame.sessionRef.current = session;
+
+      const gameId = instantId();
+      const payload = session.getDbPayload(0);
+      await db.transact(
+        db.tx.landsGames[gameId].update({
+          ...payload,
+          roomId: room.id,
+          p0Id: room.hostId,
+          p1Id: room.guestId,
+          pendingAction: null,
+        }),
+      );
+      await db.transact(
+        db.tx.landsRooms[room.id].update({
+          status: "in_game",
+          sessionId: gameId,
+        }),
+      );
+
+      // sessionRef was pinned earlier (before the DB writes) — see comment
+      // above. Here we just complete the transition.
+      setLandsMpSessionId(gameId);
+      setMode("lands_mp_game");
+    } catch (e) {
+      console.error("Failed to start Lands match:", e);
+    }
+  };
 
   const startBot = (cfg: BotSetupConfig, displayName: string) => {
     const myChar  = resolveChar(cfg.myChar);
@@ -139,6 +230,99 @@ function App() {
     return <CardGallery onBack={() => setMode("menu")} />;
   }
 
+  // ── Lands lobby (PvP setup) ──
+  if (mode === "lands_lobby") {
+    return (
+      <LandsLobby
+        room={landsLobby.room}
+        myRole={landsLobby.myRole}
+        error={landsLobby.error}
+        isLoading={landsLobby.isLoading}
+        isAuthed={!!auth.user}
+        onCreateRoom={landsLobby.createRoom}
+        onJoinRoom={landsLobby.joinRoom}
+        onSetFirstPlayer={landsLobby.setFirstPlayer}
+        onLeave={() => landsLobby.leaveRoom()}
+        onStart={handleStartLandsMatch}
+        onBack={() => {
+          void landsLobby.leaveRoom();
+          setMode("menu");
+        }}
+        onOpenAuth={() => {
+          // Punt to the menu, where the existing auth modal lives.
+          setMode("menu");
+        }}
+      />
+    );
+  }
+
+  // ── Lands multiplayer game ──
+  if (mode === "lands_mp_game") {
+    const exitToMenu = () => {
+      setLandsMpSessionId(null);
+      // Leaving the in-progress room — clean up.
+      void landsLobby.leaveRoom();
+      setMode("menu");
+    };
+    if (!landsMpGame.state || landsMpGame.myPlayerIndex === null) {
+      return (
+        <div className="lands-root">
+          <div className="lands-empty-msg" style={{ margin: "auto" }}>
+            Connecting…
+          </div>
+        </div>
+      );
+    }
+    const api: LandsBoardApi = {
+      state: landsMpGame.state,
+      humanSeat: landsMpGame.myPlayerIndex,
+      playCard: landsMpGame.playCard,
+      passMain: landsMpGame.passMain,
+      declineCounter: landsMpGame.declineCounter,
+      counter: landsMpGame.counter,
+      resolveMountain: landsMpGame.resolveMountain,
+      resolveSwamp: landsMpGame.resolveSwamp,
+      resolveForest: landsMpGame.resolveForest,
+      resolveIsland: landsMpGame.resolveIsland,
+    };
+    return <LandsBoard game={api} onExit={exitToMenu} />;
+  }
+
+  // ── Lands (side project) ──
+  if (mode === "lands") {
+    const playerName =
+      auth.profile?.name ?? auth.user?.email?.split("@")[0] ?? "Player";
+    const humanIdentity = {
+      profileId: auth.profile?.id ?? "",
+      userId: auth.user?.id ?? "",
+      name: playerName,
+    };
+    return (
+      <LandsGame
+        onExit={() => {
+          setLandsAutoStart(null);
+          setMode("menu");
+        }}
+        playerName={playerName}
+        humanIdentity={humanIdentity}
+        autoStart={
+          landsAutoStart
+            ? {
+                humanFirst: landsAutoStart.humanFirst,
+                botKind: landsAutoStart.botKind,
+                opponentName:
+                  landsAutoStart.botKind === "flowchart"
+                    ? "The Cartographer"
+                    : landsAutoStart.botKind === "heuristic"
+                      ? "The Heuristic"
+                      : "The Box",
+              }
+            : undefined
+        }
+      />
+    );
+  }
+
   // ── Bot game ──
   if (mode === "bot_game") {
     return (
@@ -201,6 +385,19 @@ function App() {
       onStartBot={startBot}
       onViewCards={() => setMode("gallery")}
       onViewMinistryLog={() => { /* not implemented yet */ }}
+      onViewLands={() => {
+        setLandsAutoStart(null);
+        setMode("lands");
+      }}
+      onStartLandsBot={(fp, botKind) => {
+        const humanFirst =
+          fp === "you" ? true :
+          fp === "bot" ? false :
+          Math.random() < 0.5;
+        setLandsAutoStart({ humanFirst, botKind });
+        setMode("lands");
+      }}
+      onPickLandsOnline={() => setMode("lands_lobby")}
       room={lobby.room}
       onCreateRoom={lobby.createRoom}
       onJoinRoom={lobby.joinRoom}

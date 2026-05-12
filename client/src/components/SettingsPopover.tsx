@@ -8,9 +8,22 @@ interface Props {
   filter: LogFilter;
   onFilterChange: (f: LogFilter) => void;
   onClose: () => void;
+  // Hidden "Lands" toggle — only renders when the easter-egg flag is set.
+  landsUnlocked?: boolean;
+  landsEnabled?: boolean;
+  onLandsEnabledChange?: (b: boolean) => void;
 }
 
-export function SettingsPopover({ open, anchorSelector, filter, onFilterChange, onClose }: Props) {
+export function SettingsPopover({
+  open,
+  anchorSelector,
+  filter,
+  onFilterChange,
+  onClose,
+  landsUnlocked,
+  landsEnabled,
+  onLandsEnabledChange,
+}: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,6 +119,21 @@ export function SettingsPopover({ open, anchorSelector, filter, onFilterChange, 
           ))}
         </div>
       </div>
+
+      {landsUnlocked && onLandsEnabledChange && (
+        <div className="section">
+          <div className="ms-checks">
+            <label className="ms-check-item">
+              <input
+                type="checkbox"
+                checked={!!landsEnabled}
+                onChange={(e) => onLandsEnabledChange(e.target.checked)}
+              />
+              <span>BLG</span>
+            </label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

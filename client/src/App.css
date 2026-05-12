@@ -4105,6 +4105,33 @@ h3 {
   mix-blend-mode: screen;
   filter: brightness(1.08) contrast(1.1);
   flex-shrink: 0;
+  cursor: pointer;
+  outline: none;
+  transition: filter 240ms ease;
+}
+/* Contour-following glow: drop-shadow uses the PNG's alpha, so the red halo
+   traces the symbol's silhouette rather than the bounding box. Stacking three
+   shadows of increasing blur gives a smooth falloff. */
+.ms-sidebar-title .stamp:hover,
+.ms-sidebar-title .stamp.is-active {
+  filter:
+    brightness(1.1) contrast(1.12)
+    drop-shadow(0 0 3px #ff2a2a)
+    drop-shadow(0 0 8px #ff1818)
+    drop-shadow(0 0 16px #ff404088);
+}
+.ms-sidebar-title .stamp.is-active:hover {
+  filter:
+    brightness(1.14) contrast(1.14)
+    drop-shadow(0 0 4px #ff3030)
+    drop-shadow(0 0 12px #ff1010)
+    drop-shadow(0 0 22px #ff5050aa);
+}
+.ms-sidebar-title .stamp:focus-visible {
+  filter:
+    brightness(1.1) contrast(1.12)
+    drop-shadow(0 0 3px #ff2a2a)
+    drop-shadow(0 0 10px #ff181888);
 }
 
 /* Identity */

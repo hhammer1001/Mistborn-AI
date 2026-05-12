@@ -96,6 +96,65 @@ const schema = i.schema({
       // Enables queries like "matches where Yeden was in the deck".
       finalDeck: i.any(),                  // Record<string, number>
     }),
+    // ── Lands (side project) multiplayer ───────────────────────────────
+    // Mirrors `rooms`/`games` shape but kept separate so the two games can
+    // evolve independently. No characters, missions, or per-player prompts.
+    landsRooms: i.entity({
+      code: i.string().unique().indexed(),
+      status: i.string().indexed(),   // "waiting" | "ready_check" | "in_game" | "finished"
+      hostId: i.string().indexed(),
+      hostName: i.string(),
+      hostReady: i.boolean(),
+      guestId: i.string(),
+      guestName: i.string(),
+      guestReady: i.boolean(),
+      sessionId: i.string(),
+      createdAt: i.number(),
+      firstPlayer: i.string(),        // "random" | "host" | "guest"
+    }),
+    landsGames: i.entity({
+      roomId: i.string().indexed(),
+      phase: i.string().indexed(),
+      activePlayer: i.number(),
+      turnCount: i.number(),
+      p0State: i.any(),
+      p1State: i.any(),
+      winner: i.number(),             // 0 | 1 (null while in progress)
+      winReason: i.string(),
+      p0Id: i.string().indexed(),
+      p1Id: i.string().indexed(),
+      updatedAt: i.number(),
+      stateVersion: i.number(),
+      pendingAction: i.any(),         // { type, playerIndex, ...params } or null
+    }),
+    // ── Lands finished-match log ─────────────────────────────────
+    // Parallel to `matches`/`matchPlayers` but Lands-shaped. Per-side data is
+    // small (just final composition / pile sizes) so the schema stays tight.
+    landsMatches: i.entity({
+      kind: i.string().indexed(),       // "lands_mp" | "lands_bot"
+      botKind: i.string(),              // "" for mp, else "heuristic" | "flowchart" | "random"
+      createdAt: i.number().indexed(),
+      endedAt: i.number(),
+      durationMs: i.number(),
+      turnCount: i.number(),
+      firstPlayerIndex: i.number(),
+      winnerIndex: i.number(),
+      winReason: i.string(),
+    }),
+    landsMatchPlayers: i.entity({
+      matchId: i.string().indexed(),
+      playerIndex: i.number(),
+      profileId: i.string().indexed(),
+      userId: i.string().indexed(),
+      name: i.string(),
+      isBot: i.boolean(),
+      // 5-tuple of final in-play counts, in LAND_TYPES order
+      //   (plains, island, swamp, mountain, forest).
+      finalInPlayByType: i.any(),
+      finalHandSize: i.number(),
+      finalDeckSize: i.number(),
+      finalDiscardSize: i.number(),
+    }),
   },
 });
 
