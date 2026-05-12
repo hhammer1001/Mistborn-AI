@@ -7,7 +7,7 @@ import {
   type PlayerState,
 } from "./types";
 
-const INITIAL_HAND_SIZE = 20;
+const INITIAL_HAND_SIZE = 3;
 const COPIES_PER_TYPE = 5;
 
 export interface SessionConfig {
