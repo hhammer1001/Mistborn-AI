@@ -125,6 +125,9 @@ function App() {
       const session = new LandsSession({
         playerNames: [room.hostName, room.guestName],
         firstPlayer,
+        // MP: always open the counter window when the opponent has ≥2 cards
+        // so the active player can't free-read whether a counter is held.
+        bluffMode: true,
       });
 
       // CRITICAL: pin the session into the hook BEFORE any DB writes. The
@@ -284,6 +287,7 @@ function App() {
       resolveSwamp: landsMpGame.resolveSwamp,
       resolveForest: landsMpGame.resolveForest,
       resolveIsland: landsMpGame.resolveIsland,
+      setBluffMode: landsMpGame.setBluffMode,
     };
     return <LandsBoard game={api} onExit={exitToMenu} />;
   }

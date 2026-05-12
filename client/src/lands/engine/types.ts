@@ -84,5 +84,12 @@ export interface GameState {
   winner: 0 | 1 | null;
   /** Why the game ended, for the game-over screen. */
   winReason: string | null;
+  /**
+   * The viewer's own bluff-mode setting. Each player has their own — the
+   * opponent's value is never shipped in the perspective-filtered snapshot,
+   * so neither side can free-read whether the other has bluff enabled.
+   * Toggleable via setBluffMode().
+   */
+  bluffMode: boolean;
   log: LogEntry[];
 }

@@ -19,6 +19,9 @@ export interface BoardGameApi {
   resolveSwamp: (targetId: number) => void;
   resolveForest: (cardId: number) => void;
   resolveIsland: (discardIds: number[], keepOrderIds: number[]) => void;
+  /** Optional — when provided, the Board renders a bluff-mode toggle. SP
+   *  omits this since the bot can't bluff. */
+  setBluffMode?: (on: boolean) => void;
 }
 
 interface Props {
@@ -248,6 +251,22 @@ export function Board({
               >
                 Pass
               </button>
+              {/* MP-only: toggle bluff mode (counter window pops up whenever
+                  opponent has ≥2 cards, even if they can't actually counter,
+                  so the active player can't free-read counter availability). */}
+              {game.setBluffMode && (
+                <button
+                  className={`lands-secondary lands-pass-btn lands-bluff-toggle${state.bluffMode ? " lands-bluff-on" : ""}`}
+                  onClick={() => game.setBluffMode!(!state.bluffMode)}
+                  title={
+                    state.bluffMode
+                      ? "Bluff mode is on — counter window opens whenever you have ≥2 cards."
+                      : "Bluff mode is off — counter window only opens when you can actually counter."
+                  }
+                >
+                  Bluff: {state.bluffMode ? "On" : "Off"}
+                </button>
+              )}
               <button className="lands-secondary lands-pass-btn" onClick={onExit}>
                 Main Menu
               </button>
@@ -753,8 +772,20 @@ function CounterOverlay({
       ? `${opp.name}'s ${pending.target ? cap(pending.target.type) : ""}`
       : `${cap(pending.target?.type ?? "")} from discard`;
 
+  // In MP, the engine opens the counter window whenever the opponent has
+  // ≥2 cards in hand (even when they can't actually counter), so the active
+  // player can't free-read counter availability. When the player here can't
+  // counter, render a stripped "bluff" variant with only Pass — visually the
+  // same as the real counter window, so the bluff stays hidden.
   return (
-    <ModalShell title={`${opp.name} plays ${playedType} — counter?`} onMinimize={onMinimize}>
+    <ModalShell
+      title={
+        canCounter
+          ? `${opp.name} plays ${playedType} — counter?`
+          : `${opp.name} plays ${playedType}`
+      }
+      onMinimize={onMinimize}
+    >
       <div className="lands-counter-visual">
         <div className="lands-counter-frame">
           <LandCard card={pending.card} size="md" />
@@ -773,25 +804,29 @@ function CounterOverlay({
           </>
         )}
       </div>
-      <p className="lands-hint">
-        Counter costs an Island and a matching {playedType} from your hand.
-      </p>
-      {!canCounter && (
-        <p className="lands-hint">You don't have both — countering isn't possible.</p>
+      {canCounter && (
+        <p className="lands-hint">
+          Counter costs an Island and a matching {playedType} from your hand.
+        </p>
       )}
       <div className="lands-modal-actions">
-        <button className="lands-secondary" onClick={() => game.declineCounter()}>
-          Don't counter
-        </button>
-        <button
-          disabled={!canCounter}
-          onClick={() => {
-            const pair = options[0];
-            game.counter(pair.island.id, pair.match.id);
-          }}
-        >
-          Counter
-        </button>
+        {canCounter ? (
+          <>
+            <button className="lands-secondary" onClick={() => game.declineCounter()}>
+              Don't counter
+            </button>
+            <button
+              onClick={() => {
+                const pair = options[0];
+                game.counter(pair.island.id, pair.match.id);
+              }}
+            >
+              Counter
+            </button>
+          </>
+        ) : (
+          <button onClick={() => game.declineCounter()}>Pass</button>
+        )}
       </div>
     </ModalShell>
   );

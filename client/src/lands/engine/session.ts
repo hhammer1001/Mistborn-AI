@@ -16,6 +16,14 @@ export interface SessionConfig {
   firstPlayer?: 0 | 1;
   /** Optional seed for deterministic shuffling (defaults to Math.random). */
   rng?: () => number;
+  /**
+   * When true, the counter window opens whenever the non-active player has
+   * ≥2 cards in hand — even if they can't actually counter. This preserves
+   * bluff potential in PvP (the opponent never gets free information about
+   * whether you held an Island + matching land). Off by default; only the
+   * MP path turns it on, since bots wouldn't bluff anyway.
+   */
+  bluffMode?: boolean;
 }
 
 /** Public listener interface — UI subscribes once and re-renders on each emit. */
@@ -26,9 +34,16 @@ export class LandsSession {
   private listeners = new Set<Listener>();
   private rng: () => number;
   private nextCardId = 1;
+  /** Per-seat bluff-mode flags. Held privately on the session so they can be
+   *  redacted per-perspective in snapshotFor — each player only sees their
+   *  own setting in the snapshot they render. */
+  private playerBluffMode: [boolean, boolean];
 
   constructor(cfg: SessionConfig) {
     this.rng = cfg.rng ?? Math.random;
+    // Both seats start at the config default. SP doesn't pass this (so it
+    // stays off for both — bots can't bluff anyway). MP passes true.
+    this.playerBluffMode = [!!cfg.bluffMode, !!cfg.bluffMode];
     const first = cfg.firstPlayer ?? (this.rng() < 0.5 ? 0 : 1);
     this.state = {
       players: [
@@ -42,6 +57,10 @@ export class LandsSession {
       islandScry: null,
       winner: null,
       winReason: null,
+      // Placeholder — the real value lives in `playerBluffMode` and is
+      // injected per-viewer by snapshotFor. This field is just here to
+      // satisfy the GameState type.
+      bluffMode: false,
       log: [
         { turn: 0, player: null, text: `${cfg.playerNames[first]} goes first.` },
       ],
@@ -101,6 +120,9 @@ export class LandsSession {
     snap.log = snap.log.map((e) =>
       e.ownerText && e.player !== viewer ? { ...e, ownerText: undefined } : e,
     );
+    // The viewer only ever sees their own bluffMode value — the opponent's
+    // setting stays private to the session.
+    snap.bluffMode = this.playerBluffMode[viewer];
     return snap;
   }
 
@@ -633,13 +655,34 @@ export class LandsSession {
     // Currently no win-from-draw condition; intentionally empty.
   }
 
-  // ── Counter-feasibility check ──
+  // ── Counter window: open if the opponent could counter, OR (in bluff mode)
+  //    if they merely *might* be holding a counter — i.e. they have ≥2 cards
+  //    in hand. The two-card threshold matches the minimum cost of a real
+  //    counter (Island + matching land), so anything less is unambiguous and
+  //    the modal would be pure friction.
 
   private opponentCanCounter(): boolean {
     if (!this.state.pending) return false;
     const opp = (this.state.activePlayer === 0 ? 1 : 0) as 0 | 1;
-    return countersAvailable(this.state.players[opp].hand, this.state.pending.card.type)
-      .length > 0;
+    const oppHand = this.state.players[opp].hand;
+    if (
+      countersAvailable(oppHand, this.state.pending.card.type).length > 0
+    ) {
+      return true;
+    }
+    // Bluff: the would-be-counterer's *own* setting controls whether the
+    // window still opens. Their hand size has to be at least 2 (minimum
+    // cost of a real counter pair) for the bluff to be plausible.
+    return this.playerBluffMode[opp] && oppHand.length >= 2;
+  }
+
+  /** Toggle a single seat's bluff-mode setting. The other seat is untouched
+   *  and the change is never logged — bluff state is private to the player
+   *  who set it. */
+  setBluffMode(seat: 0 | 1, on: boolean) {
+    if (this.playerBluffMode[seat] === on) return;
+    this.playerBluffMode[seat] = on;
+    this.emit();
   }
 
   // ── Log helpers ──

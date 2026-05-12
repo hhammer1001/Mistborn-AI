@@ -29,7 +29,8 @@ interface PendingAction {
     | "resolveMountain"
     | "resolveSwamp"
     | "resolveForest"
-    | "resolveIsland";
+    | "resolveIsland"
+    | "setBluffMode";
   playerIndex: 0 | 1;
   /** Parameters keyed by action type — narrowed at process time. */
   cardId?: number;
@@ -38,6 +39,7 @@ interface PendingAction {
   targetId?: number;
   discardIds?: number[];
   topOrderIds?: number[];
+  bluffMode?: boolean;
 }
 
 interface LandsGameRow {
@@ -71,6 +73,7 @@ export interface UseLandsMultiplayerGameApi {
   resolveSwamp: (targetId: number) => void;
   resolveForest: (cardId: number) => void;
   resolveIsland: (discardIds: number[], keepOrderIds: number[]) => void;
+  setBluffMode: (on: boolean) => void;
 }
 
 export function useLandsMultiplayerGame(
@@ -187,6 +190,13 @@ export function useLandsMultiplayerGame(
         case "resolveIsland":
           if (pending.discardIds && pending.topOrderIds) {
             session.resolveIsland(pending.discardIds, pending.topOrderIds);
+          }
+          break;
+        case "setBluffMode":
+          // Always applies to the seat that submitted the action — each
+          // player only toggles their own private bluff state.
+          if (typeof pending.bluffMode === "boolean") {
+            session.setBluffMode(pending.playerIndex, pending.bluffMode);
           }
           break;
       }
@@ -371,6 +381,18 @@ export function useLandsMultiplayerGame(
     [submit],
   );
 
+  const setBluffMode = useCallback(
+    (on: boolean) => {
+      if (myPlayerIndex === null) return;
+      const seat = myPlayerIndex;
+      submit(
+        (s) => s.setBluffMode(seat, on),
+        { type: "setBluffMode", bluffMode: on },
+      );
+    },
+    [submit, myPlayerIndex],
+  );
+
   return {
     state,
     myPlayerIndex,
@@ -386,6 +408,7 @@ export function useLandsMultiplayerGame(
     resolveSwamp,
     resolveForest,
     resolveIsland,
+    setBluffMode,
     sessionRef,
   };
 }
