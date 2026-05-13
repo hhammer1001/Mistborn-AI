@@ -15,7 +15,7 @@ export interface SaveLandsMatchArgs {
   state: GameState;
   kind: "lands_mp" | "lands_bot";
   /** Bot variant for SP matches; empty string for MP. */
-  botKind: "" | "heuristic" | "flowchart" | "random";
+  botKind: "" | "heuristic" | "flowchart" | "planner" | "random";
   /** Timestamp (ms) when the match started — used to compute duration. */
   startedAt: number;
   /** Player-0 and player-1 identity. Use SYSTEM_BOT_PROFILE_ID for the bot side. */
