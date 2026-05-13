@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BOT_TYPES, BOT_TYPE_LABELS, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
+import { BOT_TYPES, BOT_TYPE_LABELS, BOT_TYPE_BLURBS, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
 import type { BotSetupConfig, FirstPlayerChoice } from "../hooks/useMinistryPrefs";
 import type { Room } from "../hooks/useLobby";
 import type { LandsBotKind } from "../lands/hooks/useLandsGame";
@@ -7,6 +7,7 @@ import type { LandsBotKind } from "../lands/hooks/useLandsGame";
 const LANDS_BOT_OPTIONS: { value: LandsBotKind; label: string; blurb: string }[] = [
   { value: "random", label: "The Box", blurb: "A box that makes a legal decision at random." },
   { value: "flowchart", label: "The Cartographer", blurb: "Follows a fixed flowchart: early Plains/Swamp, then fills the rainbow." },
+  { value: "planner", label: "The Strategist", blurb: "Looks two plies ahead and weighs every option against the leaf eval." },
 ];
 
 const FIRST_PLAYER_OPTIONS: { value: FirstPlayerChoice; label: string }[] = [
@@ -84,6 +85,15 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
         <div className="ms-or-row"><span>or customize</span></div>
 
         <div className="ms-setup-form">
+          <label>Bot Strategy
+            <select
+              value={draft.botType}
+              onChange={(e) => setDraft({ ...draft, botType: e.target.value as BotType })}
+            >
+              {BOT_TYPES.map((b) => <option key={b} value={b}>{BOT_TYPE_LABELS[b]}</option>)}
+            </select>
+            <div className="ms-bot-blurb">{BOT_TYPE_BLURBS[draft.botType]}</div>
+          </label>
           <label>Your Character
             <select
               value={draft.myChar}
@@ -100,14 +110,6 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
               {CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
-          <label>Bot Strategy
-            <select
-              value={draft.botType}
-              onChange={(e) => setDraft({ ...draft, botType: e.target.value as BotType })}
-            >
-              {BOT_TYPES.map((b) => <option key={b} value={b}>{BOT_TYPE_LABELS[b]}</option>)}
-            </select>
-          </label>
           <label>Who goes first
             <select
               value={draft.firstPlayer}
@@ -117,14 +119,6 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={draft.testDeck}
-              onChange={(e) => setDraft({ ...draft, testDeck: e.target.checked })}
-            />
-            <span>Test deck</span>
           </label>
           <button className="start-btn" onClick={() => onStartCustom(draft)}>Start Match</button>
         </div>

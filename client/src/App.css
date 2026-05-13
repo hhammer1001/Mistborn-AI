@@ -4648,6 +4648,21 @@ h3 {
   font-weight: 600;
 }
 
+/* Blurb under each bot dropdown — describes the selected strategy. Resets
+   the uppercase label styling that .ms-setup-form label inherits to all its
+   children, so the sentence reads as prose. */
+.ms-bot-blurb {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-top: 6px;
+  text-align: center;
+}
+
 .ms-or-row {
   display: flex;
   align-items: center;

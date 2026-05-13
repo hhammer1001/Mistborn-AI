@@ -38,6 +38,17 @@ export const BOT_TYPE_LABELS: Record<BotType, string> = {
   random:   "Random Bot",
 };
 
+/** Short, colloquial blurb shown next to the bot picker in the setup menu. */
+export const BOT_TYPE_BLURBS: Record<BotType, string> = {
+  hulk:     "Best of both worlds — Hammer Bot when going first, Zoom Bot when going second.",
+  squashV2: "The strongest going-first bot. Thinks a move ahead and pounces when it sees lethal.",
+  zoom:     "Going-second specialist. Wins by spotting angles the opponent overlooked.",
+  squash:   "Scores every move and plays the best one. Solid all-arounder — beats Twonky about three games out of four.",
+  twonky:   "The original Mistborn AI. Follows a hardcoded priority list it learned from playing itself.",
+  synergy:  "Buys cards that pair well with the ones already in its deck. Built around synergy, not raw card value.",
+  random:   "Picks moves at random. Useful for chaos or quick testing.",
+};
+
 export function botLabel(t: string): string {
   return (BOT_TYPE_LABELS as Record<string, string>)[t]
     ?? (t.charAt(0).toUpperCase() + t.slice(1) + " Bot");
