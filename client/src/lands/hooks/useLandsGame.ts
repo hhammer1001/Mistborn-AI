@@ -10,7 +10,7 @@ import {
 
 const BOT_DELAY_MS = 600;
 
-export type LandsBotKind = "heuristic" | "flowchart" | "random";
+export type LandsBotKind = "heuristic" | "flowchart" | "planner" | "random";
 
 export interface StartOpts {
   botKind?: LandsBotKind;
