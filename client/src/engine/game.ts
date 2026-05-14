@@ -154,7 +154,12 @@ export class Game {
       if (ally.defender) return; // Defender blocks direct attack
     }
     opp.takeDamage(player.curDamage);
-    if (!opp.alive) {
+    // Only claim the damage victory if no earlier-in-turn condition already
+    // declared one. The bot can hit mission victory mid-turn (e.g. advances
+    // its 3rd mission to 12) and then deal lethal damage in the same turn;
+    // overwriting the mission win means resolveCloud's "survived → clear D"
+    // path nukes a legitimate non-damage victory.
+    if (!opp.alive && !this.winner) {
       this.victoryType = "D";
       this.winner = player;
     }

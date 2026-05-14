@@ -43,6 +43,72 @@ function isRealBotTurnEntry(e: BotLogEntry): boolean {
   return e.actionType !== "sense_block" && e.actionType !== "cloud_block";
 }
 
+/** Assemble log entries from a session result. Handles three layout concerns
+ *  uniformly so each handler (playAction, assignDamage, resolveCloud, ...)
+ *  doesn't reimplement the same ordering:
+ *
+ *  1. Player-perspective entries with a turn beyond the player's last turn
+ *     (e.g. "Incoming: 2 damage" logged at the bot's turncount) get deferred
+ *     to AFTER the bot's actions — otherwise stable-sort places them above
+ *     the bot's "X's turn" header inside the bot's block.
+ *  2. The bot's turn header is only emitted when the delta contains a real
+ *     bot turn entry (not just a reactive sense_block / cloud_block).
+ *  3. The player's next-turn header is suppressed when the session paused
+ *     mid-bot-turn for a defense interrupt: turncount has incremented to
+ *     the bot's turn but the player isn't really starting their turn yet. */
+function buildTurnEntries(opts: {
+  prevTurn: number;
+  data: SessionResult;
+  playerLogDelta: BotLogEntry[];
+  botLogDelta: BotLogEntry[];
+  pName: string;
+  bName: string;
+  initial?: LogEntry[];
+}): LogEntry[] {
+  const { prevTurn, data, playerLogDelta, botLogDelta, pName, bName, initial = [] } = opts;
+  const newEntries: LogEntry[] = [...initial];
+
+  const newTurnPlayerLogs: LogEntry[] = [];
+  for (const entry of playerLogDelta) {
+    const formatted: LogEntry = {
+      turn: entry.turn,
+      text: `  → ${entry.text}`,
+      card: entry.card,
+      cards: entry.cards,
+      actionType: entry.actionType,
+      metalIndex: entry.metalIndex,
+    };
+    if (entry.turn > prevTurn) newTurnPlayerLogs.push(formatted);
+    else newEntries.push(formatted);
+  }
+
+  if (botLogDelta.length > 0) {
+    const botTurn = botLogDelta[0]?.turn ?? prevTurn + 1;
+    if (botLogDelta.some(isRealBotTurnEntry)) {
+      newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
+    }
+    for (const entry of botLogDelta) {
+      newEntries.push({
+        turn: entry.turn,
+        text: `${bName} — ${entry.text}`,
+        isBot: true,
+        card: entry.card,
+        cards: entry.cards,
+        actionType: entry.actionType,
+        metalIndex: entry.metalIndex,
+      });
+    }
+  }
+
+  const inDefenseInterrupt = data.phase === "cloud_defense" || data.phase === "sense_defense";
+  if ((data.turnCount ?? 0) > prevTurn && !inDefenseInterrupt) {
+    newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
+  }
+
+  newEntries.push(...newTurnPlayerLogs);
+  return newEntries;
+}
+
 /** Strip trailing " (×N)" to get the base text for comparison */
 function baseText(text: string): string {
   return text.replace(/\s*\(×\d+\)$/, "");
@@ -266,35 +332,10 @@ export function useGame() {
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
-        const newEntries: LogEntry[] = [
-          { turn: prevTurn, text: `${pName} — ${desc}` },
-        ];
-
-        const newTurnPlayerLogs: LogEntry[] = [];
-        if (playerLogDelta.length > 0) {
-          for (const entry of playerLogDelta) {
-            if (entry.turn > prevTurn) {
-              newTurnPlayerLogs.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-            } else {
-              newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-            }
-          }
-        }
-
-        if (botLogDelta.length > 0) {
-          const botTurn = botLogDelta[0]?.turn ?? prevTurn + 1;
-          if (botLogDelta.some(isRealBotTurnEntry)) {
-            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          }
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-
-        if ((data.turnCount ?? 0) > prevTurn) {
-          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
-        }
-        newEntries.push(...newTurnPlayerLogs);
+        const newEntries = buildTurnEntries({
+          prevTurn, data, playerLogDelta, botLogDelta, pName, bName,
+          initial: [{ turn: prevTurn, text: `${pName} — ${desc}` }],
+        });
 
         // If the bot actually played, defer the gameState update behind the
         // "opponent's turn" banner so the transition feels like a hand-off.
@@ -369,29 +410,11 @@ export function useGame() {
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
-        const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
-
-        if (playerLogDelta.length > 0) {
-          for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-
-        if (botLogDelta.length > 0) {
-          const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount + 1;
-          if (botLogDelta.some(isRealBotTurnEntry)) {
-            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          }
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-
-        if ((data.turnCount ?? 0) > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
-        }
+        const newEntries = buildTurnEntries({
+          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName,
+        });
 
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
@@ -416,41 +439,25 @@ export function useGame() {
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
-        const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
 
+        const initial: LogEntry[] = [];
         if (targetIndex === -1) {
           const dmg = gameState.players[0].damage;
           if (dmg > 0) {
-            newEntries.push({ turn: gameState.turnCount, text: `${pName} dealt ${dmg} damage to ${bName}` });
+            initial.push({ turn: gameState.turnCount, text: `${pName} dealt ${dmg} damage to ${bName}` });
           }
         } else if (targetIndex === -2) {
           // Skip: explicitly dealt no damage this turn. No log entry needed.
         } else {
           const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
-          newEntries.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
+          initial.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
         }
 
-        if (playerLogDelta.length > 0) {
-          for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-
-        if (botLogDelta.length > 0) {
-          const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount + 1;
-          if (botLogDelta.some(isRealBotTurnEntry)) {
-            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          }
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-
-        if ((data.turnCount ?? 0) > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
-        }
+        const newEntries = buildTurnEntries({
+          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName, initial,
+        });
 
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
@@ -475,31 +482,15 @@ export function useGame() {
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
-        const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
+        const initial: LogEntry[] = use
+          ? [{ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` }]
+          : [];
+        const newEntries = buildTurnEntries({
+          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName, initial,
+        });
 
-        if (use) {
-          newEntries.push({ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` });
-        }
-
-        if (playerLogDelta.length) {
-          for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-        if (botLogDelta.length) {
-          const botTurn = botLogDelta[0]?.turn ?? gameState.turnCount;
-          if (botLogDelta.some(isRealBotTurnEntry)) {
-            newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
-          }
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-        if ((data.turnCount ?? 0) > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
-        }
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
           appendLog(newEntries);
@@ -519,23 +510,12 @@ export function useGame() {
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
-        const newEntries: LogEntry[] = [];
         const bName = botName.current;
         const pName = playerName.current;
+        const newEntries = buildTurnEntries({
+          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName,
+        });
 
-        if (playerLogDelta.length) {
-          for (const entry of playerLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `  → ${entry.text}`, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-        if (botLogDelta.length) {
-          for (const entry of botLogDelta) {
-            newEntries.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
-          }
-        }
-        if ((data.turnCount ?? 0) > gameState.turnCount) {
-          newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
-        }
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
           setGameState(data as unknown as GameState);
           appendLog(newEntries);

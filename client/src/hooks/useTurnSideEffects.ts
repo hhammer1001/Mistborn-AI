@@ -230,10 +230,23 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     //   SP: isMyTurn stays true; detect via botLog growth (bot turn is atomic
     //       absent defense interrupts, multi-step otherwise).
     // Skip when entering a defense interrupt: it's a mid-turn prompt, not a turn end.
+    //
+    // SP defense-interrupt exit: when the bot's turn ended via the player
+    // resolving cloud/sense defense AND the player took no entries from the
+    // bot's log (skipped), botLog doesn't grow on the resolve step. Detect
+    // that the bot's turn truly ended via (resuming from defense interrupt
+    // + turncount advanced) so the recap fires now — otherwise it leaks
+    // into the next bot reaction (a sense_block during the player's next
+    // turn) and renders with that turn's number.
+    const defenseInterruptEndedBotTurn =
+      prev && resumingFromDefenseInterrupt
+      && gameState.phase === "actions"
+      && gameState.turnCount > (prev.turnCount ?? 0);
     const oppTurnEndedMP =
       prev && prevIsMyTurn === false && isMyTurn && !enteringDefenseInterrupt;
     const oppTurnEndedSP =
-      prev && prevIsMyTurn === true && isMyTurn && botLog.length > seenLen
+      prev && prevIsMyTurn === true && isMyTurn
+      && (botLog.length > seenLen || defenseInterruptEndedBotTurn)
       && !enteringDefenseInterrupt;
 
     if (oppTurnEndedMP || oppTurnEndedSP) {
