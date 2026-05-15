@@ -1102,7 +1102,11 @@ export class GameSession {
     p.curDamage -= target.health;
     opp.killAlly(target);
     this._logs[playerIndex].push({ turn: this.game.turncount, text: `Killed ${opp.name}'s ${target.name}` });
-    this._logs[1 - playerIndex].push({ turn: this.game.turncount, text: `Opponent killed your ${target.name}` });
+    this._logs[1 - playerIndex].push({
+      turn: this.game.turncount,
+      text: `Opponent killed your ${target.name}`,
+      actionType: "opponent_kill",
+    });
 
     const [newTargets] = this.game.validTargets(p);
     // Only auto-transition when there's no leftover damage to deal. If the

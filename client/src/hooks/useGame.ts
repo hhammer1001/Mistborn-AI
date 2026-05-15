@@ -40,7 +40,18 @@ export interface LogEntry {
  *  "bot's turn" header when the delta contains only reactive entries. */
 function isRealBotTurnEntry(e: BotLogEntry): boolean {
   if (!e.actionType) return false;
-  return e.actionType !== "sense_block" && e.actionType !== "cloud_block";
+  return e.actionType !== "sense_block"
+    && e.actionType !== "cloud_block"
+    && e.actionType !== "opponent_kill";
+}
+
+/** Entries in the bot's log that are just opponent-perspective mirrors of
+ *  things the player already saw in their own log: "Opponent killed your X"
+ *  echoes the player's "Killed bot's X", and "Opponent's X blocked Y damage"
+ *  echoes the player's "X blocked Y damage". Useful for multiplayer (where
+ *  the other side is a human who needs the narration), redundant in SP. */
+function isOpponentMirror(e: BotLogEntry): boolean {
+  return e.actionType === "opponent_kill" || e.actionType === "cloud_block";
 }
 
 /** Assemble log entries from a session result. Handles three layout concerns
@@ -82,12 +93,18 @@ function buildTurnEntries(opts: {
     else newEntries.push(formatted);
   }
 
-  if (botLogDelta.length > 0) {
-    const botTurn = botLogDelta[0]?.turn ?? prevTurn + 1;
-    if (botLogDelta.some(isRealBotTurnEntry)) {
+  // Drop opponent-perspective mirrors from the bot delta in SP — the player
+  // already saw the same event from their own side. Note this also keeps
+  // botTurn (below) anchored to a real bot action rather than getting pulled
+  // back to the player's turn by a leading "Opponent killed your X" entry.
+  const filteredBotLog = botLogDelta.filter((e) => !isOpponentMirror(e));
+
+  if (filteredBotLog.length > 0) {
+    const botTurn = filteredBotLog[0]?.turn ?? prevTurn + 1;
+    if (filteredBotLog.some(isRealBotTurnEntry)) {
       newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
     }
-    for (const entry of botLogDelta) {
+    for (const entry of filteredBotLog) {
       newEntries.push({
         turn: entry.turn,
         text: `${bName} — ${entry.text}`,
