@@ -219,6 +219,30 @@ function CardActionMenu({ card, actions, composites, onAction, onCompositeAction
         const normalActions = isAtiumCard
           ? actions.filter((a) => a.code !== 2)
           : actions;
+        // Use Metal (code 4) is the trigger that consumes a stacked metal
+        // to fire the ability. Pinned to the very bottom of the popup so
+        // setup options (burn this card as metal, refresh, composites)
+        // surface above it.
+        const setupActions = normalActions.filter((a) => a.code !== 4);
+        const useMetalActions = normalActions.filter((a) => a.code === 4);
+
+        const renderAction = (a: GameAction) => {
+          const label = actionLabel(a, card);
+          return (
+            <button
+              key={a.index}
+              className="hand-action-btn"
+              onClick={(e) => { e.stopPropagation(); onAction(a.index); onClose(); }}
+              title={a.description}
+            >
+              <span>{label.text}</span>
+              {label.metalIcon && (
+                <img className="hand-action-metal-icon" src={label.metalIcon} alt="" draggable={false} />
+              )}
+              {label.suffix && <span className="hand-action-suffix">{label.suffix}</span>}
+            </button>
+          );
+        };
 
         return (
           <>
@@ -231,40 +255,25 @@ function CardActionMenu({ card, actions, composites, onAction, onCompositeAction
                 <span>Burn (choose metal)</span>
               </button>
             )}
-            {normalActions.map((a) => {
-              const label = actionLabel(a, card);
-              return (
-                <button
-                  key={a.index}
-                  className="hand-action-btn"
-                  onClick={(e) => { e.stopPropagation(); onAction(a.index); onClose(); }}
-                  title={a.description}
-                >
-                  <span>{label.text}</span>
-                  {label.metalIcon && (
-                    <img className="hand-action-metal-icon" src={label.metalIcon} alt="" draggable={false} />
-                  )}
-                  {label.suffix && <span className="hand-action-suffix">{label.suffix}</span>}
-                </button>
-              );
-            })}
+            {setupActions.map(renderAction)}
+            {composites.map((c, i) => (
+              <button
+                key={`composite-${i}`}
+                className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
+                onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.secondMatch); onClose(); }}
+                title={c.title}
+              >
+                <span className={c.isFlare ? "flare-text" : ""}>{c.textBefore}</span>
+                {c.metalIcon && (
+                  <img className="hand-action-metal-icon" src={c.metalIcon} alt="" draggable={false} />
+                )}
+                <span>{c.textAfter}</span>
+              </button>
+            ))}
+            {useMetalActions.map(renderAction)}
           </>
         );
       })()}
-      {!showAtiumBurnPopup && composites.map((c, i) => (
-        <button
-          key={`composite-${i}`}
-          className={`hand-action-btn composite${c.isFlare ? " flare" : ""}`}
-          onClick={(e) => { e.stopPropagation(); onCompositeAction(c.firstActionIndex, c.secondMatch); onClose(); }}
-          title={c.title}
-        >
-          <span className={c.isFlare ? "flare-text" : ""}>{c.textBefore}</span>
-          {c.metalIcon && (
-            <img className="hand-action-metal-icon" src={c.metalIcon} alt="" draggable={false} />
-          )}
-          <span>{c.textAfter}</span>
-        </button>
-      ))}
     </div>
   );
 
@@ -312,27 +321,7 @@ function getCompositeActions(
     }
   }
 
-  // 2) "Burn/Flare [metal token] + add to card" — if the token is unburned (code 5 exists)
-  const burnTokenAction = actions.find((a) => a.code === 5 && a.metalIndex === cardMetal);
-  if (burnTokenAction) {
-    const burnCount = player.metalTokens.slice(0, 8).filter((t) => t === 1).length + player.metalTokens[8];
-    const isFlare = burnCount >= player.burns;
-    const verb = isFlare ? "Flare" : "Burn";
-    const metalName = METAL_NAMES[cardMetal];
-    const icon = metalIcon(cardMetal);
-    composites.push({
-      textBefore: verb,
-      textAfter: nextAbilityLabel(card) ? `→ ${nextAbilityLabel(card)}` : "+ add",
-      metalIcon: icon,
-      isFlare,
-      title: `${verb} ${metalName} token and add to ${card.name}`,
-      firstActionIndex: burnTokenAction.index,
-      // After burning the token, find the "use metal on card" action (code 4) for any of our card IDs
-      secondMatch: { code: 4, cardIds: allIds },
-    });
-  }
-
-  // 3) "Burn [other card] + add to this card" — every other-name burnable
+  // 2) "Burn [other card] + add to this card" — every other-name burnable
   //    card in hand gets its own entry. Duplicate-name copies are
   //    distinguished by their copy letter (A/B/C…) so the player can pick
   //    which specific copy to spend.
@@ -352,6 +341,29 @@ function getCompositeActions(
       metalIcon: icon,
       title: `Burn ${labeledName} for ${metalName} and add to ${card.name}`,
       firstActionIndex: burnAction.index,
+      secondMatch: { code: 4, cardIds: allIds },
+    });
+  }
+
+  // 3) "Burn/Flare [metal token] + add to card" — if the token is unburned
+  //    (code 5 exists). Listed last because burning a fresh token is the
+  //    cheapest, most-default choice — surface the more consequential
+  //    spends (atium, other cards) above it.
+  const burnTokenAction = actions.find((a) => a.code === 5 && a.metalIndex === cardMetal);
+  if (burnTokenAction) {
+    const burnCount = player.metalTokens.slice(0, 8).filter((t) => t === 1).length + player.metalTokens[8];
+    const isFlare = burnCount >= player.burns;
+    const verb = isFlare ? "Flare" : "Burn";
+    const metalName = METAL_NAMES[cardMetal];
+    const icon = metalIcon(cardMetal);
+    composites.push({
+      textBefore: verb,
+      textAfter: nextAbilityLabel(card) ? `→ ${nextAbilityLabel(card)}` : "+ add",
+      metalIcon: icon,
+      isFlare,
+      title: `${verb} ${metalName} token and add to ${card.name}`,
+      firstActionIndex: burnTokenAction.index,
+      // After burning the token, find the "use metal on card" action (code 4) for any of our card IDs
       secondMatch: { code: 4, cardIds: allIds },
     });
   }
