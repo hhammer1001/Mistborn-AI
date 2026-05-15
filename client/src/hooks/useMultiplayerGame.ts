@@ -140,6 +140,9 @@ export function useMultiplayerGame(
         case "cloud":
           session.resolveCloud(pi, pending.cardIds as number[]);
           break;
+        case "ally_defense":
+          session.resolveAllyDefense(pi, pending.cardId as number);
+          break;
         case "forfeit":
           session.forfeit(pi);
           break;
@@ -323,6 +326,18 @@ export function useMultiplayerGame(
     [isHost, myPlayerIndex, _hostAction, _guestAction]
   );
 
+  const resolveAllyDefense = useCallback(
+    (cardId: number) => {
+      if (myPlayerIndex === null) return;
+      if (isHost) {
+        _hostAction((s) => s.resolveAllyDefense(myPlayerIndex, cardId));
+      } else {
+        _guestAction({ actionType: "ally_defense", cardId });
+      }
+    },
+    [isHost, myPlayerIndex, _hostAction, _guestAction]
+  );
+
   const forfeit = useCallback(async () => {
     if (myPlayerIndex === null) return;
     if (isHost) {
@@ -435,6 +450,7 @@ export function useMultiplayerGame(
     assignDamage,
     resolveSense,
     resolveCloud,
+    resolveAllyDefense,
     respondToPrompt,
     forfeit,
     undo,

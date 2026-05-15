@@ -311,25 +311,44 @@ export class Player {
     }
   }
 
-  killAlly(ally: Ally) {
-    // Check for cloudA protection
+  /** Try to kill the given ally. Returns the cloudA card that protected it
+   *  (and was discarded) on a save, or null when the ally actually died.
+   *  Bots auto-decide via `cloudAlly`. Humans never auto-protect here — the
+   *  session promotes the kill into an `ally_defense` phase upstream and
+   *  resolves through `applyKillAlly` directly. */
+  killAlly(ally: Ally): Action | null {
+    // Check for cloudA protection (bot auto-decide path)
     for (const card of [...this.deck.hand]) {
       if (card instanceof Action && card.data[9] === "cloudA") {
         if (this.cloudAlly(card, ally)) {
           const idx = this.deck.hand.indexOf(card);
           if (idx !== -1) this.deck.hand.splice(idx, 1);
           this.deck.discard.push(card);
-          return;
+          return card;
         }
       }
     }
-    // Undo on-play effects
+    this.applyKillAlly(ally);
+    return null;
+  }
+
+  /** Remove an ally + undo its on-play effects without checking cloudA. Used
+   *  by `resolveAllyDefense` when the defender declines to spend a cloudA. */
+  applyKillAlly(ally: Ally) {
     if (ally.name === "Noble") this.extraBurn(-1);
     if (ally.name === "Crewleader") this.permDraw(-1);
     if (ally.name === "Smoker") this.smoking = false;
     const idx = this.allies.indexOf(ally);
     if (idx !== -1) this.allies.splice(idx, 1);
     this.deck.discard.push(ally);
+  }
+
+  /** Cards in hand that could protect the given ally from being killed.
+   *  Used by the session to decide whether to prompt a human defender. */
+  cloudAllyCards(): Action[] {
+    return this.deck.hand.filter(
+      (c): c is Action => c instanceof Action && c.data[9] === "cloudA",
+    );
   }
 
   eliminate(amount: number) {

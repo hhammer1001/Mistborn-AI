@@ -151,7 +151,7 @@ export interface CloudCard {
 
 export interface GameState {
   sessionId: string;
-  phase: "actions" | "damage" | "sense_defense" | "cloud_defense" | "awaiting_prompt" | "game_over";
+  phase: "actions" | "damage" | "sense_defense" | "cloud_defense" | "ally_defense" | "awaiting_prompt" | "game_over";
   turnCount: number;
   winner: string | null;
   victoryType: string | null;
@@ -166,6 +166,11 @@ export interface GameState {
   senseMissionName?: string;
   cloudCards?: CloudCard[];
   incomingDamage?: number;
+  /** Cloud-ally cards (e.g. Hide) available to spend when an opponent is
+   *  trying to kill one of our allies. Populated during `ally_defense`. */
+  cloudAllyCards?: { cardId: number; name: string }[];
+  /** Ally currently targeted for kill. Populated during `ally_defense`. */
+  targetedAlly?: { name: string; cardId: number; health: number };
   botLog?: BotLogEntry[];
   playerLog?: BotLogEntry[];
   prompt?: GamePrompt;

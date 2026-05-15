@@ -42,6 +42,7 @@ function isRealBotTurnEntry(e: BotLogEntry): boolean {
   if (!e.actionType) return false;
   return e.actionType !== "sense_block"
     && e.actionType !== "cloud_block"
+    && e.actionType !== "cloud_ally_block"
     && e.actionType !== "opponent_kill";
 }
 
@@ -51,7 +52,9 @@ function isRealBotTurnEntry(e: BotLogEntry): boolean {
  *  echoes the player's "X blocked Y damage". Useful for multiplayer (where
  *  the other side is a human who needs the narration), redundant in SP. */
 function isOpponentMirror(e: BotLogEntry): boolean {
-  return e.actionType === "opponent_kill" || e.actionType === "cloud_block";
+  return e.actionType === "opponent_kill"
+    || e.actionType === "cloud_block"
+    || e.actionType === "cloud_ally_block";
 }
 
 /** Assemble log entries from a session result. Handles three layout concerns
@@ -117,7 +120,8 @@ function buildTurnEntries(opts: {
     }
   }
 
-  const inDefenseInterrupt = data.phase === "cloud_defense" || data.phase === "sense_defense";
+  const inDefenseInterrupt =
+    data.phase === "cloud_defense" || data.phase === "sense_defense" || data.phase === "ally_defense";
   if ((data.turnCount ?? 0) > prevTurn && !inDefenseInterrupt) {
     newEntries.push({ turn: data.turnCount!, text: `${pName}'s turn` });
   }
@@ -469,7 +473,12 @@ export function useGame() {
           // Skip: explicitly dealt no damage this turn. No log entry needed.
         } else {
           const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
-          initial.push({ turn: gameState.turnCount, text: `${pName} killed ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
+          // The engine may swallow the kill via cloudA (e.g. defender's Hide).
+          // Soften the verb when that happens so the action line matches the
+          // resulting "Opponent's X protected Y" effect below it.
+          const wasBlocked = playerLogDelta.some((e) => e.actionType === "cloud_ally_block");
+          const verb = wasBlocked ? "attempted to kill" : "killed";
+          initial.push({ turn: gameState.turnCount, text: `${pName} ${verb} ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
         }
 
         const newEntries = buildTurnEntries({
@@ -524,6 +533,31 @@ export function useGame() {
       setError(null);
       try {
         const data = session.resolveCloud(0, cardIds) as SessionResult;
+        if (data.error) { setError(data.error); return null; }
+        const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
+
+        const bName = botName.current;
+        const pName = playerName.current;
+        const newEntries = buildTurnEntries({
+          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName,
+        });
+
+        applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
+          setGameState(data as unknown as GameState);
+          appendLog(newEntries);
+        });
+        return data;
+      } catch (e) { setError(String(e)); return null; }
+    }, [gameState, applyBehindBanner, appendLog]
+  );
+
+  const resolveAllyDefense = useCallback(
+    (cardId: number) => {
+      const session = sessionRef.current;
+      if (!session || !gameState) return null;
+      setError(null);
+      try {
+        const data = session.resolveAllyDefense(0, cardId) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
@@ -631,6 +665,7 @@ export function useGame() {
     assignDamage,
     resolveSense,
     resolveCloud,
+    resolveAllyDefense,
     respondToPrompt,
     refreshState,
     undo,

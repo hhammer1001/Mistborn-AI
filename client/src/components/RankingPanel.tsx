@@ -13,36 +13,49 @@ export interface RankingCard {
   art?: string;
 }
 
-export type RankingVariant = "sense" | "cloud";
+export type RankingVariant = "sense" | "cloud" | "ally";
 
 interface VariantCopy {
-  eyebrow: { rank: string; toggle: string };
-  title: { rank: string; toggle: string };
-  captionDefault: { rank: string; toggle: string };
+  eyebrow: { rank: string; toggle: string; select: string };
+  title: { rank: string; toggle: string; select: string };
+  captionDefault: { rank: string; toggle: string; select: string };
   unitSingular: string;
   unitPlural: string;
 }
 
 const COPY: Record<RankingVariant, VariantCopy> = {
   sense: {
-    eyebrow: { rank: "Sense Order", toggle: "Sense Defense" },
-    title: { rank: "Burn against advances", toggle: "Block this advance?" },
+    eyebrow: { rank: "Sense Order", toggle: "Sense Defense", select: "Sense Defense" },
+    title: { rank: "Burn against advances", toggle: "Block this advance?", select: "Block this advance?" },
     captionDefault: {
       rank: "Lowest rank fires first · default is skip.",
       toggle: "Spend a Sense card to negate it.",
+      select: "Spend a Sense card to negate it.",
     },
     unitSingular: "mission",
     unitPlural: "missions",
   },
   cloud: {
-    eyebrow: { rank: "Cloud Order", toggle: "Cloud Defense" },
-    title: { rank: "Burn against damage", toggle: "Reduce incoming damage" },
+    eyebrow: { rank: "Cloud Order", toggle: "Cloud Defense", select: "Cloud Defense" },
+    title: { rank: "Burn against damage", toggle: "Reduce incoming damage", select: "Reduce incoming damage" },
     captionDefault: {
       rank: "Lowest rank fires first · default is skip.",
       toggle: "Spend a cloud to absorb part of the hit.",
+      select: "Spend a cloud to absorb part of the hit.",
     },
     unitSingular: "damage",
     unitPlural: "damage",
+  },
+  ally: {
+    eyebrow: { rank: "Ally Defense", toggle: "Ally Defense", select: "Ally Defense" },
+    title: { rank: "Save an ally", toggle: "Save an ally", select: "Save your ally" },
+    captionDefault: {
+      rank: "Lowest rank fires first · default is skip.",
+      toggle: "Discard a cloud-ally card to protect this ally.",
+      select: "Discard a cloud-ally card to save it, or let it die.",
+    },
+    unitSingular: "ally",
+    unitPlural: "allies",
   },
 };
 
@@ -65,6 +78,19 @@ type ToggleProps = {
   formatStatus?: (selected: RankingCard[]) => React.ReactNode;
 };
 
+type SelectProps = {
+  mode: "select";
+  /** Called immediately when the player taps a card (committing it) or the
+   *  skip pill (cardId === null). One tap closes the modal — no separate
+   *  submit step. Used for the ally-defense flow where each kill prompt is
+   *  a single binary save-or-die decision. */
+  onSelect: (cardId: number | null) => void;
+  /** Label for the "let it die / do not use" skip pill at the bottom. */
+  skipLabel?: string;
+  /** Action label rendered on each card row's button. */
+  actionLabel?: string;
+};
+
 const sumBlock = (selected: RankingCard[]) =>
   selected.reduce((sum, c) => sum + c.blockValue, 0);
 
@@ -83,7 +109,7 @@ type Props = {
   variant: RankingVariant;
   cards: RankingCard[];
   caption?: string;
-} & (RankProps | ToggleProps);
+} & (RankProps | ToggleProps | SelectProps);
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 const roman = (n: number): string => ROMAN[n - 1] ?? String(n);
@@ -177,6 +203,22 @@ export function RankingPanel(props: Props) {
   const title = copy.title[props.mode];
   const captionText = caption ?? copy.captionDefault[props.mode];
 
+  const handleSelect = (cardId: number | null) => {
+    if (props.mode !== "select" || committed) return;
+    setCommitted(true);
+    if (cardId === null) {
+      props.onSelect(null);
+      setCommitted(false);
+      return;
+    }
+    setBurningIds(new Set([cardId]));
+    window.setTimeout(() => {
+      props.onSelect(cardId);
+      setBurningIds(new Set());
+      setCommitted(false);
+    }, BURN_DURATION_MS);
+  };
+
   return (
     <section
       className={`ranking-panel ranking-panel--${variant}`}
@@ -223,9 +265,11 @@ export function RankingPanel(props: Props) {
                         <EyeIcon />
                       </button>
                     </div>
-                    <div className="ranking-panel__block">
-                      blocks <strong>{card.blockValue}</strong> {unit}
-                    </div>
+                    {variant !== "ally" && (
+                      <div className="ranking-panel__block">
+                        blocks <strong>{card.blockValue}</strong> {unit}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -259,6 +303,19 @@ export function RankingPanel(props: Props) {
                       </button>
                     ))}
                   </div>
+                ) : props.mode === "select" ? (
+                  <button
+                    type="button"
+                    className="ranking-pill ranking-pill--use"
+                    onClick={() => handleSelect(card.id)}
+                    disabled={committed}
+                    aria-label={`Use ${card.name}`}
+                  >
+                    <span className="ranking-pill__flame" aria-hidden>
+                      <FlameIcon size={11} />
+                    </span>
+                    {props.actionLabel ?? "Use"}
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -308,6 +365,17 @@ export function RankingPanel(props: Props) {
               {props.submitLabel ?? "Submit"}
             </button>
           </>
+        )}
+
+        {props.mode === "select" && (
+          <button
+            type="button"
+            className="ranking-pill ranking-pill--skip"
+            onClick={() => handleSelect(null)}
+            disabled={committed}
+          >
+            {props.skipLabel ?? "Do not use"}
+          </button>
         )}
       </div>
       {zoomName && <CardImagePopup name={zoomName} onClose={() => setZoomName(null)} />}

@@ -420,7 +420,7 @@ function BotGameBoard({
   game: ReturnType<typeof useGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, undo, canUndo, forfeit } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, resolveAllyDefense, respondToPrompt, undo, canUndo, forfeit } = game;
 
   const handleAction = (index: number) => {
     if (!loading) playAction(index);
@@ -464,6 +464,7 @@ function BotGameBoard({
         assignDamage={assignDamage}
         resolveSense={resolveSense}
         resolveCloud={resolveCloud}
+        resolveAllyDefense={resolveAllyDefense}
         respondToPrompt={respondToPrompt}
         onMainMenu={onMainMenu}
         onForfeit={forfeit}
@@ -486,7 +487,7 @@ function MultiplayerGameBoard({
   game: ReturnType<typeof useMultiplayerGame>;
   onMainMenu: () => void;
 }) {
-  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, respondToPrompt, forfeit, undo, canUndo } = game;
+  const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, resolveAllyDefense, respondToPrompt, forfeit, undo, canUndo } = game;
 
   const handleAction = (index: number) => {
     if (!loading && isMyTurn) playAction(index);
@@ -532,6 +533,7 @@ function MultiplayerGameBoard({
         assignDamage={assignDamage}
         resolveSense={resolveSense}
         resolveCloud={resolveCloud}
+        resolveAllyDefense={resolveAllyDefense}
         respondToPrompt={respondToPrompt}
         onMainMenu={onMainMenu}
         onForfeit={forfeit}
@@ -568,6 +570,7 @@ function GameBoard({
   assignDamage,
   resolveSense,
   resolveCloud,
+  resolveAllyDefense,
   respondToPrompt,
   onMainMenu,
   onForfeit,
@@ -588,6 +591,7 @@ function GameBoard({
   assignDamage: (targetIndex: number) => unknown;
   resolveSense: (use: boolean) => unknown;
   resolveCloud: (cardIds: number[]) => unknown;
+  resolveAllyDefense: (cardId: number) => unknown;
   respondToPrompt: (type: string, value: number) => unknown;
   onMainMenu: () => void;
   onForfeit?: () => void | Promise<void>;
@@ -749,6 +753,26 @@ function GameBoard({
               // Engine applies all selected clouds in one resolve and exits the
               // phase. Empty array = take the damage.
               resolveCloud(ids);
+            }}
+          />
+        </div>
+      )}
+      {gameState.phase === "ally_defense" && gameState.cloudAllyCards && gameState.targetedAlly && isMyTurn && (
+        <div className="modal-overlay">
+          <RankingPanel
+            variant="ally"
+            mode="select"
+            cards={gameState.cloudAllyCards.map((c) => ({
+              id: c.cardId,
+              name: c.name,
+              blockValue: 1,
+            }))}
+            caption={`Opponent is killing your ${gameState.targetedAlly.name} (${gameState.targetedAlly.health} HP). Tap a card to discard it and save the ally, or let it die.`}
+            actionLabel={`Save ${gameState.targetedAlly.name}`}
+            skipLabel={`Let ${gameState.targetedAlly.name} die`}
+            onSelect={(cardId) => {
+              if (loading) return;
+              resolveAllyDefense(cardId ?? -1);
             }}
           />
         </div>

@@ -5320,6 +5320,15 @@ h3 {
   --rp-active-bg-bottom: rgba(52, 32, 20, 0.95);
 }
 
+/* Ally variant — pewter green for "shielding a body." Distinct from the
+   cloud (incoming damage) and sense (incoming advance) hues so the player
+   reads the panel as a different kind of defense at a glance. */
+.ranking-panel--ally {
+  --rp-accent-rgb: 138, 196, 152;
+  --rp-active-bg-top: rgba(40, 70, 50, 0.95);
+  --rp-active-bg-bottom: rgba(24, 44, 32, 0.95);
+}
+
 .ranking-panel__frame {
   position: relative;
   padding: 24px 22px 20px;
@@ -5790,6 +5799,76 @@ h3 {
   opacity: 0.55;
   cursor: default;
   transform: none;
+}
+
+/* "Use" pill on each card row in select mode — tap-to-commit replacement
+   for the multi-select toggle used by cloud/sense. Matches the cloud
+   toggle's flame motif: the flame is dim by default and ignites on hover
+   so the player previews the burn before committing. */
+.ranking-pill--use {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--rp-accent);
+  border: 1px solid var(--rp-accent);
+  background: rgba(var(--rp-accent-rgb), 0.08);
+  box-shadow: 0 0 0 1px rgba(201, 164, 74, 0.18) inset;
+}
+.ranking-pill--use:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(var(--rp-accent-rgb), 0.18);
+  box-shadow:
+    0 0 0 1px rgba(201, 164, 74, 0.45) inset,
+    0 0 12px rgba(var(--rp-accent-rgb), 0.35);
+}
+.ranking-pill--use:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* Flame is always copper-orange — fire is fire, regardless of which defense
+   panel it's in. Matches the cloud toggle's flame so the burn motif reads
+   consistently across the cloud/sense/ally variants. */
+.ranking-pill__flame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: rgba(212, 145, 90, 0.55);
+  opacity: 0.55;
+  transform: translateY(0.5px) scale(0.92);
+  transition: opacity 180ms ease, transform 180ms ease, color 180ms ease,
+    filter 180ms ease;
+}
+.ranking-pill--use:hover:not(:disabled) .ranking-pill__flame {
+  color: rgb(232, 162, 90);
+  opacity: 1;
+  transform: translateY(0.5px) scale(1.1);
+  filter: drop-shadow(0 0 5px rgba(232, 162, 90, 0.8));
+}
+.ranking-pill--use:active:not(:disabled) .ranking-pill__flame {
+  filter: drop-shadow(0 0 9px rgba(232, 162, 90, 0.95));
+}
+
+/* "Do not use" pill at the bottom of select mode — quieter, gold edge so it
+   reads as a clear opt-out without competing with the save buttons. */
+.ranking-pill--skip {
+  display: block;
+  margin: 14px auto 0;
+  height: 34px;
+  padding: 0 26px;
+  color: var(--rp-skip);
+  border: 1px solid rgba(201, 164, 74, 0.35);
+  background: rgba(13, 12, 22, 0.65);
+}
+.ranking-pill--skip:hover:not(:disabled) {
+  color: var(--text);
+  border-color: rgba(201, 164, 74, 0.65);
+  background: rgba(20, 18, 32, 0.85);
+}
+.ranking-pill--skip:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* Live status strip — a quiet line above Submit that previews what the

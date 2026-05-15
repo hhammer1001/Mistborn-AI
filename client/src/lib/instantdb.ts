@@ -33,7 +33,7 @@ const schema = i.schema({
     }),
     games: i.entity({
       roomId: i.string().indexed(),
-      phase: i.string().indexed(), // "actions" | "damage" | "sense_defense" | "cloud_defense" | "awaiting_prompt" | "game_over"
+      phase: i.string().indexed(), // "actions" | "damage" | "sense_defense" | "cloud_defense" | "ally_defense" | "awaiting_prompt" | "game_over"
       activePlayer: i.number(), // 0 or 1
       turnCount: i.number(),
       p0State: i.any(), // JSON game state for player 0

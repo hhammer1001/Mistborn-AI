@@ -9,6 +9,8 @@ export function WaitingOverlay({ opponentName, phase }: WaitingOverlayProps) {
     message = `${opponentName} is deciding on Sense defense...`;
   } else if (phase === "cloud_defense") {
     message = `${opponentName} is deciding on Cloud defense...`;
+  } else if (phase === "ally_defense") {
+    message = `${opponentName} is deciding whether to save an ally...`;
   } else if (phase === "damage") {
     message = `${opponentName} is assigning damage...`;
   } else if (phase === "awaiting_prompt") {

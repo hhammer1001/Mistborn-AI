@@ -200,9 +200,13 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     // for a defensive prompt, then flip back. Those flips look like turn boundaries
     // but aren't — treating them as such splits a single opp turn's recap in two.
     const enteringDefenseInterrupt =
-      gameState.phase === "sense_defense" || gameState.phase === "cloud_defense";
+      gameState.phase === "sense_defense"
+      || gameState.phase === "cloud_defense"
+      || gameState.phase === "ally_defense";
     const resumingFromDefenseInterrupt =
-      prev?.phase === "sense_defense" || prev?.phase === "cloud_defense";
+      prev?.phase === "sense_defense"
+      || prev?.phase === "cloud_defense"
+      || prev?.phase === "ally_defense";
 
     // MP: my → opp — snapshot turn-start state and fire opponent banner.
     // Skip when resuming from a defense interrupt: the existing baseline (set at

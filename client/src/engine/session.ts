@@ -226,7 +226,7 @@ export interface ActionEvent {
 
 // ── GameSession ──
 
-export type GamePhase = "actions" | "damage" | "sense_defense" | "cloud_defense" | "awaiting_prompt" | "game_over";
+export type GamePhase = "actions" | "damage" | "sense_defense" | "cloud_defense" | "ally_defense" | "awaiting_prompt" | "game_over";
 
 export interface GameSessionOpts {
   players: [PlayerConfig, PlayerConfig];
@@ -261,6 +261,12 @@ export class GameSession {
    *  sense decision. resolveSense uses this to resume the original action
    *  after the defender chooses. */
   private _pending_advance_action: GameActionInternal | null = null;
+  /** Set when an ally-kill is paused mid-assignDamage for a human defender's
+   *  cloudA decision. resolveAllyDefense uses this to finish the kill (or
+   *  save) and hand control back to the attacker for any leftover damage. */
+  private _pending_ally_kill:
+    | { attackerIndex: 0 | 1; defenderIndex: 0 | 1; targetAllyId: number }
+    | null = null;
   /** True while resolveSense is driving _attemptAction. The sense_block log
    *  entry is pushed by resolveSense in that case (where we have direct
    *  knowledge of the defender's choice and the card they used), so the
@@ -701,6 +707,15 @@ export class GameSession {
       state["incomingDamage"] = this._cloud_damage;
     }
 
+    if (this.phase === "ally_defense" && this.activePlayer === perspective && this._pending_ally_kill) {
+      const p = this.players[perspective];
+      state["cloudAllyCards"] = p.cloudAllyCards().map((c) => ({ cardId: c.id, name: c.name }));
+      const target = p.allies.find((a) => a.id === this._pending_ally_kill!.targetAllyId);
+      if (target) {
+        state["targetedAlly"] = { name: target.name, cardId: target.id, health: target.health };
+      }
+    }
+
     if (this._pending_prompt && this.activePlayer === perspective) {
       state["prompt"] = this._pending_prompt.toJSON();
     }
@@ -1100,13 +1115,23 @@ export class GameSession {
     }
     const target = targets[targetIndex];
     p.curDamage -= target.health;
-    opp.killAlly(target);
-    this._logs[playerIndex].push({ turn: this.game.turncount, text: `Killed ${opp.name}'s ${target.name}` });
-    this._logs[1 - playerIndex].push({
-      turn: this.game.turncount,
-      text: `Opponent killed your ${target.name}`,
-      actionType: "opponent_kill",
-    });
+
+    // Human defenders get a prompt to decide whether to spend a cloudA card.
+    // Bots auto-decide inside killAlly via their `cloudAlly` override.
+    const defenderIndex = (1 - playerIndex) as 0 | 1;
+    if (!this._isBot(defenderIndex) && opp.cloudAllyCards().length > 0) {
+      this._pending_ally_kill = {
+        attackerIndex: playerIndex as 0 | 1,
+        defenderIndex,
+        targetAllyId: target.id,
+      };
+      this.phase = "ally_defense";
+      this.activePlayer = defenderIndex;
+      return this._returnState(playerIndex);
+    }
+
+    const protectedBy = opp.killAlly(target);
+    this._logKillResult(playerIndex as 0 | 1, defenderIndex, target, protectedBy);
 
     const [newTargets] = this.game.validTargets(p);
     // Only auto-transition when there's no leftover damage to deal. If the
@@ -1117,6 +1142,91 @@ export class GameSession {
       this._executeAttackAndTransition(playerIndex);
     }
     return this._returnState(playerIndex);
+  }
+
+  /** Resolve ally defense: the human defender either spends a cloudA card
+   *  to save the targeted ally (cardId set) or lets it die (cardId === -1).
+   *  Mirrors resolveCloud: the attacker already paid damage in assignDamage,
+   *  so this only decides survival + hands control back. */
+  resolveAllyDefense(playerIndex: number, cardId: number): Record<string, unknown> {
+    if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
+    if (this.phase !== "ally_defense") return { error: `Cannot resolve ally defense in phase: ${this.phase}` };
+    if (!this._pending_ally_kill) return { error: "No pending ally kill" };
+
+    const { attackerIndex, defenderIndex, targetAllyId } = this._pending_ally_kill;
+    if (playerIndex !== defenderIndex) return { error: "Not your defense to make" };
+
+    const attacker = this.players[attackerIndex];
+    const defender = this.players[defenderIndex];
+    const target = defender.allies.find((a) => a.id === targetAllyId);
+    if (!target) return { error: "Targeted ally not found" };
+
+    this._pushActionEvent("ally_defense", playerIndex, { cardId });
+
+    if (cardId === -1) {
+      // Defender declined to save — apply the kill now.
+      defender.applyKillAlly(target);
+      this._logKillResult(attackerIndex, defenderIndex, target, null);
+    } else {
+      const card = defender.deck.hand.find(
+        (c): c is Action => c instanceof Action && c.id === cardId && c.data[9] === "cloudA",
+      );
+      if (!card) return { error: `Cloud-ally card ${cardId} not in hand` };
+      const idx = defender.deck.hand.indexOf(card);
+      if (idx !== -1) defender.deck.hand.splice(idx, 1);
+      defender.deck.discard.push(card);
+      this._logKillResult(attackerIndex, defenderIndex, target, card);
+    }
+
+    this._pending_ally_kill = null;
+    this.phase = "damage";
+    this.activePlayer = attackerIndex;
+
+    // Mirror assignDamage's post-kill bookkeeping: if no more targets and the
+    // attacker has spent their damage, auto-resolve the face hit.
+    if (this.game.winner) { this.phase = "game_over"; return this._returnState(playerIndex); }
+    const [newTargets] = this.game.validTargets(attacker);
+    if (newTargets.length === 0 && attacker.curDamage === 0) {
+      this._executeAttackAndTransition(attackerIndex);
+    }
+    return this._returnState(playerIndex);
+  }
+
+  /** Write the player/opponent log entries for an ally-kill outcome. Called
+   *  from both the immediate path (bot defender or no cloudA) and the
+   *  prompted path (resolveAllyDefense). */
+  private _logKillResult(
+    attackerIndex: 0 | 1,
+    defenderIndex: 0 | 1,
+    target: Ally,
+    protectedBy: Action | null,
+  ) {
+    const opp = this.players[defenderIndex];
+    if (protectedBy) {
+      const protectorData = protectedBy.toJSON() as CardData;
+      this._logs[attackerIndex].push({
+        turn: this.game.turncount,
+        text: `Opponent's ${protectedBy.name} protected ${target.name} from being killed`,
+        card: protectorData,
+        actionType: "cloud_ally_block",
+      });
+      this._logs[defenderIndex].push({
+        turn: this.game.turncount,
+        text: `${protectedBy.name} protected your ${target.name} from being killed`,
+        card: protectorData,
+        actionType: "cloud_ally_block",
+      });
+    } else {
+      this._logs[attackerIndex].push({
+        turn: this.game.turncount,
+        text: `Killed ${opp.name}'s ${target.name}`,
+      });
+      this._logs[defenderIndex].push({
+        turn: this.game.turncount,
+        text: `Opponent killed your ${target.name}`,
+        actionType: "opponent_kill",
+      });
+    }
   }
 
   resolveSense(playerIndex: number, use: boolean): Record<string, unknown> {
