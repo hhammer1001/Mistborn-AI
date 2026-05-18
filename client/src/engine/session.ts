@@ -207,6 +207,7 @@ export type ActionEventType =
   | "damage"
   | "sense"
   | "cloud"
+  | "ally_defense"
   | "advance_all"
   | "forfeit"
   | "bot_action";
