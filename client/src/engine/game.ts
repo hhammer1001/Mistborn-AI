@@ -1,4 +1,4 @@
-import { Player } from "./player";
+import { Player, applyStartingHealth } from "./player";
 import { Ally, Card } from "./card";
 import { PlayerDeck, Market } from "./deck";
 import { Mission } from "./mission";
@@ -47,6 +47,10 @@ export class Game {
     playerFactories?: [PlayerFactory, PlayerFactory];
     testDeck?: boolean;
     seed?: number;
+    /** Seat index of the player who takes the first turn. Determines the
+     *  going-second HP compensation. Self-play / benches default to 0
+     *  (seat 0 first); GameSession passes through the user's choice. */
+    firstPlayer?: number;
   } = {}) {
     const {
       names = ["Player 1", "Player 2"],
@@ -55,6 +59,7 @@ export class Game {
       playerFactories,
       testDeck = false,
       seed,
+      firstPlayer = 0,
     } = opts;
 
     this.seed = seed ?? randomSeed();
@@ -107,19 +112,10 @@ export class Game {
       this.decks[i].cleanUp(this.players[i], this.market);
     }
 
-    // Going-second HP compensation. GameSession applies this independently
-    // (it overrides what we set here), since it knows firstPlayer; for bare
-    // Game.play() (benches and self-play) seat 0 always plays first, so
-    // seat 1 is the going-second player. Mirror GameSession's formula:
-    // +2 HP per position past first, overflow above 40 → starting boxings.
-    for (let i = 0; i < this.players.length; i++) {
-      let hp = 36 + 2 * i;
-      if (hp > 40) {
-        this.players[i].curBoxings += hp - 40;
-        hp = 40;
-      }
-      this.players[i].curHealth = hp;
-    }
+    // Going-second HP compensation. Single source of truth lives in
+    // applyStartingHealth — every code path that sets starting HP funnels
+    // through there. See the helper for the rationale.
+    applyStartingHealth(this.players, firstPlayer);
   }
 
   /** Run a full game loop (for bot-vs-bot). Returns the winner. */

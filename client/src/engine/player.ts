@@ -6,6 +6,36 @@ import { CHARACTER_DEFS } from "./data/characters";
 import type { GameActionInternal, SerializedGameAction } from "./types";
 import { METAL_NAMES, TRAINING_REWARDS, ACTION_TYPE_TO_CODE } from "./types";
 
+/** Base starting HP, before going-second compensation. */
+export const STARTING_HEALTH = 36;
+/** Hard HP cap. Overflow from the going-second bonus becomes starting boxings. */
+export const MAX_HEALTH = 40;
+
+/** Apply starting HP to every player based on actual turn order.
+ *
+ *  Going-second compensation: +2 HP per position past the first player, with
+ *  overflow above MAX_HEALTH converting to a starting boxing. Indexed by
+ *  (seat - firstPlayer) mod N so the bonus follows turn order, NOT seat
+ *  index. Get this wrong (use seat instead of turn order) and bot games
+ *  silently give the bot both first-player AND +2 HP — this has bitten the
+ *  codebase twice. Call sites that need starting HP MUST go through here.
+ *
+ *  Single source of truth: anything that sets initial HP should call this.
+ *  Game's constructor invokes it during setup; nothing else should set
+ *  curHealth at game start. */
+export function applyStartingHealth(players: Player[], firstPlayer: number): void {
+  const n = players.length;
+  for (let i = 0; i < n; i++) {
+    const positionInTurnOrder = (i - firstPlayer + n) % n;
+    let hp = STARTING_HEALTH + 2 * positionInTurnOrder;
+    if (hp > MAX_HEALTH) {
+      players[i].curBoxings += hp - MAX_HEALTH;
+      hp = MAX_HEALTH;
+    }
+    players[i].curHealth = hp;
+  }
+}
+
 /** Copy all mutable state from `src` into `dest`. Used by Player.clone and
  *  by callers that want to construct a Player subclass (e.g. a simulation
  *  player) with the same state as an existing player. */
@@ -94,11 +124,11 @@ export class Player {
     this.character = character;
     this.turnOrder = turnOrder;
     this.deck = deck;
-    // Base HP. The going-second compensation (+2 per turn-position past
-    // first, with overflow above 40 converting to a starting boxing) is
-    // applied by GameSession after firstPlayer is known, since turnOrder
-    // here is the seat index, not the position in turn order.
-    this.curHealth = 36;
+    // Default; the real starting HP (including going-second compensation)
+    // is applied by applyStartingHealth() during Game setup, once
+    // firstPlayer is known. Anything that bypasses that path will get this
+    // default — a loud signal that setup wasn't completed correctly.
+    this.curHealth = STARTING_HEALTH;
 
     const charDef = CHARACTER_DEFS[character];
     this.ability1metal = charDef ? String(charDef.ability1Metal) : "0";
