@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { db } from "../lib/instantdb";
 import type { ChronicleEntry } from "../components/MinistrySidebar";
 import type { BotType, VictoryType } from "../data/ministrySigils";
+import { startingHealthForSeat } from "../engine/player";
 
 interface MatchRow {
   id: string;
@@ -42,11 +43,12 @@ const VICTORY_LETTER_TO_LABEL: Record<string, VictoryType> = {
   F: "Forfeit",
 };
 
-// Engine starting HP rule (player.ts: 36 + 2 * turnOrder, uniform across
-// characters). Used here to render life remaining; will undercount if heals
-// were applied during play (engine tracks curHealth precisely but we don't
-// snapshot it on the match record yet).
-const startingHP = (turnOrder: number) => 36 + 2 * turnOrder;
+// Starting HP for one player given who went first. Used to render life
+// remaining; will undercount if heals were applied during play (engine
+// tracks curHealth precisely but we don't snapshot it on the match record
+// yet). Routes through startingHealthForSeat to keep the rule centralized.
+const startingHP = (seat: number, firstPlayer: number) =>
+  startingHealthForSeat(seat, firstPlayer).health;
 
 function formatDate(ts?: number): string {
   if (!ts) return "—";
@@ -102,8 +104,9 @@ export function useMatchHistory(userId: string | null): ChronicleEntry[] {
         const firstPlayer: "me" | "opp" =
           m.firstPlayerIndex === myPlayerIndex ? "me" : "opp";
 
-        const myLife  = Math.max(0, startingHP(myPlayerIndex)  - (myRow.damage  ?? 0));
-        const oppLife = Math.max(0, startingHP(oppRow.playerIndex) - (oppRow.damage ?? 0));
+        const firstPlayerIndex = m.firstPlayerIndex ?? 0;
+        const myLife  = Math.max(0, startingHP(myPlayerIndex,    firstPlayerIndex) - (myRow.damage  ?? 0));
+        const oppLife = Math.max(0, startingHP(oppRow.playerIndex, firstPlayerIndex) - (oppRow.damage ?? 0));
 
         return {
           id: m.id,

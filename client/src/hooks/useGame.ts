@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import type { GameState, GameAction, BotLogEntry, PlayerData } from "../types/game";
 import { GameSession, opponentTypeToKind } from "../engine/session";
+import { startingHealthForSeat } from "../engine/player";
 import { botLabel } from "../data/ministrySigils";
 import { resetCardIds } from "../engine/card";
 import { useTurnSideEffects, computeRecap, type TurnRecap } from "./useTurnSideEffects";
@@ -279,11 +280,13 @@ export function useGame() {
             initLog.push({ turn: entry.turn, text: `${bName} — ${entry.text}`, isBot: true, card: entry.card, cards: entry.cards, actionType: entry.actionType, metalIndex: entry.metalIndex });
           }
           // Flashes are derived declaratively by useTurnSideEffects from the
-          // initial gameState. Recap has no prior snapshot to diff against, so
-          // synthesize one from the engine's starting-HP rule (player.ts:54,
-          // `36 + 2 * turnOrder`, uniform across characters) + zero training /
-          // mission ranks / allies, then push imperatively.
-          const startHp = (p: PlayerData) => 36 + 2 * p.turnOrder;
+          // initial gameState. Recap has no prior snapshot to diff against,
+          // so synthesize one from the engine's starting-HP rule (via
+          // startingHealthForSeat — the single source of truth) plus zero
+          // training / mission ranks / allies, then push imperatively.
+          const firstPlayerIndex = botFirst ? 1 : 0;
+          const startHp = (p: PlayerData) =>
+            startingHealthForSeat(p.turnOrder, firstPlayerIndex).health;
           const baseline: GameState = {
             ...data,
             players: data.players.map((p, i) =>

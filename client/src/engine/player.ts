@@ -11,28 +11,40 @@ export const STARTING_HEALTH = 36;
 /** Hard HP cap. Overflow from the going-second bonus becomes starting boxings. */
 export const MAX_HEALTH = 40;
 
-/** Apply starting HP to every player based on actual turn order.
+/** Compute starting HP (and overflow boxings) for one seat, given who plays
+ *  first. Pure — doesn't mutate. Use this whenever you need to know what a
+ *  player WOULD start with: recap baselines, post-hoc life reconstruction
+ *  from match-history rows, anything off the live engine state.
  *
- *  Going-second compensation: +2 HP per position past the first player, with
- *  overflow above MAX_HEALTH converting to a starting boxing. Indexed by
- *  (seat - firstPlayer) mod N so the bonus follows turn order, NOT seat
- *  index. Get this wrong (use seat instead of turn order) and bot games
- *  silently give the bot both first-player AND +2 HP — this has bitten the
- *  codebase twice. Call sites that need starting HP MUST go through here.
- *
- *  Single source of truth: anything that sets initial HP should call this.
- *  Game's constructor invokes it during setup; nothing else should set
- *  curHealth at game start. */
+ *  THE BUG THIS REPLACES: previous code wrote `36 + 2 * turnOrder` in
+ *  several places, treating seat index as turn-order position. Those are
+ *  only the same when seat 0 plays first. Bot games pin the bot to seat 1,
+ *  so the bug silently gave the bot the going-second bonus even when the
+ *  bot went first. Has been re-introduced twice. If you ever feel tempted
+ *  to write `36 + 2 * seat` again, call this instead. */
+export function startingHealthForSeat(
+  seat: number,
+  firstPlayer: number,
+  numPlayers: number = 2,
+): { health: number; extraBoxings: number } {
+  const positionInTurnOrder = (seat - firstPlayer + numPlayers) % numPlayers;
+  const raw = STARTING_HEALTH + 2 * positionInTurnOrder;
+  if (raw > MAX_HEALTH) {
+    return { health: MAX_HEALTH, extraBoxings: raw - MAX_HEALTH };
+  }
+  return { health: raw, extraBoxings: 0 };
+}
+
+/** Apply starting HP to every player based on actual turn order. Single
+ *  source of truth for setting initial HP: Game's constructor calls this,
+ *  nothing else should write curHealth at game start. Delegates to
+ *  startingHealthForSeat — see there for the formula's rationale. */
 export function applyStartingHealth(players: Player[], firstPlayer: number): void {
   const n = players.length;
   for (let i = 0; i < n; i++) {
-    const positionInTurnOrder = (i - firstPlayer + n) % n;
-    let hp = STARTING_HEALTH + 2 * positionInTurnOrder;
-    if (hp > MAX_HEALTH) {
-      players[i].curBoxings += hp - MAX_HEALTH;
-      hp = MAX_HEALTH;
-    }
-    players[i].curHealth = hp;
+    const { health, extraBoxings } = startingHealthForSeat(i, firstPlayer, n);
+    players[i].curHealth = health;
+    players[i].curBoxings += extraBoxings;
   }
 }
 
