@@ -136,6 +136,9 @@ interface GameSnapshot {
    *  on rollback so events emitted by a partial action (e.g. one that threw
    *  PromptNeeded mid-way) don't leak into the activity log after restore. */
   deckEvents: Game["deckEvents"];
+  /** K-effect kill requests captured at snapshot time. Restored on rollback
+   *  so an undone Maelstrom/Assassinate doesn't leave pending kills queued. */
+  pendingKills: Game["pendingKills"];
   /** Optional bookkeeping value the caller can attach to a snapshot via
    *  `setNextSnapshotData`. Used by the hook to record its own pre-action
    *  log length so undo can roll back UI state alongside engine state. */
@@ -267,6 +270,27 @@ export class GameSession {
    *  save) and hand control back to the attacker for any leftover damage. */
   private _pending_ally_kill:
     | { attackerIndex: 0 | 1; defenderIndex: 0 | 1; targetAllyId: number }
+    | null = null;
+  /** Per-bot-turn resume state, set at the start of `_runBotTurn` and
+   *  cleared in `_finishBotTurn`. Lets the bot's turn pause mid-damage-loop
+   *  for a human defender's cloudA decision; resolveAllyDefense reads this
+   *  to know it should resume the bot turn instead of returning to the
+   *  human attacker. The snapshot fields (oppHpBefore, oppAlliesBefore,
+   *  oppHandBefore) are captured once at turn-start and used by
+   *  _finishBotTurn's post-attack logging. */
+  private _bot_turn:
+    | {
+        botIndex: 0 | 1;
+        defenderIndex: 0 | 1;
+        botTurn: number;
+        oppHpBefore: number;
+        oppAlliesBefore: string[];
+        oppHandBefore: Set<number>;
+        restorePerformAction: () => void;
+        /** Which sub-step the bot is in. Used by resolveAllyDefense to pick
+         *  the right resume path when an ally_defense pause unblocks. */
+        step: "actions" | "damage";
+      }
     | null = null;
   /** True while resolveSense is driving _attemptAction. The sense_block log
    *  entry is pushed by resolveSense in that case (where we have direct
@@ -409,6 +433,7 @@ export class GameSession {
       logLengths: [this._logs[0].length, this._logs[1].length],
       actionEventsLength: this._actionEvents.length,
       deckEvents: this.game.deckEvents.map((e) => ({ ...e })),
+      pendingKills: this.game.pendingKills.map((e) => ({ ...e })),
       ...(externalData !== null ? { externalData } : {}),
     };
   }
@@ -461,6 +486,7 @@ export class GameSession {
       }
     }
     this.game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));
+    this.game.pendingKills = snap.pendingKills.map((e) => ({ ...e }));
   }
 
   private _allCards(): Card[] {
@@ -937,6 +963,12 @@ export class GameSession {
       throw e;
     }
 
+    // Drain any K-effect kills queued by this action (Assassinate / Coinshot
+    // ability 2, Maelstrom, mission first-reached K rewards). Inline drain
+    // for now — Phase B will replace this with a pause-aware drain that
+    // prompts a human defender for cloudA.
+    this.game.drainPendingKills();
+
     this._pending_prompt = null;
     this._accumulated_responses = [];
     const revealedInfo = this._preActionSnapshot ? this._didRevealInfo(this._preActionSnapshot) : false;
@@ -1170,6 +1202,22 @@ export class GameSession {
     }
 
     this._pending_ally_kill = null;
+
+    // If we paused mid-bot-turn, resume the bot's turn from the step we
+    // were in. Actions step drains queued kills + keeps picking actions;
+    // damage step drains then continues assigning damage.
+    if (this._bot_turn) {
+      this.phase = "actions"; // placeholder; resume steps may re-pause
+      this.activePlayer = this._bot_turn.botIndex;
+      if (this._bot_turn.step === "actions") {
+        if (this._runBotActionsStep()) return this._returnState(playerIndex);
+        this._bot_turn.step = "damage";
+      }
+      if (this._runBotDamageStep()) return this._returnState(playerIndex);
+      this._finishBotTurn();
+      return this._returnState(playerIndex);
+    }
+
     this.phase = "damage";
     this.activePlayer = attackerIndex;
 
@@ -1246,6 +1294,30 @@ export class GameSession {
         usedSenseCard = defender.deck.hand.find(
           (c): c is Action => c instanceof Action && c.data[9] === "sense",
         );
+      }
+
+      // Bot-attacker resume path: the bot is mid-_runBotActionsStep waiting
+      // for this decision. Execute the advance through bot.performAction
+      // (the wrapper logs + drains deck events), then continue the actions
+      // loop / damage step from where it paused.
+      if (this._bot_turn) {
+        const bot = this.players[attackerIndex];
+        bot.performAction(pending, this.game);
+        if (usedSenseCard) {
+          const senseValue = parseInt(usedSenseCard.data[10], 10);
+          this._logs[playerIndex].push({
+            turn: this.game.turncount,
+            text: `Used ${usedSenseCard.name} to block mission advance (−${senseValue} mission)`,
+            card: usedSenseCard.toJSON() as CardData,
+            actionType: "sense_block",
+          });
+        }
+        defender._sense_flag = null;
+        if (this._runBotActionsStep()) return this._returnState(playerIndex);
+        this._bot_turn.step = "damage";
+        if (this._runBotDamageStep()) return this._returnState(playerIndex);
+        this._finishBotTurn();
+        return this._returnState(playerIndex);
       }
 
       this._resolvingSense = true;
@@ -1495,8 +1567,18 @@ export class GameSession {
     this._drainDeckEvents();
   }
 
-  /** Run a bot's full turn (training already resolved). Handles logging,
-   *  opponent-visible events (ally kills, sense blocks, damage, cloud check). */
+  /** Run a bot's full turn (training already resolved). The turn is split
+   *  into:
+   *    1. takeActions — synchronous loop in the bot's Player.takeActions,
+   *       with K-effect kills drained inline (no pause yet; Phase C target).
+   *    2. damage     — session-driven loop in _runBotDamageStep, can pause
+   *       for the human defender's cloudA decision (`ally_defense` phase).
+   *    3. finish     — game.attack + post-attack logging + cloud check +
+   *       cleanup, in `_finishBotTurn`.
+   *
+   *  When the damage step pauses, `_bot_turn` is left non-null so
+   *  resolveAllyDefense knows to resume the loop instead of returning to a
+   *  human attacker. */
   private _runBotTurn(botIndex: number) {
     const bi = botIndex as 0 | 1;
     const oi = (1 - bi) as 0 | 1;
@@ -1553,17 +1635,183 @@ export class GameSession {
       return result;
     };
 
-    try {
-      // Bot's Player.playTurn: calls training (already done → re-does it, so
-      // skip that by running takeActions+assignDamage+attack manually).
-      // Actually Player.playTurn re-trains. Instead we mirror it minus training.
-      bot.takeActions(this.game);
-      bot.assignDamage(this.game);
-      this.game.attack(bot);
-      bot.curDamage = bot.pDamage;
-    } finally {
-      bot.performAction = originalPerform;
+    this._bot_turn = {
+      botIndex: bi,
+      defenderIndex: oi,
+      botTurn,
+      oppHpBefore,
+      oppAlliesBefore,
+      oppHandBefore,
+      restorePerformAction: () => { bot.performAction = originalPerform; },
+      step: "actions",
+    };
+
+    // Actions step. Replaces Player.takeActions's loop with a session-driven
+    // version so the pendingKills drain between actions can pause for a
+    // human defender's cloudA decision.
+    if (this._runBotActionsStep()) return;
+
+    this._bot_turn.step = "damage";
+
+    // Damage step. Returns true if it paused for ally_defense.
+    if (this._runBotDamageStep()) return;
+
+    this._finishBotTurn();
+  }
+
+  /** Drive the bot's actions loop. After each action (including end_actions),
+   *  drain any K-effect kills queued by that action's resolve chain
+   *  (Assassinate / Coinshot ability 2, Maelstrom, mission first-reached K).
+   *  Before each action, if the bot is advancing a mission and the human
+   *  defender has unused sense cards, pause for `sense_defense`.
+   *  Returns true if the loop paused (ally_defense or sense_defense). */
+  private _runBotActionsStep(): boolean {
+    const turn = this._bot_turn;
+    if (!turn) return false;
+    const bot = this.players[turn.botIndex];
+    const simulating = (bot as Player & { _simulating?: boolean })._simulating === true;
+
+    for (;;) {
+      if (this._drainBotPendingKills()) return true;
+
+      const actions = bot.availableActions(this.game);
+      const action = bot.selectAction(actions, this.game);
+
+      if (this._tryPauseForSenseDefense(action, turn.defenderIndex, simulating)) return true;
+
+      bot.performAction(action, this.game);
+
+      if (action.type === "end_actions") {
+        // Drain anything end_actions itself queued (rare, but possible for
+        // future cards). Pause here too if needed.
+        if (this._drainBotPendingKills()) return true;
+        return false;
+      }
     }
+  }
+
+  /** If `action` is an advance_mission that the human defender could block
+   *  with an unused sense card, pause for the prompt and stash the action
+   *  in `_pending_advance_action` so resolveSense can actually fire it
+   *  after the defender decides. Sims skip the pause and let the bot's
+   *  performAction call the senseCheck heuristic normally. */
+  private _tryPauseForSenseDefense(
+    action: GameActionInternal,
+    defenderIndex: 0 | 1,
+    simulating: boolean,
+  ): boolean {
+    if (simulating) return false;
+    if (action.type !== "advance_mission") return false;
+    if (this._isBot(defenderIndex)) return false;
+    const defender = this.players[defenderIndex] as WebPlayer;
+    if (defender._sense_flag !== null) return false;
+    const hasSense = defender.deck.hand.some(
+      (c) => c instanceof Action && c.data[9] === "sense",
+    );
+    if (!hasSense) return false;
+    this._pending_advance_action = action;
+    this.phase = "sense_defense";
+    this.activePlayer = defenderIndex;
+    return true;
+  }
+
+  /** Apply queued K-effect kills, pausing for `ally_defense` when the
+   *  defender is a human with cloudA cards. Returns true on pause. Used by
+   *  both the bot-attacker state machine (via _drainBotPendingKills) and
+   *  the human-attacker path in _attemptAction. */
+  private _drainPendingKills(attackerIndex: 0 | 1, simulating: boolean): boolean {
+    while (this.game.pendingKills.length > 0) {
+      const req = this.game.pendingKills[0];
+      const defender = this.players[req.defenderIndex];
+      const target = defender.allies.find((a) => a.id === req.targetAllyId);
+
+      if (!target) {
+        // Already removed by an earlier queued kill — skip silently.
+        this.game.pendingKills.shift();
+        continue;
+      }
+
+      if (!this._isBot(req.defenderIndex) && defender.cloudAllyCards().length > 0 && !simulating) {
+        // Consume the request now — the pause carries the kill data via
+        // `_pending_ally_kill`, and resolveAllyDefense applies the outcome
+        // (kill or save) directly from there.
+        this.game.pendingKills.shift();
+        this._pending_ally_kill = {
+          attackerIndex,
+          defenderIndex: req.defenderIndex as 0 | 1,
+          targetAllyId: req.targetAllyId,
+        };
+        this.phase = "ally_defense";
+        this.activePlayer = req.defenderIndex as 0 | 1;
+        return true;
+      }
+
+      this.game.pendingKills.shift();
+      const protectedBy = defender.killAlly(target);
+      this._logKillResult(attackerIndex, req.defenderIndex as 0 | 1, target, protectedBy);
+    }
+    return false;
+  }
+
+  /** Convenience wrapper for the bot-attacker path. */
+  private _drainBotPendingKills(): boolean {
+    const turn = this._bot_turn;
+    if (!turn) return false;
+    const bot = this.players[turn.botIndex];
+    const simulating = (bot as Player & { _simulating?: boolean })._simulating === true;
+    return this._drainPendingKills(turn.botIndex, simulating);
+  }
+
+  /** Drive the bot's damage-assignment loop. Returns true if the loop
+   *  paused for the human defender's cloudA decision (caller must return
+   *  immediately so the engine can serve the prompt). */
+  private _runBotDamageStep(): boolean {
+    const turn = this._bot_turn;
+    if (!turn) return false;
+    const bot = this.players[turn.botIndex];
+    const opp = this.players[turn.defenderIndex];
+    const simulating = (bot as Player & { _simulating?: boolean })._simulating === true;
+
+    for (;;) {
+      const [targets] = this.game.validTargets(bot);
+      const choice = bot.assignDamageIn(targets);
+      if (choice === -1) return false;
+      const target = targets[choice];
+      bot.curDamage -= target.health;
+
+      // Pause for human defender's cloudA decision. Bots auto-decide via
+      // their cloudAlly heuristic inside killAlly (no pause needed); sims
+      // never pause regardless.
+      if (!this._isBot(turn.defenderIndex) && opp.cloudAllyCards().length > 0 && !simulating) {
+        this._pending_ally_kill = {
+          attackerIndex: turn.botIndex,
+          defenderIndex: turn.defenderIndex,
+          targetAllyId: target.id,
+        };
+        this.phase = "ally_defense";
+        this.activePlayer = turn.defenderIndex;
+        return true;
+      }
+
+      const protectedBy = opp.killAlly(target);
+      this._logKillResult(turn.botIndex, turn.defenderIndex, target, protectedBy);
+    }
+  }
+
+  /** Post-damage portion of the bot's turn: game.attack + opponent-visible
+   *  logging + cloud check + cleanup. Clears `_bot_turn` so subsequent
+   *  defense resolvers don't re-enter the bot path. */
+  private _finishBotTurn() {
+    const turn = this._bot_turn;
+    if (!turn) return;
+    const { botIndex: bi, defenderIndex: oi, botTurn, oppHpBefore, oppAlliesBefore, oppHandBefore, restorePerformAction } = turn;
+    this._bot_turn = null;
+    const bot = this.players[bi];
+    const opp = this.players[oi];
+
+    this.game.attack(bot);
+    bot.curDamage = bot.pDamage;
+    restorePerformAction();
 
     // Opponent-visible logs: ally kills, sense usage, damage
     const killed = oppAlliesBefore.filter((n) => !opp.allies.some((a) => a.name === n));

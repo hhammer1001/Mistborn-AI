@@ -229,6 +229,11 @@ export class Player {
       const actions = this.availableActions(game);
       const action = this.selectAction(actions, game);
       this.performAction(action, game);
+      // Drain any K-effect kills enqueued during this action's resolve
+      // chain (mission rewards, Assassinate/Coinshot ability 2, Maelstrom).
+      // Self-play path: applies inline; session-driven play replaces this
+      // call with its own pause-aware drain at the same point.
+      game.drainPendingKills();
       if (action.type === "end_actions") return;
     }
   }
@@ -348,7 +353,13 @@ export class Player {
     if (options.length > 0) {
       const choice = this.killEnemyAllyIn(options);
       if (choice !== -1) {
-        opp.killAlly(options[choice]);
+        // Enqueue; drained at the end of the current performAction so the
+        // session can pause for a human defender's cloudA decision between
+        // the resolve and the actual removal.
+        this.game.pendingKills.push({
+          defenderIndex: opp.turnOrder,
+          targetAllyId: options[choice].id,
+        });
       }
     }
   }
@@ -565,10 +576,17 @@ export class Player {
     this.game.market.discard.splice(choice, 1);
   }
   special11() { // Maelstrom: kill all opponent allies + clear market
+    // Enqueue per-ally kill requests. Each one becomes an individually-
+    // saveable event when the session drains; bot defenders still get to
+    // exercise cloudAlly per ally. Market clear runs inline below — it
+    // doesn't interact with the kill order.
     for (const player of this.game.players) {
       if (player !== this) {
-        for (const ally of [...player.allies]) {
-          player.killAlly(ally);
+        for (const ally of player.allies) {
+          this.game.pendingKills.push({
+            defenderIndex: player.turnOrder,
+            targetAllyId: ally.id,
+          });
         }
       }
     }

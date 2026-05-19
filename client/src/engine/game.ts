@@ -39,6 +39,18 @@ export class Game {
   /** Buffered deck events (ad-hoc draws + reshuffles) that the session
    *  drains into per-player logs after each action. Cleared by drain. */
   deckEvents: Array<{ type: "draw"; playerIndex: number; amount: number }> = [];
+  /** K-effect ally kills enqueued during action resolution (mission first-
+   *  reached `K` rewards, Assassinate / Coinshot ability 2, Maelstrom). The
+   *  queue defers the actual `killAlly` call until a safe boundary so the
+   *  session can intercept and prompt a human defender for cloudA, and so
+   *  multi-target kills (Maelstrom) become a series of individually-saveable
+   *  events rather than an atomic massacre.
+   *
+   *  Self-play (Game.play()) drains inline via drainPendingKills() right
+   *  after each performAction — behavior matches the pre-queue inline kill.
+   *  Session-driven play drives the drain with pause checks for human
+   *  defenders. */
+  pendingKills: Array<{ defenderIndex: number; targetAllyId: number }> = [];
 
   constructor(opts: {
     names?: string[];
@@ -178,6 +190,22 @@ export class Game {
     return opp.senseCheck();
   }
 
+  /** Apply every queued K-effect kill in order, then clear the queue. Each
+   *  kill goes through the defender's `killAlly` so bot defenders still
+   *  exercise their `cloudAlly` heuristic, and so Player.applyKillAlly's
+   *  on-play undoes (Noble / Crewleader / Smoker) fire. A queued target may
+   *  have already been removed by an earlier kill (Maelstrom enqueues many
+   *  at once); skip silently in that case. Session-driven play calls this
+   *  with pause checks woven in — see _drainPendingKillsWithPauses. */
+  drainPendingKills(): void {
+    while (this.pendingKills.length > 0) {
+      const req = this.pendingKills.shift()!;
+      const defender = this.players[req.defenderIndex];
+      const target = defender.allies.find((a) => a.id === req.targetAllyId);
+      if (target) defender.killAlly(target);
+    }
+  }
+
   toJSON(perspective: number | null = null) {
     return {
       turnCount: this.turncount,
@@ -233,6 +261,9 @@ export class Game {
     if (this.winner) {
       g.winner = g.players[this.winner.turnOrder];
     }
+
+    g.deckEvents = this.deckEvents.map((e) => ({ ...e }));
+    g.pendingKills = this.pendingKills.map((e) => ({ ...e }));
 
     return g;
   }
