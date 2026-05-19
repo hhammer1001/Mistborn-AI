@@ -265,11 +265,22 @@ export class GameSession {
    *  sense decision. resolveSense uses this to resume the original action
    *  after the defender chooses. */
   private _pending_advance_action: GameActionInternal | null = null;
-  /** Set when an ally-kill is paused mid-assignDamage for a human defender's
-   *  cloudA decision. resolveAllyDefense uses this to finish the kill (or
-   *  save) and hand control back to the attacker for any leftover damage. */
+  /** Set when an ally-kill is paused for a human defender's cloudA decision.
+   *  `source` tells resolveAllyDefense which resume path to take when the
+   *  pause unblocks:
+   *    "damage"   — paused inside session.assignDamage; resume returns to
+   *                 the damage phase so the attacker can keep assigning.
+   *    "k_effect" — paused inside _attemptAction's K-drain (Assassinate /
+   *                 Coinshot ability 2, Maelstrom, mission first-reached
+   *                 K rewards); resume drains remaining queued kills then
+   *                 hands control back to the attacker's actions phase. */
   private _pending_ally_kill:
-    | { attackerIndex: 0 | 1; defenderIndex: 0 | 1; targetAllyId: number }
+    | {
+        attackerIndex: 0 | 1;
+        defenderIndex: 0 | 1;
+        targetAllyId: number;
+        source: "damage" | "k_effect";
+      }
     | null = null;
   /** Per-bot-turn resume state, set at the start of `_runBotTurn` and
    *  cleared in `_finishBotTurn`. Lets the bot's turn pause mid-damage-loop
@@ -963,12 +974,6 @@ export class GameSession {
       throw e;
     }
 
-    // Drain any K-effect kills queued by this action (Assassinate / Coinshot
-    // ability 2, Maelstrom, mission first-reached K rewards). Inline drain
-    // for now — Phase B will replace this with a pause-aware drain that
-    // prompts a human defender for cloudA.
-    this.game.drainPendingKills();
-
     this._pending_prompt = null;
     this._accumulated_responses = [];
     const revealedInfo = this._preActionSnapshot ? this._didRevealInfo(this._preActionSnapshot) : false;
@@ -1083,6 +1088,15 @@ export class GameSession {
       this._undoStack = [];
     }
     this._cached_raw = null;
+
+    // Drain any K-effect kills queued by this action (Assassinate / Coinshot
+    // ability 2, Maelstrom, mission first-reached K rewards). Logged via
+    // _logKillResult; pauses for `ally_defense` when the defender is a
+    // human with a cloudA card in hand (PvP). Drained at the very end of
+    // _attemptAction so that on pause, all the action-attribution log
+    // entries are already pushed and only the kill outcome is deferred.
+    const simulating = (p as Player & { _simulating?: boolean })._simulating === true;
+    this._drainPendingKills(playerIndex as 0 | 1, simulating);
     return this._returnState(playerIndex);
   }
 
@@ -1147,6 +1161,7 @@ export class GameSession {
         attackerIndex: playerIndex as 0 | 1,
         defenderIndex,
         targetAllyId: target.id,
+        source: "damage",
       };
       this.phase = "ally_defense";
       this.activePlayer = defenderIndex;
@@ -1176,7 +1191,7 @@ export class GameSession {
     if (this.phase !== "ally_defense") return { error: `Cannot resolve ally defense in phase: ${this.phase}` };
     if (!this._pending_ally_kill) return { error: "No pending ally kill" };
 
-    const { attackerIndex, defenderIndex, targetAllyId } = this._pending_ally_kill;
+    const { attackerIndex, defenderIndex, targetAllyId, source } = this._pending_ally_kill;
     if (playerIndex !== defenderIndex) return { error: "Not your defense to make" };
 
     const attacker = this.players[attackerIndex];
@@ -1218,11 +1233,24 @@ export class GameSession {
       return this._returnState(playerIndex);
     }
 
+    // K-effect resume (human attacker, PvP): drain any remaining queued
+    // kills from the same source action (e.g. Maelstrom's other targets)
+    // then hand control back to the attacker for their next action. The
+    // attacker is still mid-actions phase — not damage.
+    if (source === "k_effect") {
+      if (this._drainPendingKills(attackerIndex, false)) {
+        return this._returnState(playerIndex);
+      }
+      this.phase = "actions";
+      this.activePlayer = attackerIndex;
+      if (this.game.winner) this.phase = "game_over";
+      return this._returnState(playerIndex);
+    }
+
+    // Damage-phase resume (existing path): back to the attacker's damage
+    // assignment. Auto-finish the face-hit if no targets and no damage left.
     this.phase = "damage";
     this.activePlayer = attackerIndex;
-
-    // Mirror assignDamage's post-kill bookkeeping: if no more targets and the
-    // attacker has spent their damage, auto-resolve the face hit.
     if (this.game.winner) { this.phase = "game_over"; return this._returnState(playerIndex); }
     const [newTargets] = this.game.validTargets(attacker);
     if (newTargets.length === 0 && attacker.curDamage === 0) {
@@ -1468,17 +1496,18 @@ export class GameSession {
       this._logs[pi].push({ turn: this.game.turncount, text: `Dealt ${hpLost} damage to ${opp.name}` });
     }
 
+    // Bot defenders already auto-consumed every cloudP card they wanted to
+    // (via takeDamage + cloudP heuristic). Remaining cloudP cards in their
+    // hand are ones the heuristic deliberately *declined* — entering the
+    // cloud_defense phase just to log a misleading "Incoming: residual"
+    // line and immediately auto-skip is pure noise. Only enter for humans.
+    const humanDefender = !this._isBot(oi);
     const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
-    if (hpLost > 0 && cloudCards.length > 0) {
+    if (hpLost > 0 && cloudCards.length > 0 && humanDefender) {
       this._cloud_damage = hpLost;
       this._logs[oi].push({ turn: this.game.turncount, text: `Incoming: ${hpLost} damage` });
       this.phase = "cloud_defense";
       this.activePlayer = oi;
-      // If the defender is a bot, auto-skip cloud defense (bot's cloudP already
-      // returns false; matching prior single-player behavior).
-      if (this._isBot(oi)) {
-        this.resolveCloud(oi, []);
-      }
       return;
     }
 
@@ -1767,12 +1796,15 @@ export class GameSession {
       if (!this._isBot(req.defenderIndex) && defender.cloudAllyCards().length > 0 && !simulating) {
         // Consume the request now — the pause carries the kill data via
         // `_pending_ally_kill`, and resolveAllyDefense applies the outcome
-        // (kill or save) directly from there.
+        // (kill or save) directly from there. `source: "k_effect"` tells
+        // the resume path to drain any remaining queued kills + return to
+        // the actions phase (vs the damage-phase resume).
         this.game.pendingKills.shift();
         this._pending_ally_kill = {
           attackerIndex,
           defenderIndex: req.defenderIndex as 0 | 1,
           targetAllyId: req.targetAllyId,
+          source: "k_effect",
         };
         this.phase = "ally_defense";
         this.activePlayer = req.defenderIndex as 0 | 1;
@@ -1820,6 +1852,7 @@ export class GameSession {
           attackerIndex: turn.botIndex,
           defenderIndex: turn.defenderIndex,
           targetAllyId: target.id,
+          source: "damage",
         };
         this.phase = "ally_defense";
         this.activePlayer = turn.defenderIndex;
@@ -1858,18 +1891,17 @@ export class GameSession {
     // when empty.
     this._logCloudBlock(oi as 0 | 1, bi as 0 | 1, cloudsUsed);
 
-    // Check cloud defense for opponent
+    // Same logic as _executeAttackAndTransition: only humans get the
+    // cloud_defense prompt. Bot defenders have already exercised their
+    // cloudP heuristic inside takeDamage; any remaining cloudP cards are
+    // ones the bot chose not to spend.
+    const humanDefender = !this._isBot(oi);
     const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
-    if (hpLost > 0 && cloudCards.length > 0) {
+    if (hpLost > 0 && cloudCards.length > 0 && humanDefender) {
       this._cloud_damage = hpLost;
       this._logs[oi].push({ turn: botTurn, text: `Incoming: ${hpLost} damage` });
       this.phase = "cloud_defense";
       this.activePlayer = oi;
-      // If the opp is also a bot (shouldn't happen in normal single/multiplayer
-      // but cheap to handle), auto-skip.
-      if (this._isBot(oi)) {
-        this.resolveCloud(oi, []);
-      }
       return;
     }
 
