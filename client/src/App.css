@@ -1612,10 +1612,9 @@ h3 {
   .player-info.you > .player-stats-grid    { order: 4; }
   .player-info.you > .player-action-btns   { order: 5; }
 
-  /* Hide the vertical metals strip on mobile — metal interactions are
-     surfaced inline via Hand/Ally cards, so the dedicated track is
-     redundant in the narrower layout. */
-  .metal-col-zone { display: none; }
+  /* The vertical metals strip is hidden on mobile via a media query
+     placed below the base .metal-col-zone rule (source-order specificity).
+     See the @media block at the end of the Metal Tokens section. */
 }
 
 /* ─── Damage Phase ────────────────────────────────────────────────── */
@@ -3006,6 +3005,15 @@ h3 {
   padding: 0.2rem 0.15rem;
   flex: 1;
   min-height: 0;
+}
+
+/* Mobile: hide the vertical metals strip. Metal interactions are surfaced
+   inline on Hand/Ally cards, so the dedicated track is redundant on narrow
+   screens. Placed here (after the base rule) because there's an earlier
+   @media block above with the same hide that gets overridden by the base
+   `display: flex` due to equal-specificity source order. */
+@media (max-width: 900px) {
+  .metal-col-zone { display: none; }
 }
 
 .metal-col-header {
