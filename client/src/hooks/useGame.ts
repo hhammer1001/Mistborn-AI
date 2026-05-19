@@ -51,11 +51,14 @@ function isRealBotTurnEntry(e: BotLogEntry): boolean {
  *  things the player already saw in their own log: "Opponent killed your X"
  *  echoes the player's "Killed bot's X", and "Opponent's X blocked Y damage"
  *  echoes the player's "X blocked Y damage". Useful for multiplayer (where
- *  the other side is a human who needs the narration), redundant in SP. */
+ *  the other side is a human who needs the narration), redundant in SP.
+ *
+ *  cloud_ally_block is NOT in this list — the single entry lives on the
+ *  defender's log (sense_block pattern) so SP players see the bot's save
+ *  rendered in opponent-red, not as an effect of their own action. */
 function isOpponentMirror(e: BotLogEntry): boolean {
   return e.actionType === "opponent_kill"
-    || e.actionType === "cloud_block"
-    || e.actionType === "cloud_ally_block";
+    || e.actionType === "cloud_block";
 }
 
 /** Assemble log entries from a session result. Handles three layout concerns
@@ -478,8 +481,10 @@ export function useGame() {
           const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
           // The engine may swallow the kill via cloudA (e.g. defender's Hide).
           // Soften the verb when that happens so the action line matches the
-          // resulting "Opponent's X protected Y" effect below it.
-          const wasBlocked = playerLogDelta.some((e) => e.actionType === "cloud_ally_block");
+          // resulting "Used Hide to save X" effect below it. The cloud_ally
+          // entry lives on the defender's log (bot log from the player's
+          // perspective), so check botLogDelta — not playerLogDelta.
+          const wasBlocked = botLogDelta.some((e) => e.actionType === "cloud_ally_block");
           const verb = wasBlocked ? "attempted to kill" : "killed";
           initial.push({ turn: gameState.turnCount, text: `${pName} ${verb} ${target?.name ?? "ally"} (${target?.health ?? "?"} HP)` });
         }

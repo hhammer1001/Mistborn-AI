@@ -1270,17 +1270,16 @@ export class GameSession {
   ) {
     const opp = this.players[defenderIndex];
     if (protectedBy) {
-      const protectorData = protectedBy.toJSON() as CardData;
-      this._logs[attackerIndex].push({
-        turn: this.game.turncount,
-        text: `Opponent's ${protectedBy.name} protected ${target.name} from being killed`,
-        card: protectorData,
-        actionType: "cloud_ally_block",
-      });
+      // Single entry on the defender's log only — matches the sense_block
+      // pattern. The attacker viewing the activity feed sees this as a bot
+      // (or opponent) action prefixed with the defender's name, styled in
+      // the opponent color. The defender's own viewer sees it in their
+      // playerLog with the standard "→" prefix. Phrased neutrally (no
+      // "your"/"opponent's") so both perspectives read naturally.
       this._logs[defenderIndex].push({
         turn: this.game.turncount,
-        text: `${protectedBy.name} protected your ${target.name} from being killed`,
-        card: protectorData,
+        text: `Used ${protectedBy.name} to save ${target.name}`,
+        card: protectedBy.toJSON() as CardData,
         actionType: "cloud_ally_block",
       });
     } else {
