@@ -1,5 +1,5 @@
 import { Player, applyStartingHealth } from "./player";
-import { Ally, Card } from "./card";
+import { Action, Ally, Card } from "./card";
 import { PlayerDeck, Market } from "./deck";
 import { Mission } from "./mission";
 import { MISSION_TIERS, ALL_MISSION_NAMES, METAL_NAMES } from "./types";
@@ -46,11 +46,19 @@ export class Game {
    *  multi-target kills (Maelstrom) become a series of individually-saveable
    *  events rather than an atomic massacre.
    *
+   *  `attackerIndex` lets the drain re-pick via the attacker's
+   *  killEnemyAllyIn when the original target is already dead — needed for
+   *  the rare case where multiple K rewards fire in one mission.progress
+   *  call (e.g., bot crosses Luthadel Garrison tiers 4 and 7 in one
+   *  advance). Bots' killEnemyAllyIn is deterministic, so both would
+   *  queue the same target; without re-targeting, the second kill is a
+   *  silent no-op compared to the old inline-kill semantics.
+   *
    *  Self-play (Game.play()) drains inline via drainPendingKills() right
    *  after each performAction — behavior matches the pre-queue inline kill.
    *  Session-driven play drives the drain with pause checks for human
    *  defenders. */
-  pendingKills: Array<{ defenderIndex: number; targetAllyId: number }> = [];
+  pendingKills: Array<{ attackerIndex: number; defenderIndex: number; targetAllyId: number }> = [];
 
   constructor(opts: {
     names?: string[];
@@ -156,12 +164,15 @@ export class Game {
     }
   }
 
-  attack(player: Player) {
+  /** Apply the attacker's damage to the opponent (or no-op if blocked by a
+   *  defender ally). Returns any cloudP cards the opponent auto-consumed
+   *  while taking damage — propagated up so the session can log them. */
+  attack(player: Player): Action[] {
     const opp = this.players[(player.turnOrder + 1) % 2];
     for (const ally of opp.allies) {
-      if (ally.defender) return; // Defender blocks direct attack
+      if (ally.defender) return []; // Defender blocks direct attack
     }
-    opp.takeDamage(player.curDamage);
+    const cloudsUsed = opp.takeDamage(player.curDamage);
     // Only claim the damage victory if no earlier-in-turn condition already
     // declared one. The bot can hit mission victory mid-turn (e.g. advances
     // its 3rd mission to 12) and then deal lethal damage in the same turn;
@@ -171,6 +182,7 @@ export class Game {
       this.victoryType = "D";
       this.winner = player;
     }
+    return cloudsUsed;
   }
 
   /** Returns [killable targets, opponent] */
@@ -190,19 +202,40 @@ export class Game {
     return opp.senseCheck();
   }
 
+  /** Resolve the queued target for a kill request: if the original ally is
+   *  still alive, use it; otherwise let the attacker's killEnemyAllyIn
+   *  re-pick from currently-living opponent allies. Returns null when no
+   *  valid target exists (skip the kill silently). Bots' killEnemyAllyIn
+   *  is deterministic, so two queued K rewards in the same advance would
+   *  otherwise reference the same target and silently waste the second
+   *  kill — re-targeting here matches the old inline-kill behavior. */
+  resolveKillTarget(req: { attackerIndex: number; defenderIndex: number; targetAllyId: number }): Ally | null {
+    const defender = this.players[req.defenderIndex];
+    const queued = defender.allies.find((a) => a.id === req.targetAllyId);
+    if (queued) return queued;
+    const attacker = this.players[req.attackerIndex];
+    const [options] = this.validTargets(attacker, true);
+    if (options.length === 0) return null;
+    const choice = attacker.killEnemyAllyIn(options);
+    if (choice === -1) return null;
+    const newTarget = options[choice];
+    req.targetAllyId = newTarget.id;
+    return newTarget;
+  }
+
   /** Apply every queued K-effect kill in order, then clear the queue. Each
    *  kill goes through the defender's `killAlly` so bot defenders still
    *  exercise their `cloudAlly` heuristic, and so Player.applyKillAlly's
-   *  on-play undoes (Noble / Crewleader / Smoker) fire. A queued target may
-   *  have already been removed by an earlier kill (Maelstrom enqueues many
-   *  at once); skip silently in that case. Session-driven play calls this
-   *  with pause checks woven in — see _drainPendingKillsWithPauses. */
+   *  on-play undoes (Noble / Crewleader / Smoker) fire. Session-driven play
+   *  calls this with pause checks woven in — see session._drainPendingKills. */
   drainPendingKills(): void {
     while (this.pendingKills.length > 0) {
       const req = this.pendingKills.shift()!;
-      const defender = this.players[req.defenderIndex];
-      const target = defender.allies.find((a) => a.id === req.targetAllyId);
-      if (target) defender.killAlly(target);
+      const target = this.resolveKillTarget(req);
+      if (target) {
+        const defender = this.players[req.defenderIndex];
+        defender.killAlly(target);
+      }
     }
   }
 

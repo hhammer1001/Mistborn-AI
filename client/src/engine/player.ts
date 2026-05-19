@@ -355,8 +355,12 @@ export class Player {
       if (choice !== -1) {
         // Enqueue; drained at the end of the current performAction so the
         // session can pause for a human defender's cloudA decision between
-        // the resolve and the actual removal.
+        // the resolve and the actual removal. attackerIndex lets the drain
+        // re-pick if the queued target is dead by drain time (matters when
+        // two K rewards fire in one mission.progress with deterministic
+        // bot picks).
         this.game.pendingKills.push({
+          attackerIndex: this.turnOrder,
           defenderIndex: opp.turnOrder,
           targetAllyId: options[choice].id,
         });
@@ -478,7 +482,15 @@ export class Player {
     }
   }
 
-  takeDamage(amount: number) {
+  /** Apply incoming damage, auto-consuming any cloudP (Coppercloud) cards
+   *  the player's bot override opts into. Returns the cards that were
+   *  used — callers (session.ts) log them so bot defensive plays show up
+   *  in the activity feed the same way cloudA usage does. Humans' cloudP
+   *  override returns false, so this list is always empty for them; their
+   *  cloudP decisions go through the cloud_defense prompt + resolveCloud
+   *  path instead. */
+  takeDamage(amount: number): Action[] {
+    const cardsUsed: Action[] = [];
     for (const card of [...this.deck.hand]) {
       if (card instanceof Action && card.data[9] === "cloudP") {
         if (this.cloudP(card)) {
@@ -486,12 +498,14 @@ export class Player {
           const idx = this.deck.hand.indexOf(card);
           if (idx !== -1) this.deck.hand.splice(idx, 1);
           this.deck.discard.push(card);
+          cardsUsed.push(card);
         }
       }
     }
     this.curHealth -= amount;
     if (amount > 0 && this.smoking) this.curHealth += 1;
     if (this.curHealth <= 0) this.alive = false;
+    return cardsUsed;
   }
 
   // ── Special abilities ──
@@ -584,6 +598,7 @@ export class Player {
       if (player !== this) {
         for (const ally of player.allies) {
           this.game.pendingKills.push({
+            attackerIndex: this.turnOrder,
             defenderIndex: player.turnOrder,
             targetAllyId: ally.id,
           });

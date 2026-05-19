@@ -283,9 +283,9 @@ export class GameSession {
         botIndex: 0 | 1;
         defenderIndex: 0 | 1;
         botTurn: number;
+        /** Opp HP before the bot's turn started. Used by _finishBotTurn to
+         *  compute hpLost for the cloud-defense check. */
         oppHpBefore: number;
-        oppAlliesBefore: string[];
-        oppHandBefore: Set<number>;
         restorePerformAction: () => void;
         /** Which sub-step the bot is in. Used by resolveAllyDefense to pick
          *  the right resume path when an ally_defense pause unblocks. */
@@ -1268,6 +1268,33 @@ export class GameSession {
     }
   }
 
+  /** Mirror of _logKillResult for cloudP (Coppercloud) auto-consumption.
+   *  When a bot defender's takeDamage swallows cloudP cards, we log them
+   *  here so the activity feed shows the defensive play — matching how
+   *  resolveCloud logs the human-prompted path. */
+  private _logCloudBlock(
+    defenderIndex: 0 | 1,
+    attackerIndex: 0 | 1,
+    cards: Action[],
+  ) {
+    if (cards.length === 0) return;
+    const totalReduction = cards.reduce((sum, c) => sum + parseInt(c.data[10], 10), 0);
+    const cardNames = cards.map((c) => c.name).join(" + ");
+    const cardsData = cards.map((c) => c.toJSON() as CardData);
+    this._logs[defenderIndex].push({
+      turn: this.game.turncount,
+      text: `${cardNames} blocked ${totalReduction} damage`,
+      cards: cardsData,
+      actionType: "cloud_block",
+    });
+    this._logs[attackerIndex].push({
+      turn: this.game.turncount,
+      text: `Opponent's ${cardNames} blocked ${totalReduction} damage`,
+      cards: cardsData,
+      actionType: "cloud_block",
+    });
+  }
+
   resolveSense(playerIndex: number, use: boolean): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "sense_defense") return { error: `Cannot resolve sense in phase: ${this.phase}` };
@@ -1426,9 +1453,16 @@ export class GameSession {
     const opp = this.players[oi];
 
     const oppHpBefore = this._defender_hp_at_turn_start ?? opp.curHealth;
-    this.game.attack(p);
+    const cloudsUsed = this.game.attack(p);
     p.curDamage = 0;  // pDamage is applied at the start of the next turn instead
     const hpLost = oppHpBefore - opp.curHealth;
+
+    // Log any cloudP cards the defender (typically a bot) auto-consumed
+    // inside takeDamage, BEFORE the dealt-damage line so the sequence
+    // reads as "blocked X, dealt Y". Humans never auto-fire cloudP (their
+    // override returns false), so this is a no-op when the defender is a
+    // human — that path goes through the cloud_defense prompt below.
+    this._logCloudBlock(oi, pi, cloudsUsed);
 
     if (hpLost > 0) {
       this._logs[pi].push({ turn: this.game.turncount, text: `Dealt ${hpLost} damage to ${opp.name}` });
@@ -1586,8 +1620,6 @@ export class GameSession {
     const opp = this.players[oi];
 
     const oppHpBefore = opp.curHealth;
-    const oppAlliesBefore = opp.allies.map((a) => a.name);
-    const oppHandBefore = new Set(opp.deck.hand.map((c) => c.id));
 
     // Wrap bot.performAction to capture each action for the bot log
     const originalPerform = bot.performAction.bind(bot);
@@ -1640,8 +1672,6 @@ export class GameSession {
       defenderIndex: oi,
       botTurn,
       oppHpBefore,
-      oppAlliesBefore,
-      oppHandBefore,
       restorePerformAction: () => { bot.performAction = originalPerform; },
       step: "actions",
     };
@@ -1722,15 +1752,18 @@ export class GameSession {
   private _drainPendingKills(attackerIndex: 0 | 1, simulating: boolean): boolean {
     while (this.game.pendingKills.length > 0) {
       const req = this.game.pendingKills[0];
-      const defender = this.players[req.defenderIndex];
-      const target = defender.allies.find((a) => a.id === req.targetAllyId);
+      // resolveKillTarget re-picks via attacker's killEnemyAllyIn when the
+      // queued target is already dead — keeps multi-K mission crossings
+      // killing the same total as the old inline-kill path.
+      const target = this.game.resolveKillTarget(req);
 
       if (!target) {
-        // Already removed by an earlier queued kill — skip silently.
+        // No valid target left — skip silently.
         this.game.pendingKills.shift();
         continue;
       }
 
+      const defender = this.players[req.defenderIndex];
       if (!this._isBot(req.defenderIndex) && defender.cloudAllyCards().length > 0 && !simulating) {
         // Consume the request now — the pause carries the kill data via
         // `_pending_ally_kill`, and resolveAllyDefense applies the outcome
@@ -1804,34 +1837,26 @@ export class GameSession {
   private _finishBotTurn() {
     const turn = this._bot_turn;
     if (!turn) return;
-    const { botIndex: bi, defenderIndex: oi, botTurn, oppHpBefore, oppAlliesBefore, oppHandBefore, restorePerformAction } = turn;
+    const { botIndex: bi, defenderIndex: oi, botTurn, oppHpBefore, restorePerformAction } = turn;
     this._bot_turn = null;
     const bot = this.players[bi];
     const opp = this.players[oi];
 
-    this.game.attack(bot);
+    const cloudsUsed = this.game.attack(bot);
     bot.curDamage = bot.pDamage;
     restorePerformAction();
 
-    // Opponent-visible logs: ally kills, sense usage, damage
-    const killed = oppAlliesBefore.filter((n) => !opp.allies.some((a) => a.name === n));
-    for (const name of killed) {
-      this._logs[oi].push({ turn: botTurn, text: `Opponent killed your ${name}` });
-    }
-    const oppHandAfter = new Set(opp.deck.hand.map((c) => c.id));
-    const usedIds = [...oppHandBefore].filter((id) => !oppHandAfter.has(id));
-    for (const card of opp.deck.discard) {
-      if (usedIds.includes(card.id) && card instanceof Action && card.data[9] === "sense") {
-        this._logs[oi].push({
-          turn: botTurn,
-          text: `${card.name} blocked a mission advance`,
-          card: card.toJSON() as CardData,
-          actionType: "sense_block",
-        });
-      }
-    }
-
+    // Opponent-visible kill / sense_block logs are now pushed at the moment
+    // each event resolves: _logKillResult fires inside _runBotDamageStep and
+    // _drainPendingKills (so saves are surfaced too), and resolveSense logs
+    // the sense_block when the human picks "use". The old before/after diff
+    // here would double-count those, so it's been removed.
     const hpLost = oppHpBefore - opp.curHealth;
+
+    // If the human defender's cloudP override ever fires (it currently
+    // doesn't — WebPlayer.cloudP returns false), surface it. Harmless
+    // when empty.
+    this._logCloudBlock(oi as 0 | 1, bi as 0 | 1, cloudsUsed);
 
     // Check cloud defense for opponent
     const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
