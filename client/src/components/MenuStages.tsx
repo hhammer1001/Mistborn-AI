@@ -120,6 +120,14 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
               ))}
             </select>
           </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={draft.testDeck}
+              onChange={(e) => setDraft({ ...draft, testDeck: e.target.checked })}
+            />
+            <span>Test deck</span>
+          </label>
           <button className="start-btn" onClick={() => onStartCustom(draft)}>Start Match</button>
         </div>
       </div>

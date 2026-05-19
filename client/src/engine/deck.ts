@@ -179,23 +179,23 @@ export class Market extends Deck {
   }
 
   private _buildTestDeck() {
-    // 10 Charm + 10 Intimidate — both are cost-3 zinc (metal=4) action
-    // cards with ability 1 + ability 2. Duplicate names exercise the
-    // A/B/C copy-label UI in hand, and a hand of all-zinc cards lets the
-    // player keep burning one to fuel another card's ability progression.
-    const charmDef: CardDef = {
-      cardType: 2, name: "Charm", cost: 3, metal: 4,
-      ability1Effect: "M", ability1Amount: "3",
-      ability2Effect: "M", ability2Amount: "2",
-      burnEffect: "M", burnAmount: "2",
+    // 10 Con + 10 Eavesdrop — a sense-focused stress deck. Eavesdrop carries
+    // active "sense" (the defender's sense reveal flow), while Con's
+    // Mi+M+E ability 1 cycles cards into the market discard so Eavesdrop
+    // has interesting reveals to choose from.
+    const conDef: CardDef = {
+      cardType: 2, name: "Con", cost: 2, metal: 5,
+      ability1Effect: "Mi.M.E", ability1Amount: "1.1.1",
+      burnEffect: "Mi", burnAmount: "1",
     };
-    const intimidateDef: CardDef = {
-      cardType: 2, name: "Intimidate", cost: 3, metal: 4,
-      ability1Effect: "M", ability1Amount: "3",
-      ability2Effect: "M.C", ability2Amount: "1.1",
+    const eavesdropDef: CardDef = {
+      cardType: 2, name: "Eavesdrop", cost: 4, metal: 1,
+      ability1Effect: "special2", ability1Amount: "0",
+      activeEffect: "sense", activeAmount: "2",
+      burnEffect: "M", burnAmount: "1",
     };
-    for (let i = 0; i < 10; i++) this.cards.push(createCard(charmDef));
-    for (let i = 0; i < 10; i++) this.cards.push(createCard(intimidateDef));
+    for (let i = 0; i < 10; i++) this.cards.push(createCard(conDef));
+    for (let i = 0; i < 10; i++) this.cards.push(createCard(eavesdropDef));
   }
 
   buy(card: Card) {
