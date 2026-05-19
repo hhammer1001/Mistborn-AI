@@ -1687,7 +1687,20 @@ export class GameSession {
         },
         annotation ?? undefined,
       );
+      // Capture leftover-money → boxings BEFORE end_actions runs (Player's
+      // end_actions case zeroes curMoney and bumps curBoxings silently;
+      // session.playAction's human path logs this trade, but bots don't
+      // pass through there). Pushed after performAction so the entry
+      // appears immediately under the bot's "End actions" line.
+      const autoBoxings = action.type === "end_actions" ? Math.floor(bot.curMoney / 2) : 0;
       const result = originalPerform(action, g);
+      if (autoBoxings > 0) {
+        this._logs[bi_captured].push({
+          turn: botTurn,
+          text: `Traded ${autoBoxings * 2} money → ${autoBoxings} boxing${autoBoxings > 1 ? "s" : ""}`,
+          actionType: "auto_boxing",
+        });
+      }
       // Drain now so deck events (cleanup-driven draws, reshuffles) land in
       // the log under the bot's current turncount and interleaved with the
       // bot's own action entries — not after _startNextTurn has advanced
