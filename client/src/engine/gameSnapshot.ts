@@ -12,6 +12,7 @@
 
 import type { Game } from "./game";
 type DeckEvent = Game["deckEvents"][number];
+type PendingKill = Game["pendingKills"][number];
 import { Action, Ally, Card } from "./card";
 import type { Player } from "./player";
 import type { Rng } from "./rng";
@@ -75,6 +76,10 @@ export interface GameStateSnap {
   /** Captured so bot-lookahead simulations don't leak in-sim deck events
    *  (ad-hoc draws, reshuffles) into the real activity log after restoreGame. */
   deckEvents: DeckEvent[];
+  /** K-effect kill queue. Sims that evaluate a Maelstrom/Assassinate
+   *  candidate enqueue requests on the real game's queue; restoreGame must
+   *  reset the queue so the actual play doesn't process leftover sim kills. */
+  pendingKills: PendingKill[];
 }
 
 function allCards(game: Game): Card[] {
@@ -133,6 +138,7 @@ export function snapshotGame(game: Game): GameStateSnap {
     gameRng: game.gameRng.clone(),
     botRngs: game.botRngs.map((r) => r.clone()),
     deckEvents: game.deckEvents.map((e) => ({ ...e })),
+    pendingKills: game.pendingKills.map((e) => ({ ...e })),
   };
 }
 
@@ -203,4 +209,5 @@ export function restoreGame(game: Game, snap: GameStateSnap): void {
     if (p.rng) p.rng = game.botRngs[i];
   }
   game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));
+  game.pendingKills = snap.pendingKills.map((e) => ({ ...e }));
 }

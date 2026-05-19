@@ -941,6 +941,15 @@ export class Player {
         break;
       }
     }
+
+    // Lookahead simulations call performAction directly (not via
+    // Player.takeActions's loop), so they bypass the inline kill drain
+    // there. Drain inline in sim mode so the simulator sees post-kill
+    // state when it scores the candidate. Real play leaves the queue for
+    // the session's pause-aware drain.
+    if ((this as Player & { _simulating?: boolean })._simulating) {
+      game.drainPendingKills();
+    }
   }
 
   // ── Clone ──
