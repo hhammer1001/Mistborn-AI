@@ -518,11 +518,13 @@ export function useGame() {
 
         const bName = botName.current;
         const pName = playerName.current;
-        const initial: LogEntry[] = use
-          ? [{ turn: gameState.turnCount, text: `${pName} — Sense defense active this turn` }]
-          : [];
+        // No initial entry — the engine pushes "Used X to block mission
+        // advance" via resolveSense when use=true, which is the meaningful
+        // log line. The old "Sense defense active this turn" message was a
+        // legacy of the per-turn pre-prompt flow and reads wrong now that
+        // each advance prompts independently.
         const newEntries = buildTurnEntries({
-          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName, initial,
+          prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName,
         });
 
         applyBehindBanner(botLogDelta.some(isRealBotTurnEntry), () => {
