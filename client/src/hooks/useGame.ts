@@ -47,6 +47,22 @@ function isRealBotTurnEntry(e: BotLogEntry): boolean {
     && e.actionType !== "opponent_kill";
 }
 
+/** Player-log entries that fire DURING or AFTER the opponent's actions —
+ *  defender's sense use, cloudA save, damage taken, ally killed. In the
+ *  rendered log they should appear AFTER the opponent's action block, not
+ *  before it (which is where same-turn playerLog entries would otherwise
+ *  land via buildTurnEntries' default ordering). Without this carve-out,
+ *  "Dealt 2 damage to you" and "Used Spy to block..." render in front of
+ *  the bot's actions that produced them. */
+function isReactiveDefenderEntry(e: BotLogEntry): boolean {
+  return e.actionType === "sense_block"
+    || e.actionType === "opponent_kill"
+    || e.actionType === "cloud_block"
+    || e.actionType === "cloud_ally_block"
+    || e.actionType === "damage_taken"
+    || e.actionType === "incoming_damage";
+}
+
 /** Entries in the bot's log that are just opponent-perspective mirrors of
  *  things the player already saw in their own log: "Opponent killed your X"
  *  echoes the player's "Killed bot's X", and "Opponent's X blocked Y damage"
@@ -86,6 +102,16 @@ function buildTurnEntries(opts: {
   const { prevTurn, data, playerLogDelta, botLogDelta, pName, bName, initial = [] } = opts;
   const newEntries: LogEntry[] = [...initial];
 
+  // Three buckets for playerLog entries with turn === prevTurn:
+  //   - actionEffectLogs: pushed during the player's own action (auto-trade,
+  //     diffToText effects). Land BEFORE bot delta — they describe what the
+  //     player just did.
+  //   - reactiveLogs: defense/received entries from the bot's actions
+  //     (sense_block, damage_taken, opponent_kill, etc). Land AFTER bot
+  //     delta so they read as a consequence of what the bot just did.
+  //   - newTurnPlayerLogs: entries with turn > prevTurn (e.g. training
+  //     reward at the start of the next player turn).
+  const reactiveLogs: LogEntry[] = [];
   const newTurnPlayerLogs: LogEntry[] = [];
   for (const entry of playerLogDelta) {
     const formatted: LogEntry = {
@@ -97,6 +123,7 @@ function buildTurnEntries(opts: {
       metalIndex: entry.metalIndex,
     };
     if (entry.turn > prevTurn) newTurnPlayerLogs.push(formatted);
+    else if (isReactiveDefenderEntry(entry)) reactiveLogs.push(formatted);
     else newEntries.push(formatted);
   }
 
@@ -123,6 +150,8 @@ function buildTurnEntries(opts: {
       });
     }
   }
+
+  newEntries.push(...reactiveLogs);
 
   const inDefenseInterrupt =
     data.phase === "cloud_defense" || data.phase === "sense_defense" || data.phase === "ally_defense";

@@ -1905,14 +1905,22 @@ export class GameSession {
     const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
     if (hpLost > 0 && cloudCards.length > 0 && humanDefender) {
       this._cloud_damage = hpLost;
-      this._logs[oi].push({ turn: botTurn, text: `Incoming: ${hpLost} damage` });
+      this._logs[oi].push({
+        turn: botTurn,
+        text: `Incoming: ${hpLost} damage`,
+        actionType: "incoming_damage",
+      });
       this.phase = "cloud_defense";
       this.activePlayer = oi;
       return;
     }
 
     if (hpLost > 0) {
-      this._logs[oi].push({ turn: botTurn, text: `Dealt ${hpLost} damage to you` });
+      this._logs[oi].push({
+        turn: botTurn,
+        text: `Dealt ${hpLost} damage to you`,
+        actionType: "damage_taken",
+      });
     }
 
     if (this.game.winner) { this.phase = "game_over"; return; }
