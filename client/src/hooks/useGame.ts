@@ -102,16 +102,21 @@ function buildTurnEntries(opts: {
   const { prevTurn, data, playerLogDelta, botLogDelta, pName, bName, initial = [] } = opts;
   const newEntries: LogEntry[] = [...initial];
 
-  // Three buckets for playerLog entries with turn === prevTurn:
+  // Bucket playerLog entries with turn === prevTurn:
   //   - actionEffectLogs: pushed during the player's own action (auto-trade,
   //     diffToText effects). Land BEFORE bot delta — they describe what the
   //     player just did.
-  //   - reactiveLogs: defense/received entries from the bot's actions
-  //     (sense_block, damage_taken, opponent_kill, etc). Land AFTER bot
-  //     delta so they read as a consequence of what the bot just did.
+  //   - reactiveByPos: defense/received entries from the bot's actions
+  //     (sense_block, damage_taken, opponent_kill, etc), keyed by their
+  //     `afterBotIdx`. Land INTERLEAVED with the bot delta — "Used Spy to
+  //     block mission advance" goes right after the Advance entry that
+  //     triggered it, not at the end of the turn.
+  //   - reactiveTail: reactive entries that didn't ship an afterBotIdx
+  //     (legacy paths). Land after the bot delta as a fallback.
   //   - newTurnPlayerLogs: entries with turn > prevTurn (e.g. training
   //     reward at the start of the next player turn).
-  const reactiveLogs: LogEntry[] = [];
+  const reactiveByPos = new Map<number, LogEntry[]>();
+  const reactiveTail: LogEntry[] = [];
   const newTurnPlayerLogs: LogEntry[] = [];
   for (const entry of playerLogDelta) {
     const formatted: LogEntry = {
@@ -122,9 +127,20 @@ function buildTurnEntries(opts: {
       actionType: entry.actionType,
       metalIndex: entry.metalIndex,
     };
-    if (entry.turn > prevTurn) newTurnPlayerLogs.push(formatted);
-    else if (isReactiveDefenderEntry(entry)) reactiveLogs.push(formatted);
-    else newEntries.push(formatted);
+    if (entry.turn > prevTurn) {
+      newTurnPlayerLogs.push(formatted);
+    } else if (isReactiveDefenderEntry(entry)) {
+      if (entry.afterBotIdx !== undefined) {
+        const pos = entry.afterBotIdx;
+        const bucket = reactiveByPos.get(pos);
+        if (bucket) bucket.push(formatted);
+        else reactiveByPos.set(pos, [formatted]);
+      } else {
+        reactiveTail.push(formatted);
+      }
+    } else {
+      newEntries.push(formatted);
+    }
   }
 
   // Drop opponent-perspective mirrors from the bot delta in SP — the player
@@ -138,20 +154,32 @@ function buildTurnEntries(opts: {
     if (filteredBotLog.some(isRealBotTurnEntry)) {
       newEntries.push({ turn: botTurn, text: `${bName}'s turn`, isBot: true });
     }
-    for (const entry of filteredBotLog) {
-      newEntries.push({
-        turn: entry.turn,
-        text: `${bName} — ${entry.text}`,
-        isBot: true,
-        card: entry.card,
-        cards: entry.cards,
-        actionType: entry.actionType,
-        metalIndex: entry.metalIndex,
-      });
+    // Walk the bot delta and splice reactive entries in at their
+    // `afterBotIdx` positions: reactiveByPos.get(i) renders BEFORE bot
+    // entry i (i.e. after `i` bot entries have already been rendered).
+    for (let i = 0; i <= filteredBotLog.length; i++) {
+      const reactives = reactiveByPos.get(i);
+      if (reactives) newEntries.push(...reactives);
+      if (i < filteredBotLog.length) {
+        const entry = filteredBotLog[i];
+        newEntries.push({
+          turn: entry.turn,
+          text: `${bName} — ${entry.text}`,
+          isBot: true,
+          card: entry.card,
+          cards: entry.cards,
+          actionType: entry.actionType,
+          metalIndex: entry.metalIndex,
+        });
+      }
     }
+  } else {
+    // No bot delta this round — flush any reactive entries by position.
+    const sortedKeys = [...reactiveByPos.keys()].sort((a, b) => a - b);
+    for (const k of sortedKeys) newEntries.push(...reactiveByPos.get(k)!);
   }
 
-  newEntries.push(...reactiveLogs);
+  newEntries.push(...reactiveTail);
 
   const inDefenseInterrupt =
     data.phase === "cloud_defense" || data.phase === "sense_defense" || data.phase === "ally_defense";

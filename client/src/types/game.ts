@@ -110,6 +110,13 @@ export interface BotLogEntry {
   cards?: CardData[];
   actionType?: string;
   metalIndex?: number;
+  /** For reactive defender entries (sense_block / opponent_kill / etc.)
+   *  in the player's log, this records how many entries had been pushed to
+   *  the BOT's log when this entry was created — letting the renderer
+   *  interleave the defender's reaction at the exact spot in the bot's
+   *  action sequence where it fired (e.g. "Used Spy" lands right after the
+   *  bot's Advance entry, not at the end of the turn). */
+  afterBotIdx?: number;
 }
 
 export interface PromptOption {

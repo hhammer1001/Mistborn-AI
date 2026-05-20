@@ -1281,6 +1281,7 @@ export class GameSession {
         text: `Used ${protectedBy.name} to save ${target.name}`,
         card: protectedBy.toJSON() as CardData,
         actionType: "cloud_ally_block",
+        afterBotIdx: this._logs[attackerIndex].length - this._logRead[attackerIndex],
       });
     } else {
       this._logs[attackerIndex].push({
@@ -1291,6 +1292,7 @@ export class GameSession {
         turn: this.game.turncount,
         text: `Opponent killed your ${target.name}`,
         actionType: "opponent_kill",
+        afterBotIdx: this._logs[attackerIndex].length - this._logRead[attackerIndex],
       });
     }
   }
@@ -1364,6 +1366,10 @@ export class GameSession {
             text: `Used ${usedSenseCard.name} to block mission advance (−${senseValue} mission)`,
             card: usedSenseCard.toJSON() as CardData,
             actionType: "sense_block",
+            // Position in the bot's log delta at push time — lets the
+            // renderer interleave this right after the Advance entry that
+            // triggered it, instead of bucketing it at the end of the turn.
+            afterBotIdx: this._logs[attackerIndex].length - this._logRead[attackerIndex],
           });
         }
         defender._sense_flag = null;
@@ -1909,6 +1915,7 @@ export class GameSession {
         turn: botTurn,
         text: `Incoming: ${hpLost} damage`,
         actionType: "incoming_damage",
+        afterBotIdx: this._logs[bi].length - this._logRead[bi],
       });
       this.phase = "cloud_defense";
       this.activePlayer = oi;
@@ -1920,6 +1927,7 @@ export class GameSession {
         turn: botTurn,
         text: `Dealt ${hpLost} damage to you`,
         actionType: "damage_taken",
+        afterBotIdx: this._logs[bi].length - this._logRead[bi],
       });
     }
 
