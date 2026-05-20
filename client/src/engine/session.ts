@@ -191,7 +191,7 @@ function diffToText(before: PSnap, after: PSnap): string[] {
 }
 
 import type { CardData } from "../types/game";
-interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number }
+interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number; afterBotIdx?: number }
 
 // ── Structured action log (for replay + post-game review) ──
 
