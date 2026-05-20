@@ -550,13 +550,11 @@ export function useGame() {
         const pName = playerName.current;
 
         const initial: LogEntry[] = [];
-        if (targetIndex === -1) {
-          const dmg = gameState.players[0].damage;
-          if (dmg > 0) {
-            initial.push({ turn: gameState.turnCount, text: `${pName} dealt ${dmg} damage to ${bName}` });
-          }
-        } else if (targetIndex === -2) {
-          // Skip: explicitly dealt no damage this turn. No log entry needed.
+        if (targetIndex === -1 || targetIndex === -2) {
+          // Face hits and explicit skips don't need an "initial" entry — the
+          // session already pushes "Dealt N damage to X" with the real hpLost
+          // (after cloudP reductions) on the attacker's log, which buildTurnEntries
+          // renders right after the action's effect lines.
         } else {
           const target = gameState.damageTargets?.find((t) => t.index === targetIndex);
           // The engine may swallow the kill via cloudA (e.g. defender's Hide).
