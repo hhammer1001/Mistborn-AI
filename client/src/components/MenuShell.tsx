@@ -31,6 +31,8 @@ interface Props {
   onViewCards: () => void;
   onViewMinistryLog: () => void;
   onViewLands?: () => void;
+  /** Open the postgame review for a chronicle row. */
+  onSelectMatch?: (matchId: string) => void;
   /** Launch the Lands game directly with a chosen first player and opponent
    *  bot (skips the Lands game's own start screen). Used when the easter-egg
    *  toggle has swapped "Play vs Bot" for the Lands setup. */
@@ -60,6 +62,7 @@ export function MenuShell({
   onViewCards,
   onViewMinistryLog,
   onViewLands,
+  onSelectMatch,
   onStartLandsBot,
   onPickLandsOnline,
   room,
@@ -122,6 +125,7 @@ export function MenuShell({
         onOpenSigilPicker={() => setSigilOpen((v) => !v)}
         entries={entries}
         filter={prefs.filter}
+        onSelectMatch={onSelectMatch}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={signOut}
         onOpenFeedback={() => setFeedbackOpen(true)}

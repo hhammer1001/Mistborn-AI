@@ -25,6 +25,7 @@ import { TurnBanner } from "./components/TurnBanner";
 import { PromptDialog } from "./components/PromptDialog";
 import { DamagePhase } from "./components/DamagePhase";
 import { GameOverScreen } from "./components/GameOverScreen";
+import { PastMatchView, type ReplayParams } from "./components/PastMatchView";
 import { RankingPanel } from "./components/RankingPanel";
 import { LandsGame, Board as LandsBoard, type BoardGameApi as LandsBoardApi } from "./lands/components/LandsGame";
 import { LandsLobby } from "./lands/components/LandsLobby";
@@ -32,7 +33,7 @@ import { useLandsLobby } from "./lands/hooks/useLandsLobby";
 import { useLandsMultiplayerGame } from "./lands/hooks/useLandsMultiplayerGame";
 import { LandsSession } from "./lands/engine/session";
 import type { LandsBotKind } from "./lands/hooks/useLandsGame";
-import { CHARACTERS } from "./data/ministrySigils";
+import { BOT_TYPES, CHARACTERS } from "./data/ministrySigils";
 import type { BotSetupConfig } from "./hooks/useMinistryPrefs";
 import type { GameState } from "./types/game";
 
@@ -42,6 +43,7 @@ type AppMode =
   | "bot_game"
   | "lobby"
   | "mp_game"
+  | "past_match"
   | "lands"
   | "lands_lobby"
   | "lands_mp_game";
@@ -62,6 +64,7 @@ function resolveChar(c: string, avoid?: string): string {
 function App() {
   const [mode, setMode] = useState<AppMode>("menu");
   const [mpSessionId, setMpSessionId] = useState<string | null>(null);
+  const [pastMatchId, setPastMatchId] = useState<string | null>(null);
   /** When set, LandsGame skips its start screen and runs the configured match
    *  immediately. Used by the easter-egg "Play vs The Box / Cartographer" flow. */
   const [landsAutoStart, setLandsAutoStart] = useState<
@@ -165,7 +168,7 @@ function App() {
     }
   };
 
-  const startBot = (cfg: BotSetupConfig, displayName: string) => {
+  const startBot = (cfg: BotSetupConfig, displayName: string, seed?: number) => {
     const myChar  = resolveChar(cfg.myChar);
     const oppChar = resolveChar(cfg.oppChar, myChar);
     const humanIdentity = {
@@ -177,8 +180,29 @@ function App() {
       cfg.firstPlayer === "bot" ? true :
       cfg.firstPlayer === "you" ? false :
       Math.random() < 0.5;  // "random"
-    botGame.createGame(displayName, myChar, cfg.botType, oppChar, botFirst, cfg.testDeck, humanIdentity);
+    botGame.createGame(displayName, myChar, cfg.botType, oppChar, botFirst, cfg.testDeck, humanIdentity, seed);
     setMode("bot_game");
+  };
+
+  const handleReplayMatch = (params: ReplayParams) => {
+    const displayName = auth.profile?.name ?? auth.user?.email?.split("@")[0] ?? "Guest";
+    // The original opponent may have been a human (PvP) — replay always uses
+    // a bot. Default to the original bot strategy when present; fall back to
+    // "twonky" so the replay still runs.
+    const botType = (BOT_TYPES as readonly string[]).includes(params.botStrategy)
+      ? (params.botStrategy as (typeof BOT_TYPES)[number])
+      : "twonky";
+    startBot(
+      {
+        myChar: params.myCharacter,
+        oppChar: params.oppCharacter,
+        botType,
+        firstPlayer: params.meFirst ? "you" : "bot",
+        testDeck: false,
+      },
+      displayName,
+      params.seed,
+    );
   };
 
   const handleStartMatchFromLobby = async () => {
@@ -315,11 +339,13 @@ function App() {
                 humanFirst: landsAutoStart.humanFirst,
                 botKind: landsAutoStart.botKind,
                 opponentName:
-                  landsAutoStart.botKind === "flowchart"
-                    ? "The Cartographer"
-                    : landsAutoStart.botKind === "heuristic"
-                      ? "The Heuristic"
-                      : "The Box",
+                  landsAutoStart.botKind === "planner"
+                    ? "The Strategist"
+                    : landsAutoStart.botKind === "flowchart"
+                      ? "The Cartographer"
+                      : landsAutoStart.botKind === "heuristic"
+                        ? "The Heuristic"
+                        : "The Box",
               }
             : undefined
         }
@@ -374,6 +400,17 @@ function App() {
     );
   }
 
+  if (mode === "past_match" && pastMatchId) {
+    return (
+      <PastMatchView
+        matchId={pastMatchId}
+        userId={auth.user?.id ?? null}
+        onBack={() => { setPastMatchId(null); setMode("menu"); }}
+        onReplay={(params) => { setPastMatchId(null); handleReplayMatch(params); }}
+      />
+    );
+  }
+
   // ── Menu shell (default) ──
   return (
     <MenuShell
@@ -389,6 +426,7 @@ function App() {
       onStartBot={startBot}
       onViewCards={() => setMode("gallery")}
       onViewMinistryLog={() => { /* not implemented yet */ }}
+      onSelectMatch={(id) => { setPastMatchId(id); setMode("past_match"); }}
       onViewLands={() => {
         setLandsAutoStart(null);
         setMode("lands");

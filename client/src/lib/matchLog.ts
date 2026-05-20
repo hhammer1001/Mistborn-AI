@@ -48,6 +48,13 @@ function playerCards(player: Player): Array<{ name: string }> {
   ];
 }
 
+/** Serialize an array of engine card/ally objects to plain CardData JSON.
+ *  Uses each card's own toJSON so per-card state (metalUsed, burned, ability
+ *  slots, ally health/availability) is preserved for the postgame screen. */
+function serializeCards(cards: Array<{ toJSON: () => unknown }>): unknown[] {
+  return cards.map((c) => c.toJSON());
+}
+
 export async function saveMatchRecord(args: SaveMatchArgs): Promise<void> {
   const { session, kind, botStrategy, startedAt, testDeck, identities, forfeiterHint } = args;
   const firstPlayerIndex = session.firstPlayer;
@@ -70,6 +77,7 @@ export async function saveMatchRecord(args: SaveMatchArgs): Promise<void> {
   const missions = game.missions;
   const missionNames = missions.map((m) => m.name);
 
+  const [p0Log, p1Log] = session.getActivityLogs();
   const baseMatch = {
     kind,
     botStrategy,
@@ -85,7 +93,10 @@ export async function saveMatchRecord(args: SaveMatchArgs): Promise<void> {
     testDeck,
     seed: game.seed,
     actionLog: session.getActionLog(),
-    schemaVersion: 1,
+    schemaVersion: 2,
+    // Postgame snapshot — full final state needed by the GameOver screen.
+    missionState: missions.map((m) => m.toJSON()),
+    activityLog: { p0: p0Log, p1: p1Log },
   };
 
   const playerRows = [0, 1].map((idx) => {
@@ -115,6 +126,22 @@ export async function saveMatchRecord(args: SaveMatchArgs): Promise<void> {
         missionRanks: missions.map((m) => m.playerRanks[idx]),
         finalDeck: countByName(playerCards(p)),
         eliminatedCounts: countNames(p.eliminatedCardNames),
+
+        // Postgame snapshot — full per-player state needed to rehydrate the
+        // GameOver screen without replaying. finalHand/Discard/Library/Allies
+        // are CardData[] (preserving id, metalUsed, burned, ability slots).
+        health: p.curHealth,
+        money: p.curMoney,
+        boxings: p.curBoxings,
+        pDamage: p.pDamage,
+        pMoney: p.pMoney,
+        charAbility1: p.charAbility1,
+        charAbility2: p.charAbility2,
+        charAbility3: p.charAbility3,
+        finalHand: serializeCards(p.deck.hand),
+        finalDiscard: serializeCards(p.deck.discard),
+        finalLibrary: serializeCards(p.deck.cards),
+        finalAllies: serializeCards(p.allies),
       },
     };
   });

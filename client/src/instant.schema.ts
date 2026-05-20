@@ -81,6 +81,12 @@ const _schema = i.schema({
       seed: i.number().optional(),
       actionLog: i.any().optional(),
       schemaVersion: i.number().optional(),
+      // Postgame snapshot — full final state needed to rehydrate the GameOver
+      // screen without replaying. missionState carries the MissionData[]
+      // (tiers + topReachedBy + playerRanks); activityLog is both players'
+      // LogEntry[] streams.
+      missionState: i.any().optional(),
+      activityLog: i.any().optional(),
     }),
     matchPlayers: i.entity({
       matchId: i.string().indexed(),
@@ -101,6 +107,21 @@ const _schema = i.schema({
       missionRanks: i.any(),
       finalDeck: i.any(),
       eliminatedCounts: i.any().optional(),
+      // Postgame snapshot — full per-player state needed to rehydrate the
+      // GameOver screen without replaying. finalHand/Discard/Library/Allies
+      // are CardData[] (preserving id, metalUsed, burned, ability slots).
+      health: i.number().optional(),
+      money: i.number().optional(),
+      boxings: i.number().optional(),
+      pDamage: i.number().optional(),
+      pMoney: i.number().optional(),
+      charAbility1: i.boolean().optional(),
+      charAbility2: i.boolean().optional(),
+      charAbility3: i.boolean().optional(),
+      finalHand: i.any().optional(),
+      finalDiscard: i.any().optional(),
+      finalLibrary: i.any().optional(),
+      finalAllies: i.any().optional(),
     }),
     // ── Lands (side-project) multiplayer ──
     // Mirrors `rooms`/`games` shape but kept separate so the two games can

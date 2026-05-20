@@ -191,22 +191,43 @@ function buildTurnEntries(opts: {
   return newEntries;
 }
 
-/** Strip trailing " (×N)" to get the base text for comparison */
+/** Strip trailing " (×N)", a mission rank suffix " (A→B)", and any ": effects"
+ *  tail so two semantically-equivalent log entries compare equal. */
 function baseText(text: string): string {
-  return text.replace(/\s*\(×\d+\)$/, "");
+  return text
+    .replace(/\s*\(×\d+\)$/, "")
+    .replace(/\s*\(\d+→\d+\)(:.*)?$/, "");
 }
 
-/** Merge consecutive identical entries into "X (×N)" */
+/** Parse a mission rank suffix "(A→B)" from a log text. */
+function parseMissionRank(text: string): { from: number; to: number } | null {
+  const m = text.match(/\((\d+)→(\d+)\)/);
+  if (!m) return null;
+  return { from: parseInt(m[1], 10), to: parseInt(m[2], 10) };
+}
+
+/** Merge consecutive identical entries. Mission advances merge by extending
+ *  the rank range ("(0→1)" + "(1→2)" → "(0→2)"); everything else collapses
+ *  to "X (×N)". */
 function consolidateLog(entries: LogEntry[]): LogEntry[] {
   const result: LogEntry[] = [];
   for (const entry of entries) {
     const last = result[result.length - 1];
     if (last && baseText(last.text) === baseText(entry.text) && last.turn === entry.turn && last.isBot === entry.isBot) {
-      const match = last.text.match(/^(.*?)(?:\s*\(×(\d+)\))?$/);
-      if (match) {
-        const base = match[1];
-        const count = parseInt(match[2] ?? "1") + 1;
-        last.text = `${base} (×${count})`;
+      const lastRank = parseMissionRank(last.text);
+      const entryRank = parseMissionRank(entry.text);
+      if (lastRank && entryRank) {
+        const base = baseText(last.text);
+        const from = Math.min(lastRank.from, entryRank.from);
+        const to = Math.max(lastRank.to, entryRank.to);
+        last.text = `${base} (${from}→${to})`;
+      } else {
+        const match = last.text.match(/^(.*?)(?:\s*\(×(\d+)\))?$/);
+        if (match) {
+          const base = match[1];
+          const count = parseInt(match[2] ?? "1") + 1;
+          last.text = `${base} (×${count})`;
+        }
       }
     } else {
       result.push({ ...entry });
@@ -293,7 +314,8 @@ export function useGame() {
       opponentCharacter: string,
       botFirst: boolean = true,
       testDeck: boolean = false,
-      humanIdentity: MatchIdentity = { profileId: "", userId: "", name: pName }
+      humanIdentity: MatchIdentity = { profileId: "", userId: "", name: pName },
+      seed?: number,
     ) => {
       setLoading(true);
       setError(null);
@@ -322,6 +344,7 @@ export function useGame() {
           ],
           firstPlayer: botFirst ? 1 : 0,
           testDeck,
+          ...(seed !== undefined ? { seed } : {}),
         });
         sessionRef.current = session;
         const data = session.getState(0) as unknown as GameState;

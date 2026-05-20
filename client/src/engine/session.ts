@@ -317,6 +317,10 @@ export class GameSession {
   private _nextSnapshotData: number | null = null;
   private _playerSnapBefore: PSnap | null = null;
   private _missionBefore = 0;
+  // Player's rank on the mission they're advancing, snapshotted before the
+  // action so the log entry can render "Mission Pits of Hathsin (0→1)".
+  // Null when the action isn't advance_mission.
+  private _missionRankBefore: number | null = null;
   // For detecting which opponent Sense card was auto-used to block a mission advance.
   private _oppDiscardIdsBefore: Set<number> | null = null;
   // For detecting cards that got eliminated (moved to market trash) during an action.
@@ -565,6 +569,13 @@ export class GameSession {
    *  move). Persist alongside the seed for replay + post-game review. */
   getActionLog(): readonly ActionEvent[] {
     return this._actionEvents;
+  }
+
+  /** Read-only view of the per-player human-readable activity logs. Used by
+   *  saveMatchRecord to persist the chronicle alongside the structured event
+   *  log so the postgame screen can rehydrate without replaying. */
+  getActivityLogs(): readonly [readonly LogEntry[], readonly LogEntry[]] {
+    return this._logs;
   }
 
   private _pushActionEvent(
@@ -855,6 +866,7 @@ export class GameSession {
     // Snapshot opponent's discard pile before advance_mission so we can
     // identify which Sense card (if any) got auto-used to block.
     if (action.type === "advance_mission") {
+      this._missionRankBefore = action.mission.playerRanks[playerIndex];
       const opp = this.players[1 - playerIndex];
       this._oppDiscardIdsBefore = new Set(opp.deck.discard.map((c) => c.id));
 
@@ -1030,8 +1042,13 @@ export class GameSession {
         });
       } else if (action.type === "advance_mission") {
         const filtered = effects.filter((e) => e !== "-1 mission");
-        if (filtered.length > 0) {
-          log.push({ turn: this.game.turncount, text: `${source}: ${filtered.join(", ")}`, actionType: action.type });
+        const rankBefore = this._missionRankBefore;
+        const rankAfter = action.mission.playerRanks[playerIndex];
+        const rankAdvanced = rankBefore !== null && rankAfter > rankBefore;
+        if (rankAdvanced || filtered.length > 0) {
+          const rankPart = rankAdvanced ? ` (${rankBefore}→${rankAfter})` : "";
+          const effectsPart = filtered.length > 0 ? `: ${filtered.join(", ")}` : "";
+          log.push({ turn: this.game.turncount, text: `${source}${rankPart}${effectsPart}`, actionType: action.type });
         }
       } else if (card) {
         // Any card-bearing action (use_metal, burn_card, refresh_metal, ally_ability_*)
@@ -1082,6 +1099,7 @@ export class GameSession {
     this._playerSnapBefore = null;
     this._marketTrashIdsBefore = null;
     this._playerCardsBefore = null;
+    this._missionRankBefore = null;
 
     if (this.game.winner) {
       this.phase = "game_over";
@@ -1667,7 +1685,14 @@ export class GameSession {
       const mi = ("metalIndex" in action && typeof (action as { metalIndex?: number }).metalIndex === "number")
         ? (action as { metalIndex: number }).metalIndex
         : undefined;
-      this._logs[bi_captured].push({ turn: botTurn, text: desc, card, actionType: action.type, metalIndex: mi });
+      // For advance_mission, capture the bot's rank on the mission so the log
+      // entry can render "Advance mission Pits of Hathsin (0→1)". Mutated
+      // post-performAction below since serializeAction runs before progress().
+      const rankBefore = action.type === "advance_mission"
+        ? action.mission.playerRanks[bi_captured]
+        : null;
+      const logEntry: LogEntry = { turn: botTurn, text: desc, card, actionType: action.type, metalIndex: mi };
+      this._logs[bi_captured].push(logEntry);
       // Record the bot's move in the structured action log. Bot moves are
       // informational at replay time (the bot regenerates them from the
       // seeded RNG) but valuable for post-game review. Bots that score
@@ -1693,6 +1718,12 @@ export class GameSession {
       // appears immediately under the bot's "End actions" line.
       const autoBoxings = action.type === "end_actions" ? Math.floor(bot.curMoney / 2) : 0;
       const result = originalPerform(action, g);
+      if (rankBefore !== null && action.type === "advance_mission") {
+        const rankAfter = action.mission.playerRanks[bi_captured];
+        if (rankAfter > rankBefore) {
+          logEntry.text = `${desc} (${rankBefore}→${rankAfter})`;
+        }
+      }
       if (autoBoxings > 0) {
         this._logs[bi_captured].push({
           turn: botTurn,

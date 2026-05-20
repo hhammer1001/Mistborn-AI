@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type KeyboardEvent, useMemo } from "react";
 import {
   MINISTRY_METALS,
   MINISTRY_SYMBOL_SRC,
@@ -37,6 +37,8 @@ interface Props {
   // Chronicle data + filter
   entries: ChronicleEntry[];
   filter: LogFilter;
+  /** Click handler for a chronicle row; opens the postgame review for that match. */
+  onSelectMatch?: (matchId: string) => void;
   // Actions
   onOpenAuth: () => void;
   onSignOut: () => void;
@@ -83,6 +85,7 @@ export function MinistrySidebar({
   onOpenSigilPicker,
   entries,
   filter,
+  onSelectMatch,
   onOpenAuth,
   onSignOut,
   onOpenFeedback,
@@ -177,7 +180,7 @@ export function MinistrySidebar({
               : <>Your file is not yet open.<br/>Register with the Ministry to keep<br/>a permanent record of your matches.</>}
           </div>
         ) : (
-          filtered.map((e) => <ChronicleRow key={e.id} entry={e} />)
+          filtered.map((e) => <ChronicleRow key={e.id} entry={e} onSelect={onSelectMatch} />)
         )}
       </div>
 
@@ -207,7 +210,13 @@ export function MinistrySidebar({
   );
 }
 
-function ChronicleRow({ entry: e }: { entry: ChronicleEntry }) {
+function ChronicleRow({
+  entry: e,
+  onSelect,
+}: {
+  entry: ChronicleEntry;
+  onSelect?: (matchId: string) => void;
+}) {
   const me  = <>You <span className="char">({e.myChar})</span></>;
   const opp = <>{e.opp} <span className="char">({e.oppChar})</span></>;
   const firstEl  = <b>{e.firstPlayer === "me" ? me : opp}</b>;
@@ -223,8 +232,23 @@ function ChronicleRow({ entry: e }: { entry: ChronicleEntry }) {
   const mode = e.kind === "mp" ? "Online" : "Bot";
   const glyph = e.result === "win" ? "✦" : "✧";
 
+  const clickable = !!onSelect;
+  const handleClick = () => onSelect?.(e.id);
+  const handleKey = (ev: KeyboardEvent) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      onSelect?.(e.id);
+    }
+  };
+
   return (
-    <div className={`ms-entry ${e.result}`}>
+    <div
+      className={`ms-entry ${e.result}${clickable ? " ms-entry-clickable" : ""}`}
+      onClick={clickable ? handleClick : undefined}
+      onKeyDown={clickable ? handleKey : undefined}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+    >
       <div className="glyph">{glyph}</div>
       <div className="row-top">
         <div className="players">
