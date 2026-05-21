@@ -5938,22 +5938,6 @@ h3 {
   display: flex;
   gap: 8px;
 }
-.pm-perspective-btn,
-.pm-replay-btn {
-  background: rgba(15, 14, 20, 0.85);
-  color: var(--gold);
-  border: 1px solid var(--gold);
-  padding: 8px 14px;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  border-radius: 2px;
-}
-.pm-perspective-btn:hover,
-.pm-replay-btn:hover {
-  background: rgba(40, 36, 28, 0.95);
-  color: var(--gold-bright);
-}
 
 .pm-overlay {
   position: fixed;
@@ -5981,24 +5965,6 @@ h3 {
   gap: 10px;
   margin-bottom: 14px;
 }
-.pm-seat-btn {
-  padding: 12px 16px;
-  background: rgba(30, 26, 22, 0.9);
-  color: #eee;
-  border: 1px solid var(--gold);
-  cursor: pointer;
-  font-size: 14px;
-}
-.pm-seat-btn:hover { background: rgba(50, 44, 36, 0.95); color: var(--gold-bright); }
-.pm-cancel-btn {
-  background: transparent;
-  color: #aaa;
-  border: 1px solid #444;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-size: 13px;
-}
-.pm-cancel-btn:hover { color: #fff; border-color: #666; }
 
 .pm-centered,
 .pm-legacy {
@@ -6022,14 +5988,3 @@ h3 {
   flex-direction: column;
   gap: 6px;
 }
-.pm-centered button,
-.pm-legacy button {
-  background: transparent;
-  color: var(--gold);
-  border: 1px solid var(--gold);
-  padding: 10px 20px;
-  cursor: pointer;
-  letter-spacing: 0.06em;
-}
-.pm-centered button:hover,
-.pm-legacy button:hover { color: var(--gold-bright); border-color: var(--gold-bright); }

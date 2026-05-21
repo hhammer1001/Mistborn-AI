@@ -99,7 +99,7 @@ export function PastMatchView({ matchId, userId, onBack, onReplay }: Props) {
       <div className="pm-controls">
         {otherPlayer && (
           <button
-            className="pm-perspective-btn"
+            className="gg-btn gg-btn-ghost"
             onClick={() => setPerspective(otherPerspective)}
             title="Switch perspective"
           >
@@ -108,7 +108,7 @@ export function PastMatchView({ matchId, userId, onBack, onReplay }: Props) {
         )}
         {typeof match.seed === "number" && (
           <button
-            className="pm-replay-btn"
+            className="gg-btn gg-btn-primary"
             onClick={() => setReplayPickerOpen(true)}
           >
             Replay with same seed
@@ -164,10 +164,10 @@ function ReplaySeatPicker({
         <h3>Replay with same seed</h3>
         <p>Pick the seat you want to play. The other seat will be filled by a bot.</p>
         <div className="pm-seat-row">
-          <button className="pm-seat-btn" onClick={() => onPick(0)}>{seatLabel(p0)}</button>
-          <button className="pm-seat-btn" onClick={() => onPick(1)}>{seatLabel(p1)}</button>
+          <button className="gg-btn gg-btn-primary" onClick={() => onPick(0)}>{seatLabel(p0)}</button>
+          <button className="gg-btn gg-btn-primary" onClick={() => onPick(1)}>{seatLabel(p1)}</button>
         </div>
-        <button className="pm-cancel-btn" onClick={onCancel}>Cancel</button>
+        <button className="gg-btn gg-btn-ghost" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -177,7 +177,7 @@ function CenteredMessage({ text, onBack }: { text: string; onBack: () => void })
   return (
     <div className="pm-centered">
       <p>{text}</p>
-      <button onClick={onBack}>Back</button>
+      <button className="gg-btn gg-btn-ghost" onClick={onBack}>Back</button>
     </div>
   );
 }
@@ -207,7 +207,7 @@ function LegacyMatchSummary({
         <li><strong>{other.name}</strong> ({other.character}) — Mission {other.mission}, Damage {other.damage}</li>
         <li>Turns: {match.turnCount ?? "—"} · Victory: {match.victoryType ?? "—"}</li>
       </ul>
-      <button onClick={onBack}>Back</button>
+      <button className="gg-btn gg-btn-ghost" onClick={onBack}>Back</button>
     </div>
   );
 }
