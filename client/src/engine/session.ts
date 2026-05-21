@@ -173,7 +173,7 @@ function psnap(p: Player): PSnap {
 function diffToText(before: PSnap, after: PSnap): string[] {
   const parts: string[] = [];
   const diffs: [keyof PSnap, string][] = [
-    ["damage", "damage"], ["money", "money"], ["health", "heal"],
+    ["damage", "damage"], ["money", "money"],
     ["mission", "mission"], ["training", "training"], ["atium", "atium"],
     ["burns", "burns"], ["handSize", "+hand size"],
     ["pDamage", "+perm damage"], ["pMoney", "+perm money"],
@@ -183,6 +183,11 @@ function diffToText(before: PSnap, after: PSnap): string[] {
     if (delta > 0) parts.push(`+${delta} ${label}`);
     else if (delta < 0) parts.push(`${delta} ${label}`);
   }
+  // Health gets the absolute-range treatment (parallel to mission advance's
+  // "(A→B)"): tells you the new HP, not just the delta.
+  const healDelta = after.health - before.health;
+  if (healDelta > 0) parts.push(`+${healDelta} heal (${before.health}→${after.health})`);
+  else if (healDelta < 0) parts.push(`${healDelta} heal (${before.health}→${after.health})`);
   const drawDelta = after.hand_count - before.hand_count;
   if (drawDelta > 0) parts.push(`drew ${drawDelta}`);
   const newAllies = after.allies.filter((n) => !before.allies.includes(n));
@@ -1516,7 +1521,10 @@ export class GameSession {
     this._logCloudBlock(oi, pi, cloudsUsed);
 
     if (hpLost > 0) {
-      this._logs[pi].push({ turn: this.game.turncount, text: `Dealt ${hpLost} damage to ${opp.name}` });
+      this._logs[pi].push({
+        turn: this.game.turncount,
+        text: `Dealt ${hpLost} damage to ${opp.name} (${oppHpBefore}→${opp.curHealth})`,
+      });
     }
 
     // Bot defenders already auto-consumed every cloudP card they wanted to
@@ -1954,11 +1962,14 @@ export class GameSession {
     }
 
     if (hpLost > 0) {
-      this._logs[oi].push({
+      // Push to the BOT'S log so the entry renders in opponent-red with the
+      // bot's name prefix: "Hulk X90 — Dealt 5 damage to you". Putting it on
+      // the player's log (`_logs[oi]`) styled it as a player-perspective
+      // "→ Dealt N damage to you" line which read like the player did it.
+      this._logs[bi].push({
         turn: botTurn,
-        text: `Dealt ${hpLost} damage to you`,
-        actionType: "damage_taken",
-        afterBotIdx: this._logs[bi].length - this._logRead[bi],
+        text: `Dealt ${hpLost} damage to you (${oppHpBefore}→${opp.curHealth})`,
+        actionType: "bot_damage",
       });
     }
 
