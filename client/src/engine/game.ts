@@ -39,6 +39,18 @@ export class Game {
   /** Buffered deck events (ad-hoc draws + reshuffles) that the session
    *  drains into per-player logs after each action. Cleared by drain. */
   deckEvents: Array<{ type: "draw"; playerIndex: number; amount: number }> = [];
+  /** Buffered seek events: every time a player resolves a `seek` and applies
+   *  the chosen market action's ability1, an entry is pushed here. The
+   *  session drains them into per-player logs alongside deckEvents so the
+   *  feed reads "Used seek on Survive (+3 heal, 23→26)" instead of silently
+   *  rolling the heal into the parent action's effect line. before/after
+   *  snapshot a handful of stats; the renderer emits whichever ones moved. */
+  seekEvents: Array<{
+    playerIndex: number;
+    cardName: string;
+    before: { health: number; damage: number; money: number; mission: number; training: number };
+    after:  { health: number; damage: number; money: number; mission: number; training: number };
+  }> = [];
   /** K-effect ally kills enqueued during action resolution (mission first-
    *  reached `K` rewards, Assassinate / Coinshot ability 2, Maelstrom). The
    *  queue defers the actual `killAlly` call until a safe boundary so the
@@ -296,6 +308,11 @@ export class Game {
     }
 
     g.deckEvents = this.deckEvents.map((e) => ({ ...e }));
+    g.seekEvents = this.seekEvents.map((e) => ({
+      ...e,
+      before: { ...e.before },
+      after: { ...e.after },
+    }));
     g.pendingKills = this.pendingKills.map((e) => ({ ...e }));
 
     return g;

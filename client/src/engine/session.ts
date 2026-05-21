@@ -136,6 +136,10 @@ interface GameSnapshot {
    *  on rollback so events emitted by a partial action (e.g. one that threw
    *  PromptNeeded mid-way) don't leak into the activity log after restore. */
   deckEvents: Game["deckEvents"];
+  /** Pending seek events captured at snapshot time. Same restore semantics
+   *  as deckEvents — a half-executed seek shouldn't surface a phantom log
+   *  entry after rollback. */
+  seekEvents: Game["seekEvents"];
   /** K-effect kill requests captured at snapshot time. Restored on rollback
    *  so an undone Maelstrom/Assassinate doesn't leave pending kills queued. */
   pendingKills: Game["pendingKills"];
@@ -453,6 +457,11 @@ export class GameSession {
       logLengths: [this._logs[0].length, this._logs[1].length],
       actionEventsLength: this._actionEvents.length,
       deckEvents: this.game.deckEvents.map((e) => ({ ...e })),
+      seekEvents: this.game.seekEvents.map((e) => ({
+        ...e,
+        before: { ...e.before },
+        after: { ...e.after },
+      })),
       pendingKills: this.game.pendingKills.map((e) => ({ ...e })),
       ...(externalData !== null ? { externalData } : {}),
     };
@@ -506,6 +515,11 @@ export class GameSession {
       }
     }
     this.game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));
+    this.game.seekEvents = snap.seekEvents.map((e) => ({
+      ...e,
+      before: { ...e.before },
+      after: { ...e.after },
+    }));
     this.game.pendingKills = snap.pendingKills.map((e) => ({ ...e }));
   }
 
@@ -689,6 +703,34 @@ export class GameSession {
       this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
     }
     this.game.deckEvents = [];
+
+    // Seek events: attribute the chosen market card. For bot actors the
+    // parent action's log entry is just the move description (no effect
+    // diff), so we attach the effect delta here too — that's the only
+    // surface where "Used seek on Survive: +3 heal (23→26)" can show.
+    // Humans already get the heal/damage/etc. in the action's effect line
+    // via diffToText, so their seek entry stays attribution-only.
+    for (const event of this.game.seekEvents) {
+      const owner = event.playerIndex as 0 | 1;
+      let suffix = "";
+      if (this._isBot(owner)) {
+        const parts: string[] = [];
+        const healDelta = event.after.health - event.before.health;
+        if (healDelta > 0) parts.push(`+${healDelta} heal (${event.before.health}→${event.after.health})`);
+        else if (healDelta < 0) parts.push(`${healDelta} heal (${event.before.health}→${event.after.health})`);
+        const dmgDelta = event.after.damage - event.before.damage;
+        if (dmgDelta !== 0) parts.push(`${dmgDelta > 0 ? "+" : ""}${dmgDelta} damage`);
+        const moneyDelta = event.after.money - event.before.money;
+        if (moneyDelta !== 0) parts.push(`${moneyDelta > 0 ? "+" : ""}${moneyDelta} money`);
+        const missionDelta = event.after.mission - event.before.mission;
+        if (missionDelta !== 0) parts.push(`${missionDelta > 0 ? "+" : ""}${missionDelta} mission`);
+        const trainingDelta = event.after.training - event.before.training;
+        if (trainingDelta !== 0) parts.push(`${trainingDelta > 0 ? "+" : ""}${trainingDelta} training`);
+        if (parts.length > 0) suffix = `: ${parts.join(", ")}`;
+      }
+      this._logs[owner].push({ turn, text: `Used seek on ${event.cardName}${suffix}` });
+    }
+    this.game.seekEvents = [];
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i];
       if (p.deck.shuffleOccurred) {

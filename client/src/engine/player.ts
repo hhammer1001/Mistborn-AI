@@ -473,13 +473,34 @@ export class Player {
 
     const [choice, choice2] = this.seekIn(twice, seeker, choices);
     if (choice > -1) {
-      choices[choice].ability1(this);
+      this._applySeekChoice(choices[choice]);
       if (twice && choice2 > -1) {
-        choices[choice2].ability1(this);
+        this._applySeekChoice(choices[choice2]);
       } else if (seeker) {
         choices[choice].sought = true;
       }
     }
+  }
+
+  /** Apply one seek pick: snapshot stats before/after ability1 and emit a
+   *  seek event for the session to surface in the activity log. Keeps the
+   *  heal/damage/etc. earned via seek visible instead of folding silently
+   *  into the parent action's effect line. */
+  private _applySeekChoice(card: Action) {
+    const before = {
+      health: this.curHealth, damage: this.curDamage, money: this.curMoney,
+      mission: this.curMission, training: this.training,
+    };
+    card.ability1(this);
+    const after = {
+      health: this.curHealth, damage: this.curDamage, money: this.curMoney,
+      mission: this.curMission, training: this.training,
+    };
+    this.game.seekEvents.push({
+      playerIndex: this.turnOrder,
+      cardName: card.name,
+      before, after,
+    });
   }
 
   /** Apply incoming damage, auto-consuming any cloudP (Coppercloud) cards
