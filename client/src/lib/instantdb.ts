@@ -65,6 +65,14 @@ const schema = i.schema({
       forfeiter: i.number(),               // 0 | 1 | -1 (-1 = natural end)
       missionNames: i.any(),               // string[]
       testDeck: i.boolean(),
+      // Replay payload — root seed + structured action log. schemaVersion
+      // lets future shape changes coexist with older recorded matches.
+      seed: i.number().optional(),
+      actionLog: i.any().optional(),
+      schemaVersion: i.number().optional(),
+      // Postgame snapshot — full state needed to rehydrate GameOverScreen.
+      missionState: i.any().optional(),    // MissionData[]
+      activityLog: i.any().optional(),     // { p0: LogEntry[], p1: LogEntry[] }
     }),
     // One row per player per match. Keeps user-scoped queries cheap
     // and opens the door to per-character / per-card stats.
@@ -95,6 +103,20 @@ const schema = i.schema({
       // Final deck composition as name->count (allies folded in).
       // Enables queries like "matches where Yeden was in the deck".
       finalDeck: i.any(),                  // Record<string, number>
+      eliminatedCounts: i.any().optional(), // Record<string, number>
+      // Postgame snapshot — full per-player state for GameOverScreen.
+      health: i.number().optional(),
+      money: i.number().optional(),
+      boxings: i.number().optional(),
+      pDamage: i.number().optional(),
+      pMoney: i.number().optional(),
+      charAbility1: i.boolean().optional(),
+      charAbility2: i.boolean().optional(),
+      charAbility3: i.boolean().optional(),
+      finalHand: i.any().optional(),       // CardData[]
+      finalDiscard: i.any().optional(),    // CardData[]
+      finalLibrary: i.any().optional(),    // CardData[]
+      finalAllies: i.any().optional(),     // CardData[]
     }),
     // ── Lands (side project) multiplayer ───────────────────────────────
     // Mirrors `rooms`/`games` shape but kept separate so the two games can
