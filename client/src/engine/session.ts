@@ -200,7 +200,7 @@ function diffToText(before: PSnap, after: PSnap): string[] {
 }
 
 import type { CardData } from "../types/game";
-interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number; afterBotIdx?: number }
+interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number; afterBotIdx?: number; marketAtTime?: Array<{ name: string; cost: number }>; moneyAtTime?: { money: number; boxings: number } }
 
 // ── Structured action log (for replay + post-game review) ──
 
@@ -334,6 +334,10 @@ export class GameSession {
   private _oppDiscardIdsBefore: Set<number> | null = null;
   // For detecting cards that got eliminated (moved to market trash) during an action.
   private _marketTrashIdsBefore: Set<number> | null = null;
+  // Visible market + buyer's spendable money at the moment a buy action starts,
+  // attached to the resulting log entry for post-game analysis. Null for non-buy actions.
+  private _marketHandBefore: Array<{ name: string; cost: number }> | null = null;
+  private _moneyAtTimeBefore: { money: number; boxings: number } | null = null;
   // Per-player card-id sets snapshotted before an action; used to attribute
   // eliminations to the player who owned the card prior to the action.
   private _playerCardsBefore: [Set<number>, Set<number>] | null = null;
@@ -910,6 +914,14 @@ export class GameSession {
       this._playerCardIdSet(0),
       this._playerCardIdSet(1),
     ];
+    if (action.type === "buy" || action.type === "buy_with_boxings"
+        || action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
+      this._marketHandBefore = this.game.market.hand.map((c) => ({ name: c.name, cost: c.cost }));
+      this._moneyAtTimeBefore = { money: p.curMoney, boxings: p.curBoxings };
+    } else {
+      this._marketHandBefore = null;
+      this._moneyAtTimeBefore = null;
+    }
     // Snapshot opponent's discard pile before advance_mission so we can
     // identify which Sense card (if any) got auto-used to block.
     if (action.type === "advance_mission") {
@@ -1077,7 +1089,11 @@ export class GameSession {
     if (source) {
       const log = this._logs[playerIndex];
       if (action.type === "buy" || action.type === "buy_with_boxings") {
-        log.push({ turn: this.game.turncount, text: source, card, actionType: action.type, metalIndex });
+        log.push({
+          turn: this.game.turncount, text: source, card, actionType: action.type, metalIndex,
+          marketAtTime: this._marketHandBefore ?? undefined,
+          moneyAtTime: this._moneyAtTimeBefore ?? undefined,
+        });
       } else if (action.type === "buy_boxing") {
         log.push({ turn: this.game.turncount, text: source, actionType: action.type });
       } else if (action.type === "buy_eliminate" || action.type === "buy_elim_boxings") {
@@ -1086,6 +1102,8 @@ export class GameSession {
           turn: this.game.turncount,
           text: filtered.length > 0 ? `${source}: ${filtered.join(", ")}` : source,
           card, actionType: action.type, metalIndex,
+          marketAtTime: this._marketHandBefore ?? undefined,
+          moneyAtTime: this._moneyAtTimeBefore ?? undefined,
         });
       } else if (action.type === "advance_mission") {
         const filtered = effects.filter((e) => e !== "-1 mission");
@@ -1147,6 +1165,8 @@ export class GameSession {
     this._marketTrashIdsBefore = null;
     this._playerCardsBefore = null;
     this._missionRankBefore = null;
+    this._marketHandBefore = null;
+    this._moneyAtTimeBefore = null;
 
     if (this.game.winner) {
       this.phase = "game_over";
@@ -1741,7 +1761,19 @@ export class GameSession {
       const rankBefore = action.type === "advance_mission"
         ? action.mission.playerRanks[bi_captured]
         : null;
-      const logEntry: LogEntry = { turn: botTurn, text: desc, card, actionType: action.type, metalIndex: mi };
+      const isBuy = action.type === "buy" || action.type === "buy_with_boxings"
+        || action.type === "buy_eliminate" || action.type === "buy_elim_boxings";
+      const marketAtTime = isBuy
+        ? g.market.hand.map((c) => ({ name: c.name, cost: c.cost }))
+        : undefined;
+      const moneyAtTime = isBuy
+        ? { money: bot.curMoney, boxings: bot.curBoxings }
+        : undefined;
+      const logEntry: LogEntry = {
+        turn: botTurn, text: desc, card, actionType: action.type, metalIndex: mi,
+        ...(marketAtTime ? { marketAtTime } : {}),
+        ...(moneyAtTime ? { moneyAtTime } : {}),
+      };
       this._logs[bi_captured].push(logEntry);
       // Record the bot's move in the structured action log. Bot moves are
       // informational at replay time (the bot regenerates them from the
@@ -1758,6 +1790,8 @@ export class GameSession {
           description: desc,
           ...(card ? { cardName: card.name } : {}),
           ...(mi !== undefined ? { metalIndex: mi } : {}),
+          ...(marketAtTime ? { marketAtTime } : {}),
+          ...(moneyAtTime ? { moneyAtTime } : {}),
         },
         annotation ?? undefined,
       );
