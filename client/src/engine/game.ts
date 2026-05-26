@@ -38,7 +38,7 @@ export class Game {
   botRngs: Rng[];
   /** Buffered deck events (ad-hoc draws + reshuffles) that the session
    *  drains into per-player logs after each action. Cleared by drain. */
-  deckEvents: Array<{ type: "draw"; playerIndex: number; amount: number }> = [];
+  deckEvents: Array<{ type: "draw"; playerIndex: number; amount: number; cards?: string[] }> = [];
   /** Buffered seek events: every time a player resolves a `seek` and applies
    *  the chosen market action's ability1, an entry is pushed here. The
    *  session drains them into per-player logs alongside deckEvents so the

@@ -290,7 +290,8 @@ export class Player {
     // draw, which calls deck.draw directly). Surface to the activity log.
     const drew = this.deck.hand.length - beforeHand;
     if (drew > 0) {
-      this.game.deckEvents.push({ type: "draw", playerIndex: this.turnOrder, amount: drew });
+      const cards = this.deck.hand.slice(beforeHand).map((c) => c.name);
+      this.game.deckEvents.push({ type: "draw", playerIndex: this.turnOrder, amount: drew, cards });
     }
   }
   gainAtium(amount: number) { this.atium += amount; }
