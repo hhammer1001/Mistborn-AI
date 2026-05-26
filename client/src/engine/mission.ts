@@ -22,19 +22,26 @@ export class Mission {
     const oldRank = this.playerRanks[playerNum];
     const newRank = oldRank + amount;
 
-    for (const tier of this.tiers) {
-      if (oldRank < tier.threshold && newRank >= tier.threshold) {
-        // Grant tier reward
-        this.game.players[playerNum].resolve(
-          tier.reward,
-          String(tier.rewardAmount)
-        );
-        // If this player is the first to reach this tier, grant first-player bonus
-        if (Math.max(...this.playerRanks) < tier.threshold) {
+    // If this advance completes the player's 3rd mission, the game is won the
+    // moment we apply it. The tier rewards (which can throw interactive prompts
+    // like refresh/eliminate) would then pop over an already-decided game, so
+    // skip granting them entirely.
+    const winsGame = this._completesThirdMission(playerNum, newRank);
+    if (!winsGame) {
+      for (const tier of this.tiers) {
+        if (oldRank < tier.threshold && newRank >= tier.threshold) {
+          // Grant tier reward
           this.game.players[playerNum].resolve(
-            tier.firstReward,
-            String(tier.firstRewardAmount)
+            tier.reward,
+            String(tier.rewardAmount)
           );
+          // If this player is the first to reach this tier, grant first-player bonus
+          if (Math.max(...this.playerRanks) < tier.threshold) {
+            this.game.players[playerNum].resolve(
+              tier.firstReward,
+              String(tier.firstRewardAmount)
+            );
+          }
         }
       }
     }
@@ -46,6 +53,20 @@ export class Mission {
 
     this.playerRanks[playerNum] = newRank;
     this.game.missionVictoryCheck(playerNum);
+  }
+
+  /** Would advancing this mission to `thisNewRank` give the player their 3rd
+   *  completed mission (and thus win the game)? Mirrors Game.missionVictoryCheck:
+   *  a mission counts as completed at rank >= 12. */
+  private _completesThirdMission(playerNum: number, thisNewRank: number): boolean {
+    const WIN_RANK = 12;
+    if (thisNewRank < WIN_RANK) return false;
+    let completed = 0;
+    for (const mission of this.game.missions) {
+      const rank = mission === this ? thisNewRank : mission.playerRanks[playerNum];
+      if (rank >= WIN_RANK) completed++;
+    }
+    return completed >= 3;
   }
 
   clone(newGame: Game): Mission {
