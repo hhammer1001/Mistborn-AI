@@ -1072,7 +1072,17 @@ export class GameSession {
 
     this._pending_prompt = null;
     this._accumulated_responses = [];
-    const revealedInfo = this._preActionSnapshot ? this._didRevealInfo(this._preActionSnapshot) : false;
+    // An action that drew cards (or reshuffled) revealed information even when
+    // _didRevealInfo's hidden→visible diff misses it: a draw off a reshuffled
+    // discard pulls a card that was *visible* in the discard before, so no
+    // hidden id flips — yet the player has now seen which card came up and
+    // undo must stay blocked. deckEvents/shuffleOccurred are still pending
+    // here (drained in _returnState), so check them directly.
+    const drewOrShuffled =
+      this.game.deckEvents.some((e) => e.type === "draw" && e.playerIndex === playerIndex && e.amount > 0)
+      || this.players[playerIndex].deck.shuffleOccurred;
+    const revealedInfo = drewOrShuffled
+      || (this._preActionSnapshot ? this._didRevealInfo(this._preActionSnapshot) : false);
 
     const snapBefore = this._playerSnapBefore!;
     const snapAfter = psnap(p);
