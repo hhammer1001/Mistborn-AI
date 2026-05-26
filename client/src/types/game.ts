@@ -160,6 +160,11 @@ export interface GameState {
   sessionId: string;
   phase: "actions" | "damage" | "sense_defense" | "cloud_defense" | "ally_defense" | "awaiting_prompt" | "game_over";
   turnCount: number;
+  /** HP each player had at the start of their most recent turn (indexed by
+   *  player). The turn recap measures the opponent's healing against their
+   *  true turn-start HP rather than the render-based baseline, which in SP
+   *  predates the human's same-call attack and would net a heal to zero. */
+  turnStartHealth?: [number, number];
   winner: string | null;
   victoryType: string | null;
   metalCodes: string[];

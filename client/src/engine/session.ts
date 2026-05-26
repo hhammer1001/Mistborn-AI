@@ -163,7 +163,7 @@ interface GameSnapshot {
  *  log only the bare action description). */
 const ABILITY_EFFECT_TYPES = new Set<string>([
   "use_metal", "char_ability_1", "char_ability_3", "ally_ability_1", "ally_ability_2",
-  "burn_card",
+  "burn_card", "advance_mission",
 ]);
 
 interface PSnap {
@@ -351,6 +351,16 @@ export class GameSession {
   private _playerCardsBefore: [Set<number>, Set<number>] | null = null;
   // Undo-batch: while open, multiple playAction calls collapse to one undo entry.
   private _batchStart: { snapshot: GameSnapshot; stackLen: number } | null = null;
+
+  // Health each player had at the start of their most recent turn. Captured
+  // for the bot in _runBotTurn (after the human's damage has already landed),
+  // so the turn recap can measure the bot's healing against its true turn-
+  // start HP. Without this, SP runs the human's attack and the bot's turn in
+  // one synchronous call, so the recap's render-based baseline predates the
+  // human's damage and a heal that just undoes that damage nets to zero.
+  // -1 means "not captured" (e.g. MP human turns, which don't run
+  // _runBotTurn); the recap falls back to its render-based baseline there.
+  private _turnStartHealth: [number, number] = [-1, -1];
 
   // Per-player logs (cumulative). Index 0 = player 0, index 1 = player 1.
   private _logs: [LogEntry[], LogEntry[]] = [[], []];
@@ -765,6 +775,7 @@ export class GameSession {
     state["myPlayerIndex"] = perspective;
     state["isMyTurn"] = this.activePlayer === perspective;
     state["turnCount"] = this.game.turncount;
+    state["turnStartHealth"] = [...this._turnStartHealth];
 
     if (this.game.winner) {
       const wi = this.game.winner.turnOrder;
@@ -1774,6 +1785,10 @@ export class GameSession {
     const opp = this.players[oi];
 
     const oppHpBefore = opp.curHealth;
+    // Capture the bot's HP now — after the human's attack resolved but before
+    // the bot acts — so the turn recap measures the bot's healing against its
+    // real turn-start HP (see _turnStartHealth).
+    this._turnStartHealth[bi] = bot.curHealth;
 
     // Wrap bot.performAction to capture each action for the bot log
     const originalPerform = bot.performAction.bind(bot);
@@ -1867,7 +1882,14 @@ export class GameSession {
           adjusted.training += ev.after.training - ev.before.training;
         }
         // Drops drew (deckEvents logs draws separately under "Drew N cards").
-        const effects = diffToText(adjusted, psnap(bot)).filter((e) => !e.startsWith("drew "));
+        let effects = diffToText(adjusted, psnap(bot)).filter((e) => !e.startsWith("drew "));
+        // For advance_mission the rank suffix already conveys progress; the
+        // -1 mission-point spend and any Mi tier reward are churn, so drop
+        // mission-point lines and keep the substantive tier rewards (heal,
+        // money, training, etc.).
+        if (action.type === "advance_mission") {
+          effects = effects.filter((e) => !e.endsWith(" mission"));
+        }
         if (effects.length > 0) logEntry.text = `${logEntry.text}: ${effects.join(", ")}`;
       }
       if (autoBoxings > 0) {

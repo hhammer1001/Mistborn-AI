@@ -66,7 +66,16 @@ export function computeRecap(
   const r: TurnRecap = {};
 
   const trained = nextOpp.training - prevOpp.training;
-  const healed = Math.max(0, nextOpp.health - prevOpp.health);
+  // Measure healing against the opponent's true turn-start HP when available.
+  // In SP the human's attack and the bot's turn run in one synchronous call,
+  // so the render-based `prev` predates the damage — a heal that just undoes
+  // that damage would net to zero against prevOpp.health. turnStartHealth is
+  // captured inside the engine after the attack lands, giving the right base.
+  const capturedStartHp = next.turnStartHealth?.[opp];
+  const oppTurnStartHp = typeof capturedStartHp === "number" && capturedStartHp >= 0
+    ? capturedStartHp
+    : prevOpp.health;
+  const healed = Math.max(0, nextOpp.health - oppTurnStartHp);
 
   const playerHpLoss = Math.max(0, prevYou.health - nextYou.health);
   if (playerHpLoss > 0) r.damageToPlayer = { name: prevYou.name, amount: playerHpLoss };
