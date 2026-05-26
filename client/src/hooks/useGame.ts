@@ -59,7 +59,6 @@ function isReactiveDefenderEntry(e: BotLogEntry): boolean {
     || e.actionType === "opponent_kill"
     || e.actionType === "cloud_block"
     || e.actionType === "cloud_ally_block"
-    || e.actionType === "damage_taken"
     || e.actionType === "incoming_damage";
 }
 
@@ -75,6 +74,16 @@ function isReactiveDefenderEntry(e: BotLogEntry): boolean {
 function isOpponentMirror(e: BotLogEntry): boolean {
   return e.actionType === "opponent_kill"
     || e.actionType === "cloud_block";
+}
+
+/** A "primary action" entry is the engine-pushed log line that represents
+ *  the action the player just took (e.g. "Used ability 1 of Copper Training:
+ *  +2 damage, +1 money"). It carries the card + actionType for the eye
+ *  icon. We promote this entry to `${pName} — ${text}` formatting so it
+ *  reads as the player's headline action (not a sub-effect), and skip the
+ *  duplicate "${pName} — ${desc}" label that would otherwise repeat it. */
+function isPrimaryActionEntry(e: BotLogEntry): boolean {
+  return e.actionType !== undefined && !isReactiveDefenderEntry(e);
 }
 
 /** Assemble log entries from a session result. Handles three layout concerns
@@ -98,16 +107,27 @@ function buildTurnEntries(opts: {
   pName: string;
   bName: string;
   initial?: LogEntry[];
+  /** Headline label for the action the player just took. When a primary
+   *  action entry exists in playerLogDelta, that entry is promoted to
+   *  "${pName} — ${entry.text}" and this fallback is dropped (avoids the
+   *  "X — Used ability 1" / "→ Used ability 1: +2 damage" duplicate). When
+   *  no primary entry is pushed (e.g. end_actions has no source), this is
+   *  inserted as a standalone line so the action still appears. */
+  primaryActionLabel?: string;
 }): LogEntry[] {
-  const { prevTurn, data, playerLogDelta, botLogDelta, pName, bName, initial = [] } = opts;
+  const { prevTurn, data, playerLogDelta, botLogDelta, pName, bName, initial = [], primaryActionLabel } = opts;
   const newEntries: LogEntry[] = [...initial];
+  const primaryEntry = playerLogDelta.find((e) => e.turn === prevTurn && isPrimaryActionEntry(e));
+  if (!primaryEntry && primaryActionLabel) {
+    newEntries.push({ turn: prevTurn, text: `${pName} — ${primaryActionLabel}` });
+  }
 
   // Bucket playerLog entries with turn === prevTurn:
   //   - actionEffectLogs: pushed during the player's own action (auto-trade,
   //     diffToText effects). Land BEFORE bot delta — they describe what the
   //     player just did.
   //   - reactiveByPos: defense/received entries from the bot's actions
-  //     (sense_block, damage_taken, opponent_kill, etc), keyed by their
+  //     (sense_block, opponent_kill, cloud_ally_block, etc), keyed by their
   //     `afterBotIdx`. Land INTERLEAVED with the bot delta — "Used Spy to
   //     block mission advance" goes right after the Advance entry that
   //     triggered it, not at the end of the turn.
@@ -119,9 +139,13 @@ function buildTurnEntries(opts: {
   const reactiveTail: LogEntry[] = [];
   const newTurnPlayerLogs: LogEntry[] = [];
   for (const entry of playerLogDelta) {
+    // Promote the primary action entry to a headline-style "${pName} — ..."
+    // line. Other entries (deck events, "Killed bot's X" sub-effects, etc)
+    // stay indented with "→".
+    const isPrimary = entry === primaryEntry;
     const formatted: LogEntry = {
       turn: entry.turn,
-      text: `  → ${entry.text}`,
+      text: isPrimary ? `${pName} — ${entry.text}` : `  → ${entry.text}`,
       card: entry.card,
       cards: entry.cards,
       actionType: entry.actionType,
@@ -255,7 +279,19 @@ export function useGame() {
    *  event handler sees the new length immediately. */
   const appendLog = useCallback((newEntries: LogEntry[]) => {
     if (newEntries.length === 0) return;
-    const next = consolidateLog([...rawLogRef.current, ...newEntries]);
+    // A bot turn that hits sense_defense / cloud_defense / ally_defense
+    // pauses and resumes across multiple session calls. Each call's
+    // buildTurnEntries re-emits the "{bot}'s turn" header because each batch
+    // contains a real bot action. Drop any "X's turn" header that's already
+    // present in the existing log for the same (turn, isBot) so the activity
+    // log shows one header per bot turn, not one per resumed segment.
+    const existing = rawLogRef.current;
+    const filtered = newEntries.filter((e) => {
+      if (!e.text.endsWith("'s turn")) return true;
+      return !existing.some((p) => p.text === e.text && p.turn === e.turn && p.isBot === e.isBot);
+    });
+    if (filtered.length === 0) return;
+    const next = consolidateLog([...existing, ...filtered]);
     rawLogRef.current = next;
     setRawLog(next);
   }, []);
@@ -441,7 +477,7 @@ export function useGame() {
 
         const newEntries = buildTurnEntries({
           prevTurn, data, playerLogDelta, botLogDelta, pName, bName,
-          initial: [{ turn: prevTurn, text: `${pName} — ${desc}` }],
+          primaryActionLabel: desc,
         });
 
         // If the bot actually played, defer the gameState update behind the
