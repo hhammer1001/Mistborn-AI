@@ -627,7 +627,7 @@ function GameBoard({
   playTwoActions: (first: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   advanceAllMission: (name: string) => void;
   assignDamage: (targetIndex: number) => unknown;
-  resolveSense: (cardId: number | null) => unknown;
+  resolveSense: (cardIds: number[]) => unknown;
   resolveCloud: (cardIds: number[]) => unknown;
   resolveAllyDefense: (cardId: number) => unknown;
   respondToPrompt: (type: string, value: number) => unknown;
@@ -756,10 +756,10 @@ function GameBoard({
             }}
             onSubmit={(ids) => {
               if (loading) return;
-              // Engine consumes exactly the chosen card (by id). The panel
-              // still allows multi-toggle as a UI affordance for comparing
-              // options, but only the first toggled id is consumed.
-              resolveSense(ids[0] ?? null);
+              // First id blocks the current advance; any others are queued to
+              // auto-block the bot's subsequent advances this turn without
+              // re-prompting. Empty = let this advance through.
+              resolveSense(ids);
             }}
           />
         </div>

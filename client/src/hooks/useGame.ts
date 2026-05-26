@@ -625,12 +625,12 @@ export function useGame() {
   );
 
   const resolveSense = useCallback(
-    (cardId: number | null) => {
+    (cardIds: number[]) => {
       const session = sessionRef.current;
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveSense(0, cardId) as SessionResult;
+        const data = session.resolveSense(0, cardIds) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 

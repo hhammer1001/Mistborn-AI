@@ -135,7 +135,7 @@ export function useMultiplayerGame(
           session.assignDamage(pi, pending.targetIndex as number);
           break;
         case "sense":
-          session.resolveSense(pi, pending.cardId as number | null);
+          session.resolveSense(pi, pending.cardIds as number[]);
           break;
         case "cloud":
           session.resolveCloud(pi, pending.cardIds as number[]);
@@ -303,12 +303,12 @@ export function useMultiplayerGame(
   );
 
   const resolveSense = useCallback(
-    (cardId: number | null) => {
+    (cardIds: number[]) => {
       if (myPlayerIndex === null) return;
       if (isHost) {
-        _hostAction((s) => s.resolveSense(myPlayerIndex, cardId));
+        _hostAction((s) => s.resolveSense(myPlayerIndex, cardIds));
       } else {
-        _guestAction({ actionType: "sense", cardId });
+        _guestAction({ actionType: "sense", cardIds });
       }
     },
     [isHost, myPlayerIndex, _hostAction, _guestAction]

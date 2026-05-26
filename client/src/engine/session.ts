@@ -282,6 +282,12 @@ export class GameSession {
    *  sense decision. resolveSense uses this to resume the original action
    *  after the defender chooses. */
   private _pending_advance_action: GameActionInternal | null = null;
+  /** Sense card ids the human defender pre-committed in the sense-defense
+   *  modal beyond the one used for the current advance. Each subsequent bot
+   *  advance this turn auto-consumes the next id (blocking it) without
+   *  re-prompting, so selecting two cards in one modal blocks the bot's next
+   *  two advances. Drained front-to-back; cleared at turn end. */
+  private _senseQueue: number[] = [];
   /** Set when an ally-kill is paused for a human defender's cloudA decision.
    *  `source` tells resolveAllyDefense which resume path to take when the
    *  pause unblocks:
@@ -1447,16 +1453,59 @@ export class GameSession {
     });
   }
 
-  resolveSense(playerIndex: number, cardId: number | null): Record<string, unknown> {
+  /** Execute a single bot advance the human chose to block with `cardId`
+   *  (null = let it through). Sets the sense flag the engine reads, runs the
+   *  advance through bot.performAction (which logs + drains deck events),
+   *  logs the block, then clears the flag so the next advance re-decides.
+   *  Shared by resolveSense (the prompted advance) and _runBotActionsStep
+   *  (queue auto-consumed advances). */
+  private _performBotAdvanceWithSense(
+    advance: GameActionInternal,
+    attackerIndex: 0 | 1,
+    defenderIndex: 0 | 1,
+    cardId: number | null,
+  ): void {
+    const defender = this.players[defenderIndex] as WebPlayer;
+    defender._sense_flag = cardId ?? -1;
+    let usedSenseCard: Action | undefined = undefined;
+    if (cardId !== null && advance.type === "advance_mission") {
+      usedSenseCard = defender.deck.hand.find(
+        (c): c is Action => c instanceof Action && c.id === cardId && c.data[9] === "sense",
+      );
+    }
+    this.players[attackerIndex].performAction(advance, this.game);
+    if (usedSenseCard) {
+      const senseValue = parseInt(usedSenseCard.data[10], 10);
+      this._logs[defenderIndex].push({
+        turn: this.game.turncount,
+        text: `Used ${usedSenseCard.name} to block mission advance (−${senseValue} mission)`,
+        card: usedSenseCard.toJSON() as CardData,
+        actionType: "sense_block",
+        // Position in the bot's log delta at push time — lets the renderer
+        // interleave this right after the Advance entry that triggered it.
+        afterBotIdx: this._logs[attackerIndex].length - this._logRead[attackerIndex],
+      });
+    }
+    defender._sense_flag = null;
+  }
+
+  /** Resolve a sense-defense prompt. `cardIds` is the modal's selection:
+   *  the first id (if any) blocks the current advance; the rest are queued to
+   *  auto-block the bot's subsequent advances this turn (no re-prompt). An
+   *  empty array means "let this advance through". */
+  resolveSense(playerIndex: number, cardIds: number[]): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "sense_defense") return { error: `Cannot resolve sense in phase: ${this.phase}` };
 
+    const cardId = cardIds.length > 0 ? cardIds[0] : null;
     this._pushActionEvent("sense", playerIndex, { cardId });
 
     const defender = this.players[playerIndex] as WebPlayer;
     // -1 sentinel = decided not to use. Distinguishes "asked, declined" from
-    // "not asked yet" (null) so `_promptSenseIfApplicable` doesn't re-prompt.
+    // "not asked yet" (null).
     defender._sense_flag = cardId ?? -1;
+    // Pre-commit the rest for the bot's upcoming advances this turn.
+    this._senseQueue = cardIds.slice(1);
 
     const pending = this._pending_advance_action;
     if (pending) {
@@ -1465,39 +1514,12 @@ export class GameSession {
       this.phase = "actions";
       this.activePlayer = attackerIndex;
 
-      // Identify the sense card the defender is about to use, before
-      // _attemptAction moves it from hand to discard. Logging from here
-      // (rather than _attemptAction's post-detection) means the entry is
-      // pushed regardless of whether the temp-var bookkeeping survives the
-      // pause/resume cycle.
-      let usedSenseCard: Action | undefined = undefined;
-      if (cardId !== null && pending.type === "advance_mission") {
-        usedSenseCard = defender.deck.hand.find(
-          (c): c is Action => c instanceof Action && c.id === cardId && c.data[9] === "sense",
-        );
-      }
-
       // Bot-attacker resume path: the bot is mid-_runBotActionsStep waiting
-      // for this decision. Execute the advance through bot.performAction
-      // (the wrapper logs + drains deck events), then continue the actions
-      // loop / damage step from where it paused.
+      // for this decision. Execute the advance, then continue the actions
+      // loop / damage step from where it paused — queued cards auto-block
+      // further advances inside _runBotActionsStep.
       if (this._bot_turn) {
-        const bot = this.players[attackerIndex];
-        bot.performAction(pending, this.game);
-        if (usedSenseCard) {
-          const senseValue = parseInt(usedSenseCard.data[10], 10);
-          this._logs[playerIndex].push({
-            turn: this.game.turncount,
-            text: `Used ${usedSenseCard.name} to block mission advance (−${senseValue} mission)`,
-            card: usedSenseCard.toJSON() as CardData,
-            actionType: "sense_block",
-            // Position in the bot's log delta at push time — lets the
-            // renderer interleave this right after the Advance entry that
-            // triggered it, instead of bucketing it at the end of the turn.
-            afterBotIdx: this._logs[attackerIndex].length - this._logRead[attackerIndex],
-          });
-        }
-        defender._sense_flag = null;
+        this._performBotAdvanceWithSense(pending, attackerIndex, playerIndex as 0 | 1, cardId);
         if (this._runBotActionsStep()) return this._returnState(playerIndex);
         this._bot_turn.step = "damage";
         if (this._runBotDamageStep()) return this._returnState(playerIndex);
@@ -1505,6 +1527,14 @@ export class GameSession {
         return this._returnState(playerIndex);
       }
 
+      // Human-vs-human (MP) path: no auto-consume loop, so the queue is inert
+      // here; each advance is its own network round-trip and prompt.
+      let usedSenseCard: Action | undefined = undefined;
+      if (cardId !== null && pending.type === "advance_mission") {
+        usedSenseCard = defender.deck.hand.find(
+          (c): c is Action => c instanceof Action && c.id === cardId && c.data[9] === "sense",
+        );
+      }
       this._resolvingSense = true;
       const result = this._attemptAction(pending, attackerIndex);
       this._resolvingSense = false;
@@ -1678,8 +1708,8 @@ export class GameSession {
     if (this.game.winner) { this.phase = "game_over"; return; }
 
     // Sense defense is now prompted at the moment of each advance_mission —
-    // session.playAction handles human-vs-human, _tryPauseForSenseDefense
-    // handles bot mission advances against a human defender. The legacy
+    // session.playAction handles human-vs-human, _runBotActionsStep handles
+    // bot mission advances against a human defender. The legacy
     // pre-turn prompt used to fire here for the human-vs-bot case (the bot
     // turn ran synchronously and couldn't pause mid-advance); the state
     // machine refactor removed that constraint. Clear any stale flag from
@@ -1687,6 +1717,8 @@ export class GameSession {
     if (!this._isBot(pi)) {
       (p as WebPlayer)._sense_flag = null;
     }
+    // Pre-committed sense cards only apply to the turn they were selected in.
+    this._senseQueue = [];
 
     this._startNextTurn(oi);
   }
@@ -1948,8 +1980,9 @@ export class GameSession {
   /** Drive the bot's actions loop. After each action (including end_actions),
    *  drain any K-effect kills queued by that action's resolve chain
    *  (Assassinate / Coinshot ability 2, Maelstrom, mission first-reached K).
-   *  Before each action, if the bot is advancing a mission and the human
-   *  defender has unused sense cards, pause for `sense_defense`.
+   *  When the bot advances a mission against a human defender with sense
+   *  cards: auto-block from the pre-committed sense queue if non-empty,
+   *  otherwise pause for `sense_defense`.
    *  Returns true if the loop paused (ally_defense or sense_defense). */
   private _runBotActionsStep(): boolean {
     const turn = this._bot_turn;
@@ -1963,7 +1996,30 @@ export class GameSession {
       const actions = bot.availableActions(this.game);
       const action = bot.selectAction(actions, this.game);
 
-      if (this._tryPauseForSenseDefense(action, turn.defenderIndex, simulating)) return true;
+      // Sense-defense decision for an advance against a human defender.
+      if (
+        !simulating &&
+        action.type === "advance_mission" &&
+        !this._isBot(turn.defenderIndex)
+      ) {
+        const defender = this.players[turn.defenderIndex] as WebPlayer;
+        if (
+          defender._sense_flag === null &&
+          defender.deck.hand.some((c) => c instanceof Action && c.data[9] === "sense")
+        ) {
+          if (this._senseQueue.length > 0) {
+            // Pre-committed in the modal: block this advance without prompting.
+            const cardId = this._senseQueue.shift()!;
+            this._performBotAdvanceWithSense(action, turn.botIndex, turn.defenderIndex, cardId);
+            continue;
+          }
+          // No pre-commitment left — pause for the human's decision.
+          this._pending_advance_action = action;
+          this.phase = "sense_defense";
+          this.activePlayer = turn.defenderIndex;
+          return true;
+        }
+      }
 
       bot.performAction(action, this.game);
 
@@ -1974,31 +2030,6 @@ export class GameSession {
         return false;
       }
     }
-  }
-
-  /** If `action` is an advance_mission that the human defender could block
-   *  with an unused sense card, pause for the prompt and stash the action
-   *  in `_pending_advance_action` so resolveSense can actually fire it
-   *  after the defender decides. Sims skip the pause and let the bot's
-   *  performAction call the senseCheck heuristic normally. */
-  private _tryPauseForSenseDefense(
-    action: GameActionInternal,
-    defenderIndex: 0 | 1,
-    simulating: boolean,
-  ): boolean {
-    if (simulating) return false;
-    if (action.type !== "advance_mission") return false;
-    if (this._isBot(defenderIndex)) return false;
-    const defender = this.players[defenderIndex] as WebPlayer;
-    if (defender._sense_flag !== null) return false;
-    const hasSense = defender.deck.hand.some(
-      (c) => c instanceof Action && c.data[9] === "sense",
-    );
-    if (!hasSense) return false;
-    this._pending_advance_action = action;
-    this.phase = "sense_defense";
-    this.activePlayer = defenderIndex;
-    return true;
   }
 
   /** Apply queued K-effect kills, pausing for `ally_defense` when the
