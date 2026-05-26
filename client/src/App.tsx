@@ -627,7 +627,7 @@ function GameBoard({
   playTwoActions: (first: number, secondMatch: { code: number; cardIds?: number[] }) => void;
   advanceAllMission: (name: string) => void;
   assignDamage: (targetIndex: number) => unknown;
-  resolveSense: (use: boolean) => unknown;
+  resolveSense: (cardId: number | null) => unknown;
   resolveCloud: (cardIds: number[]) => unknown;
   resolveAllyDefense: (cardId: number) => unknown;
   respondToPrompt: (type: string, value: number) => unknown;
@@ -756,10 +756,10 @@ function GameBoard({
             }}
             onSubmit={(ids) => {
               if (loading) return;
-              // Engine takes a binary use/no-use; consumes one sense card from
-              // hand internally. Multi-select isn't surfaced to the engine yet —
-              // the panel's UX still helps the player see the trade.
-              resolveSense(ids.length > 0);
+              // Engine consumes exactly the chosen card (by id). The panel
+              // still allows multi-toggle as a UI affordance for comparing
+              // options, but only the first toggled id is consumed.
+              resolveSense(ids[0] ?? null);
             }}
           />
         </div>

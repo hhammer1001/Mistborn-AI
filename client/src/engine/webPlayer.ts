@@ -19,8 +19,9 @@ export class WebPlayer extends Player {
   _promptQueues: Record<string, (number | boolean)[]> = {};
   /** Null until the defender has been prompted for the current advance_mission.
    *  Set by resolveSense before the advance is re-executed, then reset to null
-   *  so the next advance in the same turn prompts again. */
-  _sense_flag: boolean | null = null;
+   *  so the next advance in the same turn prompts again.
+   *  -1 = decided not to use; positive = id of the sense card to consume. */
+  _sense_flag: number | null = null;
 
   constructor(deck: PlayerDeck, game: Game, turnOrder: number, name = "Player", character = "Kelsier") {
     super(deck, game, turnOrder, name, character);
@@ -65,8 +66,8 @@ export class WebPlayer extends Player {
       ally.health > targets[best].health ? i : best, 0);
   }
 
-  override senseCheckIn(_card: Action): boolean {
-    return this._sense_flag === true;
+  override senseCheckIn(card: Action): boolean {
+    return this._sense_flag !== null && this._sense_flag === card.id;
   }
 
   override killEnemyAllyIn(allies: Ally[]): number {

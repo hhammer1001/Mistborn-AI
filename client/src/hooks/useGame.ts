@@ -621,22 +621,22 @@ export function useGame() {
   );
 
   const resolveSense = useCallback(
-    (use: boolean) => {
+    (cardId: number | null) => {
       const session = sessionRef.current;
       if (!session || !gameState) return null;
       setError(null);
       try {
-        const data = session.resolveSense(0, use) as SessionResult;
+        const data = session.resolveSense(0, cardId) as SessionResult;
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
         const bName = botName.current;
         const pName = playerName.current;
         // No initial entry — the engine pushes "Used X to block mission
-        // advance" via resolveSense when use=true, which is the meaningful
-        // log line. The old "Sense defense active this turn" message was a
-        // legacy of the per-turn pre-prompt flow and reads wrong now that
-        // each advance prompts independently.
+        // advance" via resolveSense when a card is chosen, which is the
+        // meaningful log line. The old "Sense defense active this turn"
+        // message was a legacy of the per-turn pre-prompt flow and reads
+        // wrong now that each advance prompts independently.
         const newEntries = buildTurnEntries({
           prevTurn: gameState.turnCount, data, playerLogDelta, botLogDelta, pName, bName,
         });
