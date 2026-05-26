@@ -475,9 +475,13 @@ export function useGame() {
         if (data.error) { setError(data.error); return null; }
         const { playerLogDelta, botLogDelta } = session.consumeLogDeltas(0);
 
+        // When the action pauses for a prompt (e.g. Pierce's seek), it hasn't
+        // logged its primary entry yet — that lands when respondToPrompt
+        // completes it. Skip the fallback label here so we don't get a bare
+        // "X — Used ability 1 of Pierce" followed by the detailed entry.
         const newEntries = buildTurnEntries({
           prevTurn, data, playerLogDelta, botLogDelta, pName, bName,
-          primaryActionLabel: desc,
+          primaryActionLabel: data.phase === "awaiting_prompt" ? undefined : desc,
         });
 
         // If the bot actually played, defer the gameState update behind the

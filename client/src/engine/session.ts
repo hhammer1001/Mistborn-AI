@@ -715,23 +715,15 @@ export class GameSession {
    *  method so the log reflects everything the action triggered. */
   private _drainDeckEvents() {
     const turn = this.game.turncount;
-    for (const event of this.game.deckEvents) {
-      if (event.amount <= 0) continue;
-      const owner = event.playerIndex as 0 | 1;
-      const noun = `card${event.amount === 1 ? "" : "s"}`;
-      // Only push to the owner's log. Each UI renders the opponent's log
-      // with the opponent's name prefixed (Bot/Player-X), so a single entry
-      // shows up correctly from both perspectives without duplication.
-      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}`, drawnCards: event.cards });
-    }
-    this.game.deckEvents = [];
 
-    // Seek events: attribute the chosen market card. For bot actors the
-    // parent action's log entry is just the move description (no effect
-    // diff), so we attach the effect delta here too — that's the only
-    // surface where "Used seek on Survive: +3 heal (23→26)" can show.
-    // Humans already get the heal/damage/etc. in the action's effect line
-    // via diffToText, so their seek entry stays attribution-only.
+    // Seek events first: a sought card's ability commonly triggers the draw
+    // below ("seek Coppercloud → draw 1"), so the seek attribution must land
+    // before its "Drew N cards" line to read causally.
+    // For bot actors the parent action's log entry is just the move
+    // description (no effect diff), so we attach the effect delta here too —
+    // that's the only surface where "Used seek on Survive: +3 heal (23→26)"
+    // can show. Humans already get the heal/damage/etc. in the action's
+    // effect line via diffToText, so their seek entry stays attribution-only.
     for (const event of this.game.seekEvents) {
       const owner = event.playerIndex as 0 | 1;
       let suffix = "";
@@ -753,6 +745,17 @@ export class GameSession {
       this._logs[owner].push({ turn, text: `Used seek on ${event.cardName}${suffix}` });
     }
     this.game.seekEvents = [];
+
+    for (const event of this.game.deckEvents) {
+      if (event.amount <= 0) continue;
+      const owner = event.playerIndex as 0 | 1;
+      const noun = `card${event.amount === 1 ? "" : "s"}`;
+      // Only push to the owner's log. Each UI renders the opponent's log
+      // with the opponent's name prefixed (Bot/Player-X), so a single entry
+      // shows up correctly from both perspectives without duplication.
+      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}`, drawnCards: event.cards });
+    }
+    this.game.deckEvents = [];
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i];
       if (p.deck.shuffleOccurred) {
@@ -1073,7 +1076,10 @@ export class GameSession {
 
     const snapBefore = this._playerSnapBefore!;
     const snapAfter = psnap(p);
-    const effects = diffToText(snapBefore, snapAfter);
+    // Drop "drew N" — draws are logged on their own "Drew N cards" line by
+    // _drainDeckEvents (and a seek-triggered draw belongs under its seek
+    // entry, not folded into the parent action's effect summary).
+    const effects = diffToText(snapBefore, snapAfter).filter((e) => !e.startsWith("drew "));
     const source = this._actionSourceName(action, playerIndex);
     const missionBefore = this._missionBefore;
 
