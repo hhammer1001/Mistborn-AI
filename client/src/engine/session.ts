@@ -94,7 +94,7 @@ interface PlayerSnapshot {
   metalAvailable: number[];
   metalBurned: number[];
   activeCardId: number | null;
-  senseFlag: boolean | null;
+  senseFlag: number | null;
   allyIds: number[];
   handIds: number[];
   deckIds: number[];
@@ -158,6 +158,14 @@ interface GameSnapshot {
 
 // ── Snapshot helpers for effect logging ──
 
+/** Bot action types whose log entry should be enriched with the effect diff
+ *  (humans get this via diffToText on their own action path; bots otherwise
+ *  log only the bare action description). */
+const ABILITY_EFFECT_TYPES = new Set<string>([
+  "use_metal", "char_ability_1", "char_ability_3", "ally_ability_1", "ally_ability_2",
+  "burn_card",
+]);
+
 interface PSnap {
   damage: number; money: number; health: number; mission: number;
   training: number; atium: number; burns: number; handSize: number;
@@ -200,7 +208,7 @@ function diffToText(before: PSnap, after: PSnap): string[] {
 }
 
 import type { CardData } from "../types/game";
-interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number; afterBotIdx?: number; marketAtTime?: Array<{ name: string; cost: number }>; moneyAtTime?: { money: number; boxings: number } }
+interface LogEntry { turn: number; text: string; card?: CardData; cards?: CardData[]; actionType?: string; metalIndex?: number; afterBotIdx?: number; marketAtTime?: Array<{ name: string; cost: number }>; moneyAtTime?: { money: number; boxings: number }; handAtStart?: string[]; metalTokens?: number[]; metalAvailable?: number[]; deckRemaining?: number; discardCount?: number; drawnCards?: string[] }
 
 // ── Structured action log (for replay + post-game review) ──
 
@@ -704,7 +712,7 @@ export class GameSession {
       // Only push to the owner's log. Each UI renders the opponent's log
       // with the opponent's name prefixed (Bot/Player-X), so a single entry
       // shows up correctly from both perspectives without duplication.
-      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}` });
+      this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}`, drawnCards: event.cards });
     }
     this.game.deckEvents = [];
 
@@ -828,8 +836,11 @@ export class GameSession {
   consumeLogDeltas(perspective: number = 0): { playerLogDelta: LogEntry[]; botLogDelta: LogEntry[] } {
     const pi = perspective as 0 | 1;
     const oi = (1 - pi) as 0 | 1;
-    const playerLogDelta = this._logs[pi].slice(this._logRead[pi]);
-    const botLogDelta = this._logs[oi].slice(this._logRead[oi]);
+    // turn_start entries are analysis-only (hand + token snapshot). They live
+    // in the persisted activityLog but must never reach the live UI — they'd
+    // both clutter the feed and leak the opponent's hand in PvP.
+    const playerLogDelta = this._logs[pi].slice(this._logRead[pi]).filter((e) => e.actionType !== "turn_start");
+    const botLogDelta = this._logs[oi].slice(this._logRead[oi]).filter((e) => e.actionType !== "turn_start");
     this._logRead[pi] = this._logs[pi].length;
     this._logRead[oi] = this._logs[oi].length;
     return { playerLogDelta, botLogDelta };
@@ -1409,14 +1420,16 @@ export class GameSession {
     });
   }
 
-  resolveSense(playerIndex: number, use: boolean): Record<string, unknown> {
+  resolveSense(playerIndex: number, cardId: number | null): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "sense_defense") return { error: `Cannot resolve sense in phase: ${this.phase}` };
 
-    this._pushActionEvent("sense", playerIndex, { use });
+    this._pushActionEvent("sense", playerIndex, { cardId });
 
     const defender = this.players[playerIndex] as WebPlayer;
-    defender._sense_flag = use;
+    // -1 sentinel = decided not to use. Distinguishes "asked, declined" from
+    // "not asked yet" (null) so `_promptSenseIfApplicable` doesn't re-prompt.
+    defender._sense_flag = cardId ?? -1;
 
     const pending = this._pending_advance_action;
     if (pending) {
@@ -1431,9 +1444,9 @@ export class GameSession {
       // pushed regardless of whether the temp-var bookkeeping survives the
       // pause/resume cycle.
       let usedSenseCard: Action | undefined = undefined;
-      if (use && pending.type === "advance_mission") {
+      if (cardId !== null && pending.type === "advance_mission") {
         usedSenseCard = defender.deck.hand.find(
-          (c): c is Action => c instanceof Action && c.data[9] === "sense",
+          (c): c is Action => c instanceof Action && c.id === cardId && c.data[9] === "sense",
         );
       }
 
@@ -1493,6 +1506,17 @@ export class GameSession {
    *  full set of cloud-card commits. Empty array = "take the damage." All
    *  cards are validated up front, then applied atomically; the phase
    *  always exits afterward, so one popup = one decision per damage event. */
+  /** Whether spending cloudP cards could still change the defender's fate.
+   *  Returns false (so the caller skips the prompt) when the attacker has
+   *  already locked a mission victory this turn — blocking damage can't undo
+   *  it, since resolveCloud only reverses a damage ("D") win — or when healing
+   *  with every cloudP card in hand still leaves the defender dead. */
+  private _cloudDefenseCanMatter(defender: Player, cloudCards: Action[]): boolean {
+    if (this.game.victoryType === "M") return false;
+    const maxBlock = cloudCards.reduce((sum, c) => sum + parseInt(c.data[10], 10), 0);
+    return defender.curHealth + maxBlock > 0;
+  }
+
   resolveCloud(playerIndex: number, cardIds: number[]): Record<string, unknown> {
     if (playerIndex !== this.activePlayer) return { error: "Not your turn" };
     if (this.phase !== "cloud_defense") return { error: `Cannot resolve cloud in phase: ${this.phase}` };
@@ -1596,7 +1620,7 @@ export class GameSession {
     // line and immediately auto-skip is pure noise. Only enter for humans.
     const humanDefender = !this._isBot(oi);
     const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
-    if (hpLost > 0 && cloudCards.length > 0 && humanDefender) {
+    if (hpLost > 0 && cloudCards.length > 0 && humanDefender && this._cloudDefenseCanMatter(opp, cloudCards)) {
       this._cloud_damage = hpLost;
       this._logs[oi].push({ turn: this.game.turncount, text: `Incoming: ${hpLost} damage` });
       this.phase = "cloud_defense";
@@ -1667,6 +1691,20 @@ export class GameSession {
     this._preActionSnapshot = null;
     this._playerSnapBefore = null;
     this._undoStack = [];
+
+    // Snapshot start-of-turn hand + resource state for post-game analysis.
+    // Combined with per-draw card names and the action log, this lets a
+    // reviewer reconstruct hand + token state at every decision point.
+    this._logs[nextPi].push({
+      turn: this.game.turncount,
+      text: `Hand: ${p.deck.hand.map((c) => c.name).join(", ")}`,
+      actionType: "turn_start",
+      handAtStart: p.deck.hand.map((c) => c.name),
+      metalTokens: [...p.metalTokens],
+      metalAvailable: [...p.metalAvailable],
+      deckRemaining: p.deck.cards.length,
+      discardCount: p.deck.discard.length,
+    });
 
     if (this._isBot(nextPi)) {
       this._runBotTurn(nextPi);
@@ -1761,6 +1799,15 @@ export class GameSession {
       const rankBefore = action.type === "advance_mission"
         ? action.mission.playerRanks[bi_captured]
         : null;
+      // For ability-firing actions, capture a stat snapshot so the bot's log
+      // entry can show the effect ("Used ability 1 of Steelpush: +2 damage").
+      // The human path gets this via diffToText already; bots otherwise only
+      // log the bare action description. seekEvents emitted during the action
+      // are subtracted below so a seek-triggered gain isn't double-counted
+      // between this line and its own "Used seek on X" entry.
+      const enrichEffects = ABILITY_EFFECT_TYPES.has(action.type);
+      const snapBefore = enrichEffects ? psnap(bot) : null;
+      const seekStart = g.seekEvents.length;
       const isBuy = action.type === "buy" || action.type === "buy_with_boxings"
         || action.type === "buy_eliminate" || action.type === "buy_elim_boxings";
       const marketAtTime = isBuy
@@ -1807,6 +1854,21 @@ export class GameSession {
         if (rankAfter > rankBefore) {
           logEntry.text = `${desc} (${rankBefore}→${rankAfter})`;
         }
+      }
+      if (snapBefore) {
+        // Absorb seek contributions into the baseline so they don't show on
+        // both this line and the seek's own entry.
+        const adjusted = { ...snapBefore };
+        for (const ev of g.seekEvents.slice(seekStart)) {
+          adjusted.health += ev.after.health - ev.before.health;
+          adjusted.damage += ev.after.damage - ev.before.damage;
+          adjusted.money += ev.after.money - ev.before.money;
+          adjusted.mission += ev.after.mission - ev.before.mission;
+          adjusted.training += ev.after.training - ev.before.training;
+        }
+        // Drops drew (deckEvents logs draws separately under "Drew N cards").
+        const effects = diffToText(adjusted, psnap(bot)).filter((e) => !e.startsWith("drew "));
+        if (effects.length > 0) logEntry.text = `${logEntry.text}: ${effects.join(", ")}`;
       }
       if (autoBoxings > 0) {
         this._logs[bi_captured].push({
@@ -2024,7 +2086,7 @@ export class GameSession {
     // ones the bot chose not to spend.
     const humanDefender = !this._isBot(oi);
     const cloudCards = opp.deck.hand.filter((c): c is Action => c instanceof Action && c.data[9] === "cloudP");
-    if (hpLost > 0 && cloudCards.length > 0 && humanDefender) {
+    if (hpLost > 0 && cloudCards.length > 0 && humanDefender && this._cloudDefenseCanMatter(opp, cloudCards)) {
       this._cloud_damage = hpLost;
       this._logs[oi].push({
         turn: botTurn,
