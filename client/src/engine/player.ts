@@ -183,6 +183,7 @@ export class Player {
       special14: () => this.special14(),
       special15: () => this.special15(),
       special16: () => this.special16(),
+      special17: () => this.special17(),
     };
   }
 
@@ -682,6 +683,13 @@ export class Player {
     if (soughtCards.length > 0) {
       (soughtCards[0] as Action).ability1(this);
     }
+  }
+  special17() { // Mercenary: gain any eliminated card to discard
+    const choices = this.game.market.discard;
+    const choice = this.soarIn(choices);
+    if (choice === -1) return;
+    this.deck.discard.push(choices[choice]);
+    this.game.market.discard.splice(choice, 1);
   }
 
   // ── Metal token helpers ──

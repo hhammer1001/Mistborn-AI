@@ -35,6 +35,7 @@ const SPECIAL_TEXT: Record<string, string> = {
   special14: "Look at the top card of your deck. Eliminate it or put it back",
   special15: "Set aside a card from your hand. Draw it at the start of your next turn",
   special16: "Use the top ability of the same Action again",
+  special17: "Gain an eliminated card to your discard pile",
   special:   "Reduce all damage you take by 1",
 };
 

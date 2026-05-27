@@ -39,6 +39,7 @@ const EFFECT_VALUE: Record<string, number> = {
   special14: 1.0,
   special15: 1.5,
   special16: 2.5,
+  special17: 3.0,
 };
 
 function evalEffect(effect: string | undefined, amount: string | undefined): number {

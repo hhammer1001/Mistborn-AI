@@ -808,6 +808,8 @@ function estimateSpecialValue(special: string, snap: GameStateSnapshot): number 
       return 2.0;
     case "special16": // Seeker 2: play sought card's ability
       return 3.0;
+    case "special17": // Mercenary: gain any eliminated card to discard
+      return 3.0;
     default:
       return 2.0;
   }
