@@ -288,6 +288,15 @@ export class GameSession {
    *  re-prompting, so selecting two cards in one modal blocks the bot's next
    *  two advances. Drained front-to-back; cleared at turn end. */
   private _senseQueue: number[] = [];
+  /** True once the human defender has answered the sense modal for the bot's
+   *  current mission pool. While set (and no new mission was added), further
+   *  advances spend that pool without re-prompting — the player already
+   *  decided how many to block. Reset at the bot turn start. */
+  private _senseDecided = false;
+  /** Set when the bot's mission total grows (ability/card/ally/tier reward)
+   *  after a sense decision. Re-arms the prompt so the player gets to answer
+   *  again for the freshly-added mission, even mid-turn. */
+  private _senseMissionAdded = false;
   /** Set when an ally-kill is paused for a human defender's cloudA decision.
    *  `source` tells resolveAllyDefense which resume path to take when the
    *  pause unblocks:
@@ -1506,6 +1515,10 @@ export class GameSession {
     defender._sense_flag = cardId ?? -1;
     // Pre-commit the rest for the bot's upcoming advances this turn.
     this._senseQueue = cardIds.slice(1);
+    // The player has now decided for the bot's current mission pool. Further
+    // advances spend it without re-prompting until the bot adds more mission.
+    this._senseDecided = true;
+    this._senseMissionAdded = false;
 
     const pending = this._pending_advance_action;
     if (pending) {
@@ -1838,6 +1851,12 @@ export class GameSession {
     // real turn-start HP (see _turnStartHealth).
     this._turnStartHealth[bi] = bot.curHealth;
 
+    // Fresh sense-defense state for this bot turn: nothing decided yet, no
+    // pre-committed cards, no mission added.
+    this._senseDecided = false;
+    this._senseMissionAdded = false;
+    this._senseQueue = [];
+
     // Wrap bot.performAction to capture each action for the bot log
     const originalPerform = bot.performAction.bind(bot);
     const botTurn = this.game.turncount;
@@ -1995,6 +2014,7 @@ export class GameSession {
 
       const actions = bot.availableActions(this.game);
       const action = bot.selectAction(actions, this.game);
+      const missionBefore = bot.curMission;
 
       // Sense-defense decision for an advance against a human defender.
       if (
@@ -2003,25 +2023,31 @@ export class GameSession {
         !this._isBot(turn.defenderIndex)
       ) {
         const defender = this.players[turn.defenderIndex] as WebPlayer;
-        if (
-          defender._sense_flag === null &&
-          defender.deck.hand.some((c) => c instanceof Action && c.data[9] === "sense")
-        ) {
+        const hasSense = defender.deck.hand.some((c) => c instanceof Action && c.data[9] === "sense");
+        if (hasSense) {
           if (this._senseQueue.length > 0) {
             // Pre-committed in the modal: block this advance without prompting.
             const cardId = this._senseQueue.shift()!;
             this._performBotAdvanceWithSense(action, turn.botIndex, turn.defenderIndex, cardId);
+            if (bot.curMission > missionBefore) this._senseMissionAdded = true;
             continue;
           }
-          // No pre-commitment left — pause for the human's decision.
-          this._pending_advance_action = action;
-          this.phase = "sense_defense";
-          this.activePlayer = turn.defenderIndex;
-          return true;
+          if (!this._senseDecided || this._senseMissionAdded) {
+            // First advance of the pool, or the bot replenished its mission
+            // since the last decision — prompt for a fresh sense answer.
+            this._pending_advance_action = action;
+            this.phase = "sense_defense";
+            this.activePlayer = turn.defenderIndex;
+            return true;
+          }
+          // Already decided for this pool and no new mission added — let the
+          // advance through without re-prompting (_sense_flag is null, so
+          // senseCheck won't block it).
         }
       }
 
       bot.performAction(action, this.game);
+      if (bot.curMission > missionBefore) this._senseMissionAdded = true;
 
       if (action.type === "end_actions") {
         // Drain anything end_actions itself queued (rare, but possible for
