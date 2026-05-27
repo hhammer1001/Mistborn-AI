@@ -48,6 +48,17 @@ const BUY_ACTION_TYPES = new Set([
   "buy", "buy_eliminate", "buy_with_boxings", "buy_elim_boxings",
 ]);
 
+/** Bot-log entries that are defensive *reactions* during the human's turn
+ *  (the bot blocking an advance / damage, or saving/killing an ally), not the
+ *  bot taking its own turn. SP detects "bot turn ended" via bot-log growth, so
+ *  these must be excluded — otherwise the bot reactively spending a Sense card
+ *  on the human's turn fires a spurious "bot turn recap". */
+const REACTIVE_BOT_ACTION_TYPES = new Set([
+  "sense_block", "cloud_block", "cloud_ally_block", "opponent_kill",
+]);
+const hasRealBotTurnEntry = (entries: BotLogEntry[]): boolean =>
+  entries.some((e) => e.actionType !== undefined && !REACTIVE_BOT_ACTION_TYPES.has(e.actionType));
+
 /** Exported so callers (e.g., useGame bot-first) can compute recaps from a
  *  synthetic baseline outside the hook's internal observation cycle. */
 export function computeRecap(
@@ -231,8 +242,14 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     // SP: capture turn-start baseline on first bot activity. Preserved across
     // defense interrupts (sense_defense, cloud_defense) so the final recap
     // covers the whole bot turn, not just the post-interrupt portion.
+    // Only treat bot-log growth as the bot's *turn* when it contains a real
+    // turn action — a bare sense_block / cloud_block etc. is the bot reacting
+    // to the human's current turn and must not capture a baseline or fire a
+    // recap.
+    const newBotEntries = botLog.slice(seenLen);
+    const spRealBotTurn = hasRealBotTurnEntry(newBotEntries);
     const spBotActivity =
-      prevIsMyTurn === true && isMyTurn && botLog.length > seenLen;
+      prevIsMyTurn === true && isMyTurn && spRealBotTurn;
     if (spBotActivity && turnStartStateRef.current === null && prev) {
       turnStartStateRef.current = prev;
       turnStartBotLogLenRef.current = seenLen;
@@ -259,7 +276,7 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
       prev && prevIsMyTurn === false && isMyTurn && !enteringDefenseInterrupt;
     const oppTurnEndedSP =
       prev && prevIsMyTurn === true && isMyTurn
-      && (botLog.length > seenLen || defenseInterruptEndedBotTurn)
+      && (spRealBotTurn || defenseInterruptEndedBotTurn)
       && !enteringDefenseInterrupt;
 
     if (oppTurnEndedMP || oppTurnEndedSP) {
