@@ -769,6 +769,15 @@ export class GameSession {
       // with the opponent's name prefixed (Bot/Player-X), so a single entry
       // shows up correctly from both perspectives without duplication.
       this._logs[owner].push({ turn, text: `Drew ${event.amount} ${noun}`, drawnCards: event.cards });
+      // Mid-turn draws auto-play any Funding cards immediately (deck.ts:112),
+      // unlike end-of-turn cleanUp which defers them to next turn's pending
+      // playback. Surface that as a separate entry so the money bump is
+      // visible in the log.
+      const fundingsDrawn = (event.cards ?? []).filter((n) => n === "Funding").length;
+      if (fundingsDrawn > 0) {
+        const fnoun = fundingsDrawn === 1 ? "funding" : "fundings";
+        this._logs[owner].push({ turn, text: `Played ${fundingsDrawn} ${fnoun}` });
+      }
     }
     this.game.deckEvents = [];
     for (let i = 0; i < this.players.length; i++) {
@@ -1784,7 +1793,8 @@ export class GameSession {
   }
 
   /** Play any allies/funding sitting in hand with pending=true. Allies move
-   *  to the zone + run play(); funding runs play() for money. Clears flag. */
+   *  to the zone + run play(); funding runs play() for money. Clears flag.
+   *  Logs the auto-played funding count for the activity log. */
   private _playPending(playerIndex: number) {
     const p = this.players[playerIndex];
     const hand = p.deck.hand;
@@ -1801,11 +1811,20 @@ export class GameSession {
     }
     p.deck.hand = remaining;
     // Funding: play() for money but keep in hand
+    let fundingsPlayed = 0;
     for (const c of p.deck.hand) {
       if (c.pending && c instanceof Funding) {
         c.pending = false;
         c.play(p);
+        fundingsPlayed++;
       }
+    }
+    if (fundingsPlayed > 0) {
+      const noun = fundingsPlayed === 1 ? "funding" : "fundings";
+      this._logs[playerIndex].push({
+        turn: this.game.turncount,
+        text: `Played ${fundingsPlayed} ${noun}`,
+      });
     }
   }
 
