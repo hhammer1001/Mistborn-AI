@@ -741,15 +741,16 @@ function GameBoard({
                 : "Opponent is advancing a mission."
             }
             formatStatus={(selected) => {
-              // Advances are 1 mission each in the engine; engine consumes one
-              // sense card if the defender chose "use," so "in pool" reads as
-              // the threat being defended against.
-              const advance = 1;
+              // Pool size = the attacker's remaining mission resource; each
+              // advance costs 1, and a chosen sense card consumes block-value
+              // mission instead (see player.ts:861). Selecting cards in this
+              // modal pre-commits blocks for subsequent advances this turn.
+              const pool = opp.mission;
               const sumSelected = selected.reduce((s, c) => s + c.blockValue, 0);
-              const left = advance - sumSelected;
+              const left = Math.max(0, pool - sumSelected);
               return (
                 <>
-                  <strong>{advance}</strong> mission currently in pool,{" "}
+                  <strong>{pool}</strong> mission currently in pool,{" "}
                   <strong>{left}</strong> mission left after sensing
                 </>
               );
