@@ -1163,6 +1163,16 @@ export function recomputeSquashV2VsOppLifts(): void {
   }
 }
 
+/** Swap the SquashV2 base self-play weights at runtime (for A/B testing
+ * alternately-trained weight sets) and rebuild ratings. Pass a per-character
+ * map of card-name -> [wins, total, winRate]. */
+export function setSquashV2SelfPlayWeights(
+  weights: Record<string, Record<string, [number, number, number]>>,
+): void {
+  SELFPLAY_WEIGHTS_BY_PROFILE.squashV2 = weights as Record<string, SelfPlayWeights>;
+  recomputeSquashV2Ratings();
+}
+
 // Initial population (uses SquashV2Config defaults).
 recomputeSquashV2Ratings();
 recomputeSquashV2VsOppLifts();

@@ -60,7 +60,7 @@ export class SquashBot extends Player {
 
   // ── Card evaluation ──
 
-  private cardRating(card: Card, snap: GameStateSnapshot): number {
+  protected cardRating(card: Card, snap: GameStateSnapshot): number {
     return dynamicCardRating(card.name, this.character, snap);
   }
 
@@ -166,7 +166,7 @@ export class SquashBot extends Player {
     return 0; // Baseline — everything else must beat this
   }
 
-  private scoreMissionAdvance(
+  protected scoreMissionAdvance(
     action: GameActionInternal & { type: "advance_mission" },
     snap: GameStateSnapshot,
   ): number {
@@ -234,7 +234,7 @@ export class SquashBot extends Player {
     return score;
   }
 
-  private scoreUseMetal(
+  protected scoreUseMetal(
     action: GameActionInternal & { type: "use_metal" },
     snap: GameStateSnapshot,
   ): number {
@@ -253,7 +253,7 @@ export class SquashBot extends Player {
     return 30;
   }
 
-  private scoreBurnCard(
+  protected scoreBurnCard(
     action: GameActionInternal & { type: "burn_card" },
     snap: GameStateSnapshot,
   ): number {
@@ -294,7 +294,7 @@ export class SquashBot extends Player {
     return metalVal + burnEffectVal + synergyVal * 0.5 - opportunityCost;
   }
 
-  private scoreBurnMetal(
+  protected scoreBurnMetal(
     action: GameActionInternal & { type: "burn_metal" },
     snap: GameStateSnapshot,
   ): number {
@@ -305,7 +305,7 @@ export class SquashBot extends Player {
     return metalVal - burnSlotCost;
   }
 
-  private scoreFlare(
+  protected scoreFlare(
     action: GameActionInternal & { type: "flare_metal" },
     snap: GameStateSnapshot,
   ): number {
@@ -315,7 +315,7 @@ export class SquashBot extends Player {
     return metalVal - 1.5;
   }
 
-  private scoreRefresh(
+  protected scoreRefresh(
     action: GameActionInternal & { type: "refresh_metal" },
     snap: GameStateSnapshot,
   ): number {
@@ -329,7 +329,7 @@ export class SquashBot extends Player {
     return 5 + metalVal - cardCost;
   }
 
-  private scoreAllyAbility(
+  protected scoreAllyAbility(
     action: GameActionInternal & { type: "ally_ability_1" | "ally_ability_2" },
     snap: GameStateSnapshot,
     tier: number,
@@ -353,7 +353,7 @@ export class SquashBot extends Player {
     return 35 + effectVal;
   }
 
-  private scoreBuy(
+  protected scoreBuy(
     action: GameActionInternal & { type: "buy" },
     snap: GameStateSnapshot,
   ): number {
@@ -437,14 +437,14 @@ export class SquashBot extends Player {
     return metalUnlockValue(action.metalIndex, this, snap) - cost;
   }
 
-  private scoreBuyBoxing(snap: GameStateSnapshot): number {
+  protected scoreBuyBoxing(snap: GameStateSnapshot): number {
     // Convert 2 money → 1 boxing (savings for future turns)
     if (snap.curMoney % 2 === 1) return -5; // don't waste an odd money
     if (snap.curMoney >= 4) return 1; // save excess
     return -5;
   }
 
-  private scoreUseBoxing(snap: GameStateSnapshot): number {
+  protected scoreUseBoxing(snap: GameStateSnapshot): number {
     // Convert 1 boxing → 1 money
     // Worth it if the extra money enables buying something good
     const bestBuyable = this.game.market.hand

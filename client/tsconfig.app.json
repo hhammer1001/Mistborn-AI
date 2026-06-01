@@ -43,6 +43,10 @@
     "src/engine/cloneTest.ts",
     "src/engine/twitchBot.ts",
     "src/engine/twitchDebug.ts",
-    "src/engine/twitchEval.ts"
+    "src/engine/twitchEval.ts",
+    "src/engine/v3head2head.ts",
+    "src/engine/v3ablation.ts",
+    "src/engine/selfplaySquashV2VsZoomBase.ts",
+    "src/engine/selfplaySquashV3Mirror.ts"
   ]
 }

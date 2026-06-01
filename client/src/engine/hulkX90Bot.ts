@@ -21,7 +21,7 @@
 import type { Game } from "./game";
 import type { Player } from "./player";
 import type { PlayerDeck } from "./deck";
-import { SquashV2Bot } from "./squashV2Bot";
+import { SquashV3Bot } from "./squashV3Bot";
 import { ZoomBot } from "./zoomBot";
 
 export function createHulkX90(
@@ -31,7 +31,12 @@ export function createHulkX90(
   name: string,
   character: string,
 ): Player {
+  // Going first: SquashV3 (SquashV2 + validated going-first tweaks — skip the
+  // opp-lead mission penalty on the bot's own path, flare/burn-metal cost cuts).
+  // ~+1.5pp vs strong mission-racers (validated head-to-head), uses the same
+  // committed self-play weights as V2 (a full-scale retrain did not help).
+  // Going second: ZoomBot (seat-1 specialist), unchanged.
   return turnOrder === 0
-    ? new SquashV2Bot(deck, game, turnOrder, name, character)
+    ? new SquashV3Bot(deck, game, turnOrder, name, character)
     : new ZoomBot(deck, game, turnOrder, name, character);
 }
