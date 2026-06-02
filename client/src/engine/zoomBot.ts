@@ -128,6 +128,7 @@ export class ZoomBot extends SquashBot {
     // Mark this bot as simulating so the session's performAction wrapper
     // skips logging during candidate evaluation. Cleared after the loop.
     const self = this as Player & { _simulating?: boolean };
+    const wasSimulating = self._simulating;
     self._simulating = true;
     try {
       for (const cand of candidates) {
@@ -162,7 +163,7 @@ export class ZoomBot extends SquashBot {
         }
       }
     } finally {
-      self._simulating = false;
+      self._simulating = wasSimulating;
     }
 
     // Reset action count when ending turn (mirrors SquashBot's behavior)

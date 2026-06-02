@@ -137,6 +137,7 @@ export class SquashV2Bot extends SquashBot {
     const chainBudgetMs = Math.max(20, decisionBudgetMs - (chainStart - decisionStart));
 
     const self = this as Player & { _simulating?: boolean };
+    const wasSimulating = self._simulating;
     self._simulating = true;
     try {
       for (const cand of candidates) {
@@ -191,7 +192,7 @@ export class SquashV2Bot extends SquashBot {
         }
       }
     } finally {
-      self._simulating = false;
+      self._simulating = wasSimulating;
     }
 
     if (bestAction.type === "end_actions") {

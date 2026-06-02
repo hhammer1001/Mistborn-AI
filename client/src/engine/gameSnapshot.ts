@@ -12,6 +12,7 @@
 
 import type { Game } from "./game";
 type DeckEvent = Game["deckEvents"][number];
+type SeekEvent = Game["seekEvents"][number];
 type PendingKill = Game["pendingKills"][number];
 import { Action, Ally, Card } from "./card";
 import type { Player } from "./player";
@@ -76,6 +77,11 @@ export interface GameStateSnap {
   /** Captured so bot-lookahead simulations don't leak in-sim deck events
    *  (ad-hoc draws, reshuffles) into the real activity log after restoreGame. */
   deckEvents: DeckEvent[];
+  /** Same rationale as deckEvents: in-sim seeks push onto game.seekEvents but
+   *  are never drained (the drain only runs on real, non-simulating actions),
+   *  so without restoring this the next real drain dumps every simulated
+   *  "Used seek on X" into the activity log. */
+  seekEvents: SeekEvent[];
   /** K-effect kill queue. Sims that evaluate a Maelstrom/Assassinate
    *  candidate enqueue requests on the real game's queue; restoreGame must
    *  reset the queue so the actual play doesn't process leftover sim kills. */
@@ -138,6 +144,11 @@ export function snapshotGame(game: Game): GameStateSnap {
     gameRng: game.gameRng.clone(),
     botRngs: game.botRngs.map((r) => r.clone()),
     deckEvents: game.deckEvents.map((e) => ({ ...e })),
+    seekEvents: game.seekEvents.map((e) => ({
+      ...e,
+      before: { ...e.before },
+      after: { ...e.after },
+    })),
     pendingKills: game.pendingKills.map((e) => ({ ...e })),
   };
 }
@@ -209,5 +220,10 @@ export function restoreGame(game: Game, snap: GameStateSnap): void {
     if (p.rng) p.rng = game.botRngs[i];
   }
   game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));
+  game.seekEvents = snap.seekEvents.map((e) => ({
+    ...e,
+    before: { ...e.before },
+    after: { ...e.after },
+  }));
   game.pendingKills = snap.pendingKills.map((e) => ({ ...e }));
 }
