@@ -32,6 +32,7 @@ const FILTER_LABELS: Record<LogFilterKey, string> = {
 type ResultFilter = "all" | "win" | "loss";
 type ModeFilter = "all" | "bot" | "mp";
 type FirstFilter = "all" | "me" | "opp";
+type SearchScope = "both" | "mine" | "opp";
 type SortKey = "date" | "first" | "victory" | "turn" | "deck";
 
 interface Selections {
@@ -44,12 +45,13 @@ interface Selections {
   vic: string;   // VictoryType | "all"
   char: string;  // character | "all"
   search: string;
+  searchScope: SearchScope; // which deck the card-name search looks at
 }
 
 const DEFAULT_SELECTIONS: Selections = {
   result: "all", mode: "all", first: "all",
   dateFrom: "", dateTo: "",
-  bot: "all", vic: "all", char: "all", search: "",
+  bot: "all", vic: "all", char: "all", search: "", searchScope: "both",
 };
 
 // Reset patch applied when a filter is hidden, so it stops affecting results.
@@ -124,7 +126,12 @@ export function MinistryLog({
         const q = sel.search.toLowerCase();
         const inOpp = e.opp.toLowerCase().includes(q);
         const inChar = (e.myChar + e.oppChar).toLowerCase().includes(q);
-        const inCards = Object.keys({ ...e.myDeck, ...e.oppDeck }).some((c) => c.toLowerCase().includes(q));
+        const myCards = Object.keys(e.myDeck).some((c) => c.toLowerCase().includes(q));
+        const oppCards = Object.keys(e.oppDeck).some((c) => c.toLowerCase().includes(q));
+        const inCards =
+          sel.searchScope === "mine" ? myCards :
+          sel.searchScope === "opp" ? oppCards :
+          myCards || oppCards;
         if (!inOpp && !inChar && !inCards) return false;
       }
       return true;
@@ -333,6 +340,14 @@ export function MinistryLog({
               value={sel.search}
               onChange={(e) => updateSel({ search: e.target.value })}
             />
+            <div className="search-scope">
+              <span className="scope-label">cards:</span>
+              <Seg
+                value={sel.searchScope}
+                options={[["both", "Both"], ["mine", "Yours"], ["opp", "Opp"]]}
+                onChange={(v) => updateSel({ searchScope: v as SearchScope })}
+              />
+            </div>
           </div>
         )}
         <button className="mlog-clear" onClick={clearFilters}>clear filters</button>

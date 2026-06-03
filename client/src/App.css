@@ -6146,6 +6146,14 @@ h3 {
 .mlog-filters .search input:focus { outline: none; border-color: var(--gold-dim); }
 .mlog-filters .search { display: flex; flex-direction: column; gap: 4px; margin-left: auto; }
 .mlog-filters .search input { min-width: 180px; }
+.mlog-filters .search-scope { display: flex; align-items: center; gap: 7px; }
+.mlog-filters .search-scope .scope-label {
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.mlog-filters .search-scope .seg button { padding: 3px 9px; font-size: 0.76rem; }
 
 /* Date-range filter — two native date inputs sharing the select styling. */
 .mlog-daterange { display: inline-flex; align-items: center; gap: 8px; }
