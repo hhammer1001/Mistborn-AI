@@ -22,6 +22,7 @@ const FILTER_LABELS: Record<LogFilterKey, string> = {
   result: "Result",
   mode: "Mode",
   first: "First Player",
+  date: "Date Range",
   bot: "Bot Strategy",
   vic: "Victory Type",
   char: "Your Character",
@@ -37,6 +38,8 @@ interface Selections {
   result: ResultFilter;
   mode: ModeFilter;
   first: FirstFilter;
+  dateFrom: string; // "YYYY-MM-DD" (empty = open-ended)
+  dateTo: string;   // "YYYY-MM-DD" (empty = open-ended)
   bot: string;   // BotType | "all"
   vic: string;   // VictoryType | "all"
   char: string;  // character | "all"
@@ -45,8 +48,16 @@ interface Selections {
 
 const DEFAULT_SELECTIONS: Selections = {
   result: "all", mode: "all", first: "all",
+  dateFrom: "", dateTo: "",
   bot: "all", vic: "all", char: "all", search: "",
 };
+
+// Reset patch applied when a filter is hidden, so it stops affecting results.
+function resetPatch(key: LogFilterKey): Partial<Selections> {
+  if (key === "date") return { dateFrom: "", dateTo: "" };
+  if (key === "search") return { search: "" };
+  return { [key]: "all" } as Partial<Selections>;
+}
 
 const VIC_ORDER: Record<VictoryType, number> = {
   Mission: 0, Combat: 1, Confrontation: 2, Forfeit: 3,
@@ -102,6 +113,10 @@ export function MinistryLog({
       if (visible.has("result") && sel.result !== "all" && e.result !== sel.result) return false;
       if (visible.has("mode") && sel.mode !== "all" && e.kind !== sel.mode) return false;
       if (visible.has("first") && sel.first !== "all" && e.firstPlayer !== sel.first) return false;
+      if (visible.has("date")) {
+        if (sel.dateFrom && e.createdAt < new Date(sel.dateFrom + "T00:00:00").getTime()) return false;
+        if (sel.dateTo && e.createdAt > new Date(sel.dateTo + "T23:59:59.999").getTime()) return false;
+      }
       if (visible.has("bot") && sel.bot !== "all" && e.botType !== sel.bot) return false;
       if (visible.has("vic") && sel.vic !== "all" && e.victory !== sel.vic) return false;
       if (visible.has("char") && sel.char !== "all" && e.myChar !== sel.char) return false;
@@ -166,7 +181,7 @@ export function MinistryLog({
     if (visible.has(key)) {
       onChangeVisibleFilters(visibleFilters.filter((k) => k !== key));
       // Reset the now-hidden filter so it stops affecting results.
-      updateSel({ [key]: key === "search" ? "" : "all" } as Partial<Selections>);
+      updateSel(resetPatch(key));
     } else {
       // Preserve the canonical filter order when re-adding.
       onChangeVisibleFilters(LOG_FILTER_KEYS.filter((k) => k === key || visible.has(k)));
@@ -258,6 +273,28 @@ export function MinistryLog({
               options={[["all", "All"], ["me", "You"], ["opp", "Opp"]]}
               onChange={(v) => updateSel({ first: v as FirstFilter })}
             />
+          </div>
+        )}
+        {visible.has("date") && (
+          <div className="fgroup">
+            <label>Date Range</label>
+            <div className="mlog-daterange">
+              <input
+                type="date"
+                aria-label="From date"
+                value={sel.dateFrom}
+                max={sel.dateTo || undefined}
+                onChange={(e) => updateSel({ dateFrom: e.target.value })}
+              />
+              <span className="dash">–</span>
+              <input
+                type="date"
+                aria-label="To date"
+                value={sel.dateTo}
+                min={sel.dateFrom || undefined}
+                onChange={(e) => updateSel({ dateTo: e.target.value })}
+              />
+            </div>
           </div>
         )}
         {visible.has("bot") && (

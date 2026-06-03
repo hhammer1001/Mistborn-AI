@@ -6003,10 +6003,11 @@ h3 {
   width: 100%;
   max-width: 1500px;
   margin: 0 auto;
-  padding: 28px 32px 64px;
+  padding: 28px 32px 28px;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  /* Header/stats/filters stay pinned; only .mlog-table-wrap scrolls. */
+  overflow: hidden;
   height: 100vh;
 }
 
@@ -6145,6 +6146,22 @@ h3 {
 .mlog-filters .search input:focus { outline: none; border-color: var(--gold-dim); }
 .mlog-filters .search { display: flex; flex-direction: column; gap: 4px; margin-left: auto; }
 .mlog-filters .search input { min-width: 180px; }
+
+/* Date-range filter — two native date inputs sharing the select styling. */
+.mlog-daterange { display: inline-flex; align-items: center; gap: 8px; }
+.mlog-daterange input[type="date"] {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  background: var(--bg-zone);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  padding: 5px 8px;
+  border-radius: 4px;
+  min-width: 138px;
+  color-scheme: dark;
+}
+.mlog-daterange input[type="date"]:focus { outline: none; border-color: var(--gold-dim); }
+.mlog-daterange .dash { color: var(--text-faint); }
 .mlog-clear {
   font-family: var(--font-body);
   font-size: 0.8rem;
@@ -6227,10 +6244,17 @@ h3 {
 .mlog-table-wrap {
   border: 1px solid var(--border);
   border-radius: 5px;
-  overflow: hidden;
   background: var(--bg-panel);
+  /* Fill the remaining shell height and scroll the rows. min-height:0 lets a
+     flex child shrink below its content so the overflow region actually
+     forms (without it the flex item refuses to shrink and nothing scrolls). */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 .mlog table { width: 100%; border-collapse: collapse; }
+/* Keep the column headers visible while the body scrolls. */
+.mlog thead th { position: sticky; top: 0; z-index: 3; }
 .mlog thead th {
   font-family: var(--font-display);
   font-size: 0.7rem;

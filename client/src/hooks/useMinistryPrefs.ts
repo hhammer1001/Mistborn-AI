@@ -46,8 +46,8 @@ export const DEFAULT_FILTER: LogFilter = {
 
 /** Filter controls the full Ministry Log can show, and which ones appear by
  *  default. Users customize the visible set via the log's "⚙ Filters" menu. */
-export type LogFilterKey = "result" | "mode" | "first" | "bot" | "vic" | "char" | "search";
-export const LOG_FILTER_KEYS: LogFilterKey[] = ["result", "mode", "first", "bot", "vic", "char", "search"];
+export type LogFilterKey = "result" | "mode" | "first" | "date" | "bot" | "vic" | "char" | "search";
+export const LOG_FILTER_KEYS: LogFilterKey[] = ["result", "mode", "first", "date", "bot", "vic", "char", "search"];
 export const DEFAULT_LOG_VISIBLE: LogFilterKey[] = ["result", "mode", "bot", "search"];
 
 function readJSON<T>(key: string, fallback: T): T {
