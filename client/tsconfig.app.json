@@ -41,6 +41,7 @@
     "src/engine/squashV2Ablation.ts",
     "src/engine/replayTest.ts",
     "src/engine/cloneTest.ts",
+    "src/engine/seekLeakTest.ts",
     "src/engine/twitchBot.ts",
     "src/engine/twitchDebug.ts",
     "src/engine/twitchEval.ts",
