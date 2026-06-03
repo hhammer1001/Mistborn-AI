@@ -4,6 +4,7 @@ import { BOT_TYPES, VICTORY_TYPES, type BotType, type VictoryType } from "../dat
 const KEY_SIGIL          = "ministry.sigil";
 const KEY_FLARED         = "ministry.flared";
 const KEY_FILTER         = "ministry.filter";
+const KEY_LOG_VISIBLE    = "ministry.logVisibleFilters";
 const KEY_BOT_CFG        = "mistborn.botConfig";
 const KEY_LANDS_UNLOCKED = "mistborn.landsUnlocked";
 const KEY_LANDS_ENABLED  = "mistborn.landsEnabled";
@@ -43,6 +44,12 @@ export const DEFAULT_FILTER: LogFilter = {
   firstPlayer: "all",
 };
 
+/** Filter controls the full Ministry Log can show, and which ones appear by
+ *  default. Users customize the visible set via the log's "⚙ Filters" menu. */
+export type LogFilterKey = "result" | "mode" | "first" | "bot" | "vic" | "char" | "search";
+export const LOG_FILTER_KEYS: LogFilterKey[] = ["result", "mode", "first", "bot", "vic", "char", "search"];
+export const DEFAULT_LOG_VISIBLE: LogFilterKey[] = ["result", "mode", "bot", "search"];
+
 function readJSON<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -73,6 +80,9 @@ export function useMinistryPrefs() {
   const [filter, setFilterState] = useState<LogFilter>(() =>
     readJSON<LogFilter>(KEY_FILTER, DEFAULT_FILTER),
   );
+  const [logVisibleFilters, setLogVisibleState] = useState<LogFilterKey[]>(() =>
+    readJSON<LogFilterKey[]>(KEY_LOG_VISIBLE, DEFAULT_LOG_VISIBLE),
+  );
   const [landsUnlocked, setLandsUnlockedState] = useState<boolean>(
     () => localStorage.getItem(KEY_LANDS_UNLOCKED) === "true",
   );
@@ -100,6 +110,11 @@ export function useMinistryPrefs() {
     localStorage.setItem(KEY_FILTER, JSON.stringify(f));
   }, []);
 
+  const setLogVisibleFilters = useCallback((keys: LogFilterKey[]) => {
+    setLogVisibleState(keys);
+    localStorage.setItem(KEY_LOG_VISIBLE, JSON.stringify(keys));
+  }, []);
+
   const setLandsUnlocked = useCallback((b: boolean) => {
     setLandsUnlockedState(b);
     localStorage.setItem(KEY_LANDS_UNLOCKED, String(b));
@@ -123,6 +138,7 @@ export function useMinistryPrefs() {
       if (ev.key === KEY_FLARED)                setFlaredState(ev.newValue === "true");
       if (ev.key === KEY_BOT_CFG && ev.newValue) setBotConfigState(migrateBotConfig(readJSON<BotSetupConfig>(KEY_BOT_CFG, DEFAULT_BOT_CONFIG)));
       if (ev.key === KEY_FILTER && ev.newValue)  setFilterState(readJSON<LogFilter>(KEY_FILTER, DEFAULT_FILTER));
+      if (ev.key === KEY_LOG_VISIBLE && ev.newValue) setLogVisibleState(readJSON<LogFilterKey[]>(KEY_LOG_VISIBLE, DEFAULT_LOG_VISIBLE));
       if (ev.key === KEY_LANDS_UNLOCKED) setLandsUnlockedState(ev.newValue === "true");
       if (ev.key === KEY_LANDS_ENABLED)  setLandsEnabledState(ev.newValue === "true");
     };
@@ -135,6 +151,7 @@ export function useMinistryPrefs() {
     flared, setFlared,
     botConfig, setBotConfig,
     filter, setFilter,
+    logVisibleFilters, setLogVisibleFilters,
     landsUnlocked, setLandsUnlocked,
     landsEnabled, setLandsEnabled,
   };

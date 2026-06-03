@@ -10,6 +10,8 @@ import type { LogFilter } from "../hooks/useMinistryPrefs";
 export interface ChronicleEntry {
   id: string;
   date: string;
+  /** Raw match timestamp — used by the full Ministry Log for sorting. */
+  createdAt: number;
   opp: string;
   kind: "mp" | "bot";
   botType?: BotType;
@@ -23,6 +25,10 @@ export interface ChronicleEntry {
   oppLife: number;
   myMission: number;
   oppMission: number;
+  /** Aggregate card counts ({ [cardName]: count }) for each player. Powers the
+   *  "Cards Used" column + expandable deck breakdown in the full log. */
+  myDeck: Record<string, number>;
+  oppDeck: Record<string, number>;
 }
 
 interface Props {

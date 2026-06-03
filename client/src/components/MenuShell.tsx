@@ -5,6 +5,7 @@ import { MetalSigilPicker } from "./MetalSigilPicker";
 import { SettingsPopover } from "./SettingsPopover";
 import { FeedbackModal } from "./FeedbackModal";
 import { MainMenuView, BotSetupView, OnlineSetupView, LandsBotSetupView } from "./MenuStages";
+import { MinistryLog } from "./MinistryLog";
 import type { FirstPlayerChoice } from "../hooks/useMinistryPrefs";
 import type { LandsBotKind } from "../lands/hooks/useLandsGame";
 import { PWAUpdatePrompt } from "./PWAUpdatePrompt";
@@ -12,7 +13,7 @@ import { useMinistryPrefs, type BotSetupConfig } from "../hooks/useMinistryPrefs
 import { useMatchHistory } from "../hooks/useMatchHistory";
 import type { Room } from "../hooks/useLobby";
 
-type StageView = "menu" | "bot" | "online";
+type StageView = "menu" | "bot" | "online" | "log";
 
 interface Props {
   // Auth state
@@ -29,7 +30,6 @@ interface Props {
   // Menu actions
   onStartBot: (cfg: BotSetupConfig, displayName: string) => void;
   onViewCards: () => void;
-  onViewMinistryLog: () => void;
   onViewLands?: () => void;
   /** Open the postgame review for a chronicle row. */
   onSelectMatch?: (matchId: string) => void;
@@ -60,7 +60,6 @@ export function MenuShell({
   signOut,
   onStartBot,
   onViewCards,
-  onViewMinistryLog,
   onViewLands,
   onSelectMatch,
   onStartLandsBot,
@@ -113,6 +112,23 @@ export function MenuShell({
     onStartBot(cfg, displayName ?? "Guest");
   };
 
+  if (view === "log") {
+    return (
+      <div className="ms-shell">
+        <PWAUpdatePrompt />
+        <MinistryLog
+          entries={entries}
+          onBack={() => setView("menu")}
+          onSelectMatch={onSelectMatch}
+          visibleFilters={prefs.logVisibleFilters}
+          onChangeVisibleFilters={prefs.setLogVisibleFilters}
+        />
+        <div className="ms-ash-layer" aria-hidden />
+        <div className="ms-ash-layer slow" aria-hidden />
+      </div>
+    );
+  }
+
   return (
     <div className="ms-shell">
       <PWAUpdatePrompt />
@@ -153,7 +169,7 @@ export function MenuShell({
                 : handleOnlineEntry
             }
             onPickCards={onViewCards}
-            onPickLog={onViewMinistryLog}
+            onPickLog={() => setView("log")}
             // Lands shortcut button — only surfaces when the stamp is
             // unlocked (glowing) AND the BLG setting is active. Toggling the
             // stamp off auto-disables the setting (in useMinistryPrefs).

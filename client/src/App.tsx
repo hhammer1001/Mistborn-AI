@@ -425,7 +425,6 @@ function App() {
       signOut={auth.signOut}
       onStartBot={startBot}
       onViewCards={() => setMode("gallery")}
-      onViewMinistryLog={() => { /* not implemented yet */ }}
       onSelectMatch={(id) => { setPastMatchId(id); setMode("past_match"); }}
       onViewLands={() => {
         setLandsAutoStart(null);

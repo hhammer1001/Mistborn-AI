@@ -34,6 +34,7 @@ interface PlayerRow {
   training?: number;
   burns?: number;
   atium?: number;
+  finalDeck?: Record<string, number>;
 }
 
 const VICTORY_LETTER_TO_LABEL: Record<string, VictoryType> = {
@@ -111,6 +112,7 @@ export function useMatchHistory(userId: string | null): ChronicleEntry[] {
         return {
           id: m.id,
           date: formatDate(m.createdAt),
+          createdAt: m.createdAt ?? 0,
           opp: oppRow.name,
           kind: m.kind === "mp" ? "mp" : "bot",
           botType: m.botStrategy ? (m.botStrategy as BotType) : undefined,
@@ -124,6 +126,8 @@ export function useMatchHistory(userId: string | null): ChronicleEntry[] {
           oppLife,
           myMission: myRow.mission ?? 0,
           oppMission: oppRow.mission ?? 0,
+          myDeck: myRow.finalDeck ?? {},
+          oppDeck: oppRow.finalDeck ?? {},
         };
       })
       .filter((e): e is ChronicleEntry => e !== null);
