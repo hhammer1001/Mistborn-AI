@@ -492,9 +492,11 @@ function MultiSelect({
       </button>
       {open && (
         <div className="ms-multi-pop">
-          {selected.length > 0 && (
-            <button type="button" className="ms-multi-clear" onClick={() => onChange([])}>✕ clear</button>
-          )}
+          <div className="ms-multi-actions">
+            <button type="button" onClick={() => onChange(options.map((o) => o.value))}>Select all</button>
+            <span className="sep">·</span>
+            <button type="button" onClick={() => onChange([])}>None</button>
+          </div>
           {options.map((o) => (
             <label className="customize-item" key={o.value}>
               <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggle(o.value)} />

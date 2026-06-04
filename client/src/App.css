@@ -6632,13 +6632,24 @@ h3 {
   flex-direction: column;
   gap: 1px;
 }
-.mlog-filters .ms-multi-clear {
-  align-self: flex-end;
+.mlog-filters .ms-multi-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 7px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.mlog-filters .ms-multi-actions button {
   background: transparent;
   border: none;
-  color: var(--text-faint);
-  font-size: 0.72rem;
+  color: var(--gold-dim);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
-  padding: 3px 6px 5px;
+  padding: 2px;
 }
-.mlog-filters .ms-multi-clear:hover { color: var(--red-bright); }
+.mlog-filters .ms-multi-actions button:hover { color: var(--gold-bright); }
+.mlog-filters .ms-multi-actions .sep { color: var(--border-light); }
