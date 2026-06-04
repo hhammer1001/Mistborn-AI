@@ -218,7 +218,7 @@ export function MinistryLog({
         <div className="stat"><span className="v dim">{stats.total}</span><span className="k">Matches</span></div>
         <div className="stat"><span className="v">{stats.wins}<span className="unit">W</span></span><span className="k">Won</span></div>
         <div className="stat"><span className="v loss">{stats.losses}<span className="unit">L</span></span><span className="k">Lost</span></div>
-        <div className="stat"><span className="v">{stats.wr}%</span><span className="k">Win Rate</span></div>
+        <div className="stat highlight"><span className="v">{stats.wr}%</span><span className="k">Win Rate</span></div>
         <div className="stat"><span className="v dim">{stats.avgTurns}</span><span className="k">Avg Turns</span></div>
         <div className="stat"><span className="v dim">{stats.missionWins}<span className="unit"> · {stats.combatWins} dmg</span></span><span className="k">Mission Wins</span></div>
       </div>

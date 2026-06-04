@@ -6011,6 +6011,11 @@ h3 {
   height: 100vh;
 }
 
+/* The header, stat strip, filter bar, and footer stay their natural height
+   and pinned; only .mlog-table-wrap flexes and scrolls. Without this the
+   tall table crushes the other rows (esp. the stat strip) via flex-shrink. */
+.mlog > * { flex-shrink: 0; }
+
 .mlog-hdr {
   display: flex;
   align-items: flex-end;
@@ -6084,6 +6089,14 @@ h3 {
 .mlog-stats .v.dim { color: var(--text); }
 .mlog-stats .v.loss { color: #a06a4a; }
 .mlog-stats .v .unit { font-size: 0.55em; color: var(--text-faint); }
+/* Win Rate is the headline metric — give it a gold cap + faint tint so the
+   eye lands there first in the strip. */
+.mlog-stats .stat.highlight {
+  background: linear-gradient(180deg, #1b1832 0%, var(--bg-panel) 72%);
+  box-shadow: inset 0 2px 0 var(--gold);
+}
+.mlog-stats .stat.highlight .v { font-size: 1.9rem; color: var(--gold-bright); }
+.mlog-stats .stat.highlight .k { color: var(--gold-dim); }
 .mlog-stats .k {
   font-size: 0.72rem;
   letter-spacing: 0.12em;
@@ -6261,8 +6274,14 @@ h3 {
   overflow: auto;
 }
 .mlog table { width: 100%; border-collapse: collapse; }
-/* Keep the column headers visible while the body scrolls. */
-.mlog thead th { position: sticky; top: 0; z-index: 3; }
+/* Keep the column headers visible while the body scrolls; the shadow lifts
+   the header above rows sliding underneath it. */
+.mlog thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: 0 6px 11px -8px rgba(0, 0, 0, 0.7);
+}
 .mlog thead th {
   font-family: var(--font-display);
   font-size: 0.7rem;
