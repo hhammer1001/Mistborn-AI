@@ -6064,7 +6064,7 @@ h3 {
 /* ── Summary stat strip ── */
 .mlog-stats {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, 1fr) 1.7fr;
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
@@ -6123,13 +6123,13 @@ h3 {
   text-transform: uppercase;
   color: var(--text-faint);
 }
-.mlog-filters .seg {
+.mlog .seg {
   display: inline-flex;
   border: 1px solid var(--border-light);
   border-radius: 4px;
   overflow: hidden;
 }
-.mlog-filters .seg button {
+.mlog .seg button {
   font-family: var(--font-body);
   font-size: 0.82rem;
   background: transparent;
@@ -6140,9 +6140,9 @@ h3 {
   border-right: 1px solid var(--border);
   transition: all 0.12s;
 }
-.mlog-filters .seg button:last-child { border-right: none; }
-.mlog-filters .seg button.on { background: var(--gold-dim); color: #14110a; font-weight: 700; }
-.mlog-filters .seg button:not(.on):hover { background: #ffffff10; color: var(--gold-bright); }
+.mlog .seg button:last-child { border-right: none; }
+.mlog .seg button.on { background: var(--gold-dim); color: #14110a; font-weight: 700; }
+.mlog .seg button:not(.on):hover { background: #ffffff10; color: var(--gold-bright); }
 
 .mlog-filters select,
 .mlog-filters .search input {
@@ -6428,3 +6428,159 @@ h3 {
   text-align: right;
   letter-spacing: 0.05em;
 }
+
+/* ── Ministry Log: graphs view (charts + sparkline) ── */
+.mlog-hdr-actions { display: flex; align-items: center; gap: 14px; }
+
+/* Recent-form sparkline cell in the stat strip */
+.mlog-stats .spark-cell { justify-content: center; gap: 6px; }
+.mlog-stats .spark-cell .spark-row { display: flex; align-items: center; gap: 10px; }
+.mlog-stats .spark-cell .v { font-size: 1.5rem; }
+.mlog-stats .spark-cell .spark-svg { flex: 1; height: 38px; min-width: 0; }
+.mlog-stats .spark-cell .spark-line { fill: none; stroke: var(--gold-bright); stroke-width: 2; }
+.mlog-stats .spark-cell .spark-empty { font-family: var(--font-display); font-size: 1.5rem; color: var(--text-faint); }
+
+/* Chart panel — mirrors .mlog-table-wrap as the flexing scroll region */
+.mlog-chart-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-panel);
+  padding: 18px 22px 24px;
+  display: flex;
+  flex-direction: column;
+}
+.mlog-chart-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.mlog-chart-toolbar label {
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.mlog-chart-toolbar select {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  background: var(--bg-zone);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 4px;
+  min-width: 300px;
+}
+.mlog-chart-toolbar select:focus { outline: none; border-color: var(--gold-dim); }
+
+.mlog-chart-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+}
+.mlog-chart-empty .flourish { color: var(--gold-dim); font-size: 1.4rem; }
+
+/* Line chart — SVG shapes + percentage-positioned HTML overlay for text/dots */
+.mlog-linechart {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+}
+.mlog-linechart .chart-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mlog-linechart .chart-grid { stroke: var(--border); stroke-width: 1; }
+.mlog-linechart .chart-zero { stroke: var(--border-light); stroke-width: 1; stroke-dasharray: 4 4; }
+.mlog-linechart .chart-area { stroke: none; }
+.mlog-linechart .chart-line { fill: none; stroke: var(--gold-bright); stroke-width: 2; stroke-linejoin: round; }
+.mlog-linechart .chart-guide { stroke: var(--gold-dim); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.7; }
+
+.mlog-linechart .chart-overlay { position: absolute; inset: 0; pointer-events: none; }
+.mlog-linechart .y-label {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  width: 50px;
+  text-align: right;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.mlog-linechart .x-label {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.mlog-linechart .dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: var(--gold-bright);
+  box-shadow: 0 0 0 3px rgba(224, 191, 96, 0.2);
+}
+.mlog-linechart .chart-tip {
+  position: absolute;
+  transform: translate(10px, -120%);
+  background: var(--bg-zone);
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  padding: 5px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.mlog-linechart .chart-tip.flip { transform: translate(calc(-100% - 10px), -120%); }
+.mlog-linechart .chart-tip b { font-family: var(--font-display); color: var(--gold-bright); font-size: 0.95rem; }
+.mlog-linechart .chart-tip span { font-size: 0.72rem; color: var(--text-faint); }
+.mlog-linechart .chart-hit { position: absolute; left: 5.8%; right: 2.2%; top: 5.5%; bottom: 11%; cursor: crosshair; }
+
+/* Bar chart (HTML/CSS) */
+.mlog-barchart {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  padding: 10px 10px 0;
+}
+.mlog-barchart .bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.mlog-barchart .bar-val { font-family: var(--font-display); font-size: 1.05rem; color: var(--gold-bright); }
+.mlog-barchart .bar-track {
+  flex: 1;
+  width: 100%;
+  max-width: 96px;
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(180deg, #ffffff06, transparent);
+  border-bottom: 1px solid var(--border-light);
+}
+.mlog-barchart .bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold-dim));
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.mlog-barchart .bar-label {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  color: var(--text);
+}
+.mlog-barchart .bar-n { font-size: 0.7rem; color: var(--text-faint); }

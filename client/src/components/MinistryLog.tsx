@@ -12,6 +12,7 @@ import {
   LOG_FILTER_KEYS,
   type LogFilterKey,
 } from "../hooks/useMinistryPrefs";
+import { LogChartPanel, Sparkline, LOG_METRICS, type LogMetric } from "./LogCharts";
 
 // Cards worth calling out in the deck breakdown (the high-impact ones).
 const KEY_CARDS = new Set([
@@ -92,6 +93,8 @@ export function MinistryLog({
   onChangeVisibleFilters,
 }: Props) {
   const [sel, setSel] = useState<Selections>(DEFAULT_SELECTIONS);
+  const [viewMode, setViewMode] = useState<"table" | "graphs">("table");
+  const [chartMetric, setChartMetric] = useState<LogMetric>("winrate-cum");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -211,7 +214,14 @@ export function MinistryLog({
           <h1>Full Records</h1>
           <span className="sub">· complete chronicle of filed matches ·</span>
         </div>
-        <button className="mlog-back" onClick={onBack}>← Back to Menu</button>
+        <div className="mlog-hdr-actions">
+          <Seg
+            value={viewMode}
+            options={[["table", "Table"], ["graphs", "Graphs"]]}
+            onChange={(v) => setViewMode(v as "table" | "graphs")}
+          />
+          <button className="mlog-back" onClick={onBack}>← Back to Menu</button>
+        </div>
       </div>
 
       <div className="mlog-stats">
@@ -221,6 +231,7 @@ export function MinistryLog({
         <div className="stat highlight"><span className="v">{stats.wr}%</span><span className="k">Win Rate</span></div>
         <div className="stat"><span className="v dim">{stats.avgTurns}</span><span className="k">Avg Turns</span></div>
         <div className="stat"><span className="v dim">{stats.missionWins}<span className="unit"> · {stats.combatWins} dmg</span></span><span className="k">Mission Wins</span></div>
+        <Sparkline entries={filtered} />
       </div>
 
       <div className="mlog-filters">
@@ -365,6 +376,17 @@ export function MinistryLog({
         <button className="mlog-clear" onClick={clearFilters}>clear filters</button>
       </div>
 
+      {viewMode === "graphs" ? (
+        <div className="mlog-chart-wrap">
+          <div className="mlog-chart-toolbar">
+            <label>Metric</label>
+            <select value={chartMetric} onChange={(e) => setChartMetric(e.target.value as LogMetric)}>
+              {LOG_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+          </div>
+          <LogChartPanel entries={filtered} metric={chartMetric} />
+        </div>
+      ) : (
       <div className="mlog-table-wrap">
         <table>
           <thead>
@@ -402,6 +424,7 @@ export function MinistryLog({
           </tbody>
         </table>
       </div>
+      )}
       <div className="mlog-footcount">Showing {sorted.length} of {entries.length} filed matches</div>
     </div>
   );
