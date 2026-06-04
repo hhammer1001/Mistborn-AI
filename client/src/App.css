@@ -6584,3 +6584,61 @@ h3 {
   color: var(--text);
 }
 .mlog-barchart .bar-n { font-size: 0.7rem; color: var(--text-faint); }
+
+/* ── Ministry Log: multi-select filter dropdowns ── */
+.mlog-filters .ms-multi { position: relative; }
+.mlog-filters .ms-multi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  background: var(--bg-zone);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 4px;
+  min-width: 132px;
+  max-width: 220px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.mlog-filters .ms-multi-btn:hover,
+.mlog-filters .ms-multi.open .ms-multi-btn { border-color: var(--gold-dim); }
+.mlog-filters .ms-multi-summary {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mlog-filters .ms-multi-summary.all { color: var(--text-faint); }
+.mlog-filters .ms-multi-btn .caret { font-size: 0.7em; color: var(--text-faint); }
+.mlog-filters .ms-multi-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 25;
+  min-width: 100%;
+  width: max-content;
+  max-width: 260px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  border-radius: 5px;
+  box-shadow: 0 12px 32px #00000099;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mlog-filters .ms-multi-clear {
+  align-self: flex-end;
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 3px 6px 5px;
+}
+.mlog-filters .ms-multi-clear:hover { color: var(--red-bright); }

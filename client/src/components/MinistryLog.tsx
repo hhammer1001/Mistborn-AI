@@ -31,38 +31,40 @@ const FILTER_LABELS: Record<LogFilterKey, string> = {
   search: "Search",
 };
 
-type ResultFilter = "all" | "win" | "loss";
-type ModeFilter = "all" | "bot" | "mp";
-type FirstFilter = "all" | "me" | "opp";
 type SearchScope = "both" | "mine" | "opp";
 type SortKey = "date" | "first" | "victory" | "turn" | "deck";
 
+// Categorical filters are multi-select: an empty array means "no constraint"
+// (show all); any subset narrows to those values.
 interface Selections {
-  result: ResultFilter;
-  mode: ModeFilter;
-  first: FirstFilter;
-  dateFrom: string; // "YYYY-MM-DD" (empty = open-ended)
-  dateTo: string;   // "YYYY-MM-DD" (empty = open-ended)
-  bot: string;     // BotType | "all"
-  vic: string;     // VictoryType | "all"
-  char: string;    // your character | "all"
-  oppChar: string; // opponent character | "all"
+  result: string[];  // subset of "win" | "loss"
+  mode: string[];    // subset of "bot" | "mp"
+  first: string[];   // subset of "me" | "opp"
+  dateFrom: string;  // "YYYY-MM-DD" (empty = open-ended)
+  dateTo: string;    // "YYYY-MM-DD" (empty = open-ended)
+  bot: string[];     // BotType[]
+  vic: string[];     // VictoryType[]
+  char: string[];    // your characters
+  oppChar: string[]; // opponent characters
   search: string;
   searchScope: SearchScope; // which deck the card-name search looks at
 }
 
 const DEFAULT_SELECTIONS: Selections = {
-  result: "all", mode: "all", first: "all",
+  result: [], mode: [], first: [],
   dateFrom: "", dateTo: "",
-  bot: "all", vic: "all", char: "all", oppChar: "all", search: "", searchScope: "both",
+  bot: [], vic: [], char: [], oppChar: [], search: "", searchScope: "both",
 };
 
 // Reset patch applied when a filter is hidden, so it stops affecting results.
 function resetPatch(key: LogFilterKey): Partial<Selections> {
   if (key === "date") return { dateFrom: "", dateTo: "" };
   if (key === "search") return { search: "" };
-  return { [key]: "all" } as Partial<Selections>;
+  return { [key]: [] } as Partial<Selections>;
 }
+
+// Empty selection = no constraint; otherwise the value must be in the set.
+const inSet = (arr: string[], val: string | undefined) => arr.length === 0 || (val != null && arr.includes(val));
 
 const VIC_ORDER: Record<VictoryType, number> = {
   Mission: 0, Combat: 1, Confrontation: 2, Forfeit: 3,
@@ -117,17 +119,17 @@ export function MinistryLog({
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {
-      if (visible.has("result") && sel.result !== "all" && e.result !== sel.result) return false;
-      if (visible.has("mode") && sel.mode !== "all" && e.kind !== sel.mode) return false;
-      if (visible.has("first") && sel.first !== "all" && e.firstPlayer !== sel.first) return false;
+      if (visible.has("result") && !inSet(sel.result, e.result)) return false;
+      if (visible.has("mode") && !inSet(sel.mode, e.kind)) return false;
+      if (visible.has("first") && !inSet(sel.first, e.firstPlayer)) return false;
       if (visible.has("date")) {
         if (sel.dateFrom && e.createdAt < new Date(sel.dateFrom + "T00:00:00").getTime()) return false;
         if (sel.dateTo && e.createdAt > new Date(sel.dateTo + "T23:59:59.999").getTime()) return false;
       }
-      if (visible.has("bot") && sel.bot !== "all" && e.botType !== sel.bot) return false;
-      if (visible.has("vic") && sel.vic !== "all" && e.victory !== sel.vic) return false;
-      if (visible.has("char") && sel.char !== "all" && e.myChar !== sel.char) return false;
-      if (visible.has("oppChar") && sel.oppChar !== "all" && e.oppChar !== sel.oppChar) return false;
+      if (visible.has("bot") && !inSet(sel.bot, e.botType)) return false;
+      if (visible.has("vic") && !inSet(sel.vic, e.victory)) return false;
+      if (visible.has("char") && !inSet(sel.char, e.myChar)) return false;
+      if (visible.has("oppChar") && !inSet(sel.oppChar, e.oppChar)) return false;
       if (visible.has("search") && sel.search) {
         const q = sel.search.toLowerCase();
         const inOpp = e.opp.toLowerCase().includes(q);
@@ -269,30 +271,30 @@ export function MinistryLog({
         {visible.has("result") && (
           <div className="fgroup">
             <label>Result</label>
-            <Seg
-              value={sel.result}
-              options={[["all", "All"], ["win", "Wins"], ["loss", "Losses"]]}
-              onChange={(v) => updateSel({ result: v as ResultFilter })}
+            <MultiSelect
+              options={[{ value: "win", label: "Wins" }, { value: "loss", label: "Losses" }]}
+              selected={sel.result}
+              onChange={(v) => updateSel({ result: v })}
             />
           </div>
         )}
         {visible.has("mode") && (
           <div className="fgroup">
             <label>Mode</label>
-            <Seg
-              value={sel.mode}
-              options={[["all", "All"], ["bot", "Bot"], ["mp", "Online"]]}
-              onChange={(v) => updateSel({ mode: v as ModeFilter })}
+            <MultiSelect
+              options={[{ value: "bot", label: "Bot" }, { value: "mp", label: "Online" }]}
+              selected={sel.mode}
+              onChange={(v) => updateSel({ mode: v })}
             />
           </div>
         )}
         {visible.has("first") && (
           <div className="fgroup">
             <label>First Player</label>
-            <Seg
-              value={sel.first}
-              options={[["all", "All"], ["me", "You"], ["opp", "Opp"]]}
-              onChange={(v) => updateSel({ first: v as FirstFilter })}
+            <MultiSelect
+              options={[{ value: "me", label: "You" }, { value: "opp", label: "Opp" }]}
+              selected={sel.first}
+              onChange={(v) => updateSel({ first: v })}
             />
           </div>
         )}
@@ -321,37 +323,42 @@ export function MinistryLog({
         {visible.has("bot") && (
           <div className="fgroup">
             <label>Bot Strategy</label>
-            <select value={sel.bot} onChange={(e) => updateSel({ bot: e.target.value })}>
-              <option value="all">All bots</option>
-              {BOT_TYPES.map((b) => <option key={b} value={b}>{BOT_TYPE_LABELS[b]}</option>)}
-            </select>
+            <MultiSelect
+              options={BOT_TYPES.map((b) => ({ value: b, label: BOT_TYPE_LABELS[b] }))}
+              selected={sel.bot}
+              onChange={(v) => updateSel({ bot: v })}
+              allLabel="All bots"
+            />
           </div>
         )}
         {visible.has("vic") && (
           <div className="fgroup">
             <label>Victory Type</label>
-            <select value={sel.vic} onChange={(e) => updateSel({ vic: e.target.value })}>
-              <option value="all">All</option>
-              {VICTORY_TYPES.map((v) => <option key={v} value={v}>{v}</option>)}
-            </select>
+            <MultiSelect
+              options={VICTORY_TYPES.map((v) => ({ value: v, label: v }))}
+              selected={sel.vic}
+              onChange={(v) => updateSel({ vic: v })}
+            />
           </div>
         )}
         {visible.has("char") && (
           <div className="fgroup">
             <label>Your Character</label>
-            <select value={sel.char} onChange={(e) => updateSel({ char: e.target.value })}>
-              <option value="all">All</option>
-              {CHARACTERS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <MultiSelect
+              options={CHARACTERS.map((c) => ({ value: c, label: c }))}
+              selected={sel.char}
+              onChange={(v) => updateSel({ char: v })}
+            />
           </div>
         )}
         {visible.has("oppChar") && (
           <div className="fgroup">
             <label>Opp Character</label>
-            <select value={sel.oppChar} onChange={(e) => updateSel({ oppChar: e.target.value })}>
-              <option value="all">All</option>
-              {CHARACTERS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <MultiSelect
+              options={CHARACTERS.map((c) => ({ value: c, label: c }))}
+              selected={sel.oppChar}
+              onChange={(v) => updateSel({ oppChar: v })}
+            />
           </div>
         )}
         {visible.has("search") && (
@@ -443,6 +450,59 @@ function Seg({
       {options.map(([v, label]) => (
         <button key={v} className={v === value ? "on" : ""} onClick={() => onChange(v)}>{label}</button>
       ))}
+    </div>
+  );
+}
+
+// ── Multi-select checkbox dropdown ──
+// Empty selection = no constraint (shows allLabel). Any subset narrows.
+function MultiSelect({
+  options, selected, onChange, allLabel = "All",
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  allLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const toggle = (value: string) =>
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+
+  const summary =
+    selected.length === 0 ? allLabel :
+    selected.length === 1 ? (options.find((o) => o.value === selected[0])?.label ?? selected[0]) :
+    `${selected.length} selected`;
+
+  return (
+    <div className={`ms-multi${open ? " open" : ""}`} ref={ref}>
+      <button type="button" className="ms-multi-btn" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className={`ms-multi-summary${selected.length === 0 ? " all" : ""}`}>{summary}</span>
+        <span className="caret">▾</span>
+      </button>
+      {open && (
+        <div className="ms-multi-pop">
+          {selected.length > 0 && (
+            <button type="button" className="ms-multi-clear" onClick={() => onChange([])}>✕ clear</button>
+          )}
+          {options.map((o) => (
+            <label className="customize-item" key={o.value}>
+              <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggle(o.value)} />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
