@@ -26,6 +26,7 @@ const FILTER_LABELS: Record<LogFilterKey, string> = {
   bot: "Bot Strategy",
   vic: "Victory Type",
   char: "Your Character",
+  oppChar: "Opp Character",
   search: "Search",
 };
 
@@ -41,9 +42,10 @@ interface Selections {
   first: FirstFilter;
   dateFrom: string; // "YYYY-MM-DD" (empty = open-ended)
   dateTo: string;   // "YYYY-MM-DD" (empty = open-ended)
-  bot: string;   // BotType | "all"
-  vic: string;   // VictoryType | "all"
-  char: string;  // character | "all"
+  bot: string;     // BotType | "all"
+  vic: string;     // VictoryType | "all"
+  char: string;    // your character | "all"
+  oppChar: string; // opponent character | "all"
   search: string;
   searchScope: SearchScope; // which deck the card-name search looks at
 }
@@ -51,7 +53,7 @@ interface Selections {
 const DEFAULT_SELECTIONS: Selections = {
   result: "all", mode: "all", first: "all",
   dateFrom: "", dateTo: "",
-  bot: "all", vic: "all", char: "all", search: "", searchScope: "both",
+  bot: "all", vic: "all", char: "all", oppChar: "all", search: "", searchScope: "both",
 };
 
 // Reset patch applied when a filter is hidden, so it stops affecting results.
@@ -122,6 +124,7 @@ export function MinistryLog({
       if (visible.has("bot") && sel.bot !== "all" && e.botType !== sel.bot) return false;
       if (visible.has("vic") && sel.vic !== "all" && e.victory !== sel.vic) return false;
       if (visible.has("char") && sel.char !== "all" && e.myChar !== sel.char) return false;
+      if (visible.has("oppChar") && sel.oppChar !== "all" && e.oppChar !== sel.oppChar) return false;
       if (visible.has("search") && sel.search) {
         const q = sel.search.toLowerCase();
         const inOpp = e.opp.toLowerCase().includes(q);
@@ -326,6 +329,15 @@ export function MinistryLog({
           <div className="fgroup">
             <label>Your Character</label>
             <select value={sel.char} onChange={(e) => updateSel({ char: e.target.value })}>
+              <option value="all">All</option>
+              {CHARACTERS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
+        {visible.has("oppChar") && (
+          <div className="fgroup">
+            <label>Opp Character</label>
+            <select value={sel.oppChar} onChange={(e) => updateSel({ oppChar: e.target.value })}>
               <option value="all">All</option>
               {CHARACTERS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
