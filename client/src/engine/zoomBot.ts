@@ -48,6 +48,11 @@ export class ZoomBot extends SquashBot {
    * lookahead from over-trusting noisy follow-up estimates. */
   static followupWeight = 0.6;
 
+  /** Lookahead depth. 1 = 1-ply chain (validated default). 2 = recurse one
+   * more level on the best follow-up, discounted by followupWeight again —
+   * same shape as SquashV2Bot's 2-ply. */
+  static lookaheadDepth = 1;
+
   // Per-turn lethal-cache + invocation cap — same as SquashV2Bot. Without it,
   // late-game turns where opp HP is low can spend many seconds re-running the
   // 12-step greedy lookahead per selectAction call. Empirically cap=3 is
@@ -65,6 +70,67 @@ export class ZoomBot extends SquashBot {
 
   protected override get evalProfile(): BotProfile {
     return "zoom";
+  }
+
+  // ── Instance-level lookahead knobs ──
+  // Default to the class statics (behavior-neutral). Subclasses (AnvilBot)
+  // override per evolved policy without touching the shared statics — statics
+  // are shared with any same-class opponent in a bench.
+  protected get lookTopK(): number { return ZoomBot.lookaheadTopK; }
+  protected get lookFollowupWeight(): number { return ZoomBot.followupWeight; }
+  protected get lookDepth(): number { return ZoomBot.lookaheadDepth; }
+  protected get lookLethalThreshold(): number { return ZoomBot.lethalThreshold; }
+  /** Score-gap pruning gate: skip chain lookahead when the heuristic best
+   * beats the runner-up by at least this margin. 0 = off. */
+  protected get lookGapGate(): number { return 0; }
+
+  // ── Simulated-candidate valuation hooks ──
+  // Defaults reproduce the validated heuristic-chain behavior exactly.
+  // Subclasses (AnvilSecondBot's value-leaf mode) swap in a learned state
+  // evaluation without touching the lookahead scaffolding.
+
+  /** Value of a simulated candidate that immediately ended the game. */
+  protected simTerminalValue(immediateScore: number, won: boolean): number {
+    return immediateScore + (won ? 1000 : -1000);
+  }
+
+  /** Value of the (non-terminal) post-action state. Default: heuristic-chain
+   * follow-up — immediate score plus the discounted best follow-up score,
+   * with optional 2-ply recursion. Called with `game` already advanced by
+   * the candidate action; must not mutate it un-restorably (any inner sim
+   * snapshots/restores locally). */
+  protected simStateValue(immediateScore: number, game: Game): number {
+    const nextActions = this.availableActions(game);
+    if (nextActions.length === 0) return immediateScore;
+    const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
+    let followup = nextScored[0]?.score ?? 0;
+    // 2-ply: recurse one more level on the best follow-up
+    if (this.lookDepth >= 2 && nextScored.length > 0 && nextScored[0].action.type !== "end_actions") {
+      const innerSnap = snapshotGame(game);
+      try {
+        this.performAction(nextScored[0].action, game);
+        if (game.winner === this) followup += 1000;
+        else if (game.winner && game.winner !== this) followup -= 1000;
+        else {
+          const lvl2Actions = this.availableActions(game);
+          if (lvl2Actions.length > 0) {
+            const { scored: lvl2Scored } = this.scoreAndSortActions(lvl2Actions, game);
+            followup += (lvl2Scored[0]?.score ?? 0) * this.lookFollowupWeight;
+          }
+        }
+      } catch {
+        // skip
+      } finally {
+        restoreGame(game, innerSnap);
+      }
+    }
+    return immediateScore + followup * this.lookFollowupWeight;
+  }
+
+  /** Value of the end_actions candidate (never simulated — cleanup draws
+   * would leak hidden information). Default: its heuristic score. */
+  protected endActionsValue(immediateScore: number, _game: Game): number {
+    return immediateScore;
   }
 
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
@@ -90,7 +156,7 @@ export class ZoomBot extends SquashBot {
     // burn_card) that don't grow curDamage but still get performed. See
     // SquashV2Bot for the same fix.
     const opp = game.players[(this.turnOrder + 1) % 2];
-    if (opp.curHealth > 0 && opp.curHealth <= ZoomBot.lethalThreshold) {
+    if (opp.curHealth > 0 && opp.curHealth <= this.lookLethalThreshold) {
       if (this.lethalCallsTurn !== game.turncount) {
         this.lethalCallsTurn = game.turncount;
         this.lethalCallsThisTurn = 0;
@@ -115,10 +181,16 @@ export class ZoomBot extends SquashBot {
 
     // Heuristic scoring narrows the candidate set.
     const { scored } = this.scoreAndSortActions(actions, game);
-    const candidates = scored.slice(0, ZoomBot.lookaheadTopK);
+    // Gap gate: when the best action already dominates, don't spend the
+    // decision budget second-guessing it.
+    const gated =
+      this.lookGapGate > 0 &&
+      scored.length > 1 &&
+      scored[0].score - scored[1].score >= this.lookGapGate;
+    const candidates = gated ? [] : scored.slice(0, this.lookTopK);
 
     const stateBefore = snapshotGame(game);
-    let bestAction: GameActionInternal = candidates[0].action;
+    let bestAction: GameActionInternal = scored[0].action;
     let bestValue = -Infinity;
 
     // Chain-lookahead wall-clock budget — same fix as SquashV2.
@@ -139,22 +211,16 @@ export class ZoomBot extends SquashBot {
         if (action.type !== "end_actions") {
           try {
             this.performAction(action, game);
-            if (game.winner === this) value += 1000;
-            else if (game.winner && game.winner !== this) value -= 1000;
-            else {
-              // 1-ply chain: best follow-up heuristic from post-action state
-              const nextActions = this.availableActions(game);
-              if (nextActions.length > 0) {
-                const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
-                const followup = nextScored[0]?.score ?? 0;
-                value += followup * ZoomBot.followupWeight;
-              }
-            }
+            if (game.winner === this) value = this.simTerminalValue(cand.score, true);
+            else if (game.winner && game.winner !== this) value = this.simTerminalValue(cand.score, false);
+            else value = this.simStateValue(cand.score, game);
           } catch {
             // Sim failed — keep heuristic value
           } finally {
             restoreGame(game, stateBefore);
           }
+        } else {
+          value = this.endActionsValue(cand.score, game);
         }
 
         if (value > bestValue) {

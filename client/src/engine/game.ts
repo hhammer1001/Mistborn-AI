@@ -29,6 +29,10 @@ export class Game {
   /** Root seed for this game. All RNG streams are derived from it via
    *  `subRng(seed, label)`. Persist this for replay. */
   seed: number;
+  /** Seat index of the player who took the first turn. Stored so state
+   *  evaluation can distinguish move order from seat index — they differ
+   *  when GameSession passes firstPlayer=1 (e.g. Henry's bot-first games). */
+  firstPlayer: number;
   /** Stream used for mission picks and any future game-wide randomness.
    *  Independent of the market/initial-deck streams so consuming this
    *  more or less doesn't perturb the fixed initial orderings. */
@@ -95,6 +99,7 @@ export class Game {
     } = opts;
 
     this.seed = seed ?? randomSeed();
+    this.firstPlayer = firstPlayer;
     const marketRng = subRng(this.seed, "market");
     this.gameRng = subRng(this.seed, "game");
     this.botRngs = Array.from({ length: numPlayers }, (_, i) =>
@@ -288,6 +293,7 @@ export class Game {
     g.characters = [...this.characters];
     g.missionNames = [...this.missionNames];
     g.seed = this.seed;
+    g.firstPlayer = this.firstPlayer;
     g.gameRng = this.gameRng.clone();
     g.botRngs = this.botRngs.map((r) => r.clone());
 

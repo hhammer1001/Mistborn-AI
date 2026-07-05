@@ -69,6 +69,20 @@ export class SquashV2Bot extends SquashBot {
     return "squashV2";
   }
 
+  // ── Instance-level lookahead knobs ──
+  // Default to the class statics (behavior-neutral). Subclasses (AnvilBot)
+  // override per evolved policy without touching the shared statics — statics
+  // are shared with any opponent of the same class in a bench, so mutating
+  // them would change both sides.
+  protected get lookTopK(): number { return SquashV2Bot.lookaheadTopK; }
+  protected get lookFollowupWeight(): number { return SquashV2Bot.followupWeight; }
+  protected get lookDepth(): number { return SquashV2Bot.lookaheadDepth; }
+  protected get lookLethalThreshold(): number { return SquashV2Bot.lethalThreshold; }
+  /** Score-gap pruning gate: if the heuristic best beats the runner-up by at
+   * least this margin, skip the chain lookahead and play it directly. 0 = off.
+   * Saves decision budget for the close calls where lookahead actually helps. */
+  protected get lookGapGate(): number { return 0; }
+
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
     if (
       !SquashV2Bot.lookaheadEnabled ||
@@ -93,7 +107,7 @@ export class SquashV2Bot extends SquashBot {
     // the current curDamage on this turn. curDamage is monotonic per turn
     // (resets at end_actions), so re-searching only matters when it grows.
     const opp = game.players[(this.turnOrder + 1) % 2];
-    if (opp.curHealth > 0 && opp.curHealth <= SquashV2Bot.lethalThreshold) {
+    if (opp.curHealth > 0 && opp.curHealth <= this.lookLethalThreshold) {
       // Reset per-turn invocation counter on turn change.
       if (this.lethalCallsTurn !== game.turncount) {
         this.lethalCallsTurn = game.turncount;
@@ -124,10 +138,16 @@ export class SquashV2Bot extends SquashBot {
     }
 
     const { scored } = this.scoreAndSortActions(actions, game);
-    const candidates = scored.slice(0, SquashV2Bot.lookaheadTopK);
+    // Gap gate: when the best action already dominates, don't spend the
+    // decision budget second-guessing it.
+    const gated =
+      this.lookGapGate > 0 &&
+      scored.length > 1 &&
+      scored[0].score - scored[1].score >= this.lookGapGate;
+    const candidates = gated ? [] : scored.slice(0, this.lookTopK);
 
     const stateBefore = snapshotGame(game);
-    let bestAction: GameActionInternal = candidates[0].action;
+    let bestAction: GameActionInternal = scored[0].action;
     let bestValue = -Infinity;
 
     // Chain-lookahead wall-clock budget. Combined with the lethal solver,
@@ -156,7 +176,7 @@ export class SquashV2Bot extends SquashBot {
                 const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
                 let followup = nextScored[0]?.score ?? 0;
                 // 2-ply: recurse one more level on the best follow-up
-                if (SquashV2Bot.lookaheadDepth >= 2 && nextScored.length > 0 && nextScored[0].action.type !== "end_actions") {
+                if (this.lookDepth >= 2 && nextScored.length > 0 && nextScored[0].action.type !== "end_actions") {
                   const innerSnap = snapshotGame(game);
                   try {
                     this.performAction(nextScored[0].action, game);
@@ -167,7 +187,7 @@ export class SquashV2Bot extends SquashBot {
                       if (lvl2Actions.length > 0) {
                         const { scored: lvl2Scored } = this.scoreAndSortActions(lvl2Actions, game);
                         const lvl2 = lvl2Scored[0]?.score ?? 0;
-                        followup += lvl2 * SquashV2Bot.followupWeight;
+                        followup += lvl2 * this.lookFollowupWeight;
                       }
                     }
                   } catch {
@@ -176,7 +196,7 @@ export class SquashV2Bot extends SquashBot {
                     restoreGame(game, innerSnap);
                   }
                 }
-                value += followup * SquashV2Bot.followupWeight;
+                value += followup * this.lookFollowupWeight;
               }
             }
           } catch {

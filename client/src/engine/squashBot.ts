@@ -162,7 +162,7 @@ export class SquashBot extends Player {
 
   // ── Individual scoring functions ──
 
-  private scoreEndTurn(_snap: GameStateSnapshot): number {
+  protected scoreEndTurn(_snap: GameStateSnapshot): number {
     return 0; // Baseline — everything else must beat this
   }
 
@@ -343,12 +343,12 @@ export class SquashBot extends Player {
     return 40 + effectVal;
   }
 
-  private scoreCharAbility1(snap: GameStateSnapshot): number {
+  protected scoreCharAbility1(snap: GameStateSnapshot): number {
     const effectVal = estimateEffectValue(this.ability1effect, this.ability1amount, snap);
     return 35 + effectVal;
   }
 
-  private scoreCharAbility3(snap: GameStateSnapshot): number {
+  protected scoreCharAbility3(snap: GameStateSnapshot): number {
     const effectVal = estimateEffectValue("D.Mi", "3.3", snap);
     return 35 + effectVal;
   }
@@ -413,7 +413,7 @@ export class SquashBot extends Player {
     return baseScore * 0.85;
   }
 
-  private scoreUseAtium(
+  protected scoreUseAtium(
     action: GameActionInternal & { type: "use_atium" },
     snap: GameStateSnapshot,
   ): number {
