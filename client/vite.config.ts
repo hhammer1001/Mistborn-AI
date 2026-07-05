@@ -25,6 +25,9 @@ export default defineConfig({
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
         display: 'standalone',
+        // Phones play in landscape only (RotateGate covers portrait);
+        // lock the installed app where the platform honors it.
+        orientation: 'landscape',
         icons: [
           { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
         ],

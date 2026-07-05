@@ -1,4 +1,6 @@
 import { RewardIcon } from "./RewardIcon";
+import { useIsPhone } from "../hooks/useMobile";
+import { useUIScale } from "../hooks/useUIScale";
 
 const CHARACTER_COLORS: Record<string, string> = {
   Vin: "#e04040",
@@ -34,6 +36,11 @@ export function TrainingTrack({ training, character }: Props) {
   const maxDisplay = 21;
   const color = CHARACTER_COLORS[character] ?? "#c9a44a";
   const fillPct = Math.min((training / maxDisplay) * 100, 100);
+  // Cards and the track zone shrink with --ui-scale on phones; RewardIcon
+  // sizes are inline px, so scale them the same way (desktop: k = 1).
+  const isPhone = useIsPhone();
+  const uiScale = useUIScale();
+  const k = isPhone ? uiScale : 1;
 
   return (
     <div className="training-track-zone">
@@ -64,9 +71,9 @@ export function TrainingTrack({ training, character }: Props) {
               className="training-v-top-reward"
               title="Training maxed: every train grants +1 atium"
             >
-              <RewardIcon code="T" size={22} />
+              <RewardIcon code="T" size={Math.round(22 * k)} />
               <span className="training-v-eq">=</span>
-              <RewardIcon code="A" size={22} />
+              <RewardIcon code="A" size={Math.round(22 * k)} />
             </div>
           )}
           {/* Milestone markers */}
@@ -81,7 +88,7 @@ export function TrainingTrack({ training, character }: Props) {
                 title={`${m.level}: ${m.tip}`}
               >
                 {m.rewardCode ? (
-                  <RewardIcon code={m.rewardCode} size={18} className={reached ? "reached" : ""} />
+                  <RewardIcon code={m.rewardCode} size={Math.round(18 * k)} className={reached ? "reached" : ""} />
                 ) : (
                   <span className={`training-v-marker marker-${m.type}${reached ? " reached" : ""}`}>
                     {m.icon}

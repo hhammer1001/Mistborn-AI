@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import "./mobile.css";
 import { useGame } from "./hooks/useGame";
 import { useAuth } from "./hooks/useAuth";
 import { useLobby } from "./hooks/useLobby";

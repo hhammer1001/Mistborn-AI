@@ -1,0 +1,290 @@
+/* ════════════════════════════════════════════════════════════════════
+   Mobile overrides.
+
+   Every rule is scoped under html.touch / html.phone /
+   html.phone-landscape / html.phone-portrait — classes set by
+   src/hooks/useMobile.ts. Desktop (fine pointer) never gets these
+   classes, so nothing in this file affects it. App.css is untouched;
+   this file is imported after it in App.tsx, so equal-specificity
+   rules here win by source order and class-scoped rules outrank
+   App.css's media-query rules by specificity.
+
+   Device classes:
+     .touch            phones AND tablets — touch affordances only
+     .phone            short edge < 500px — layout changes
+     .phone-landscape  the supported play orientation
+     .phone-portrait   RotateGate covers the app
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Touch affordances (phones + tablets) ─────────────────────────── */
+
+html.touch body,
+html.touch #root {
+  height: 100dvh; /* 100vh misjudges iOS Safari's collapsing chrome */
+}
+
+html.touch body {
+  touch-action: manipulation; /* kills the 300ms double-tap-zoom delay */
+}
+
+/* Long-press opens the card detail popup; without these iOS shows its
+   image callout / text-selection UI over the gesture instead. */
+html.touch .card-wrapper,
+html.touch .card-sprite,
+html.touch .character-card-thumb,
+html.touch .hand-action-menu {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Horizontal swipe scrolls the hand; vertical pans cancel the
+   long-press timer via pointercancel rather than fighting it. */
+html.touch .hand-zone .card-row {
+  touch-action: pan-x;
+}
+
+/* ── Rotate gate (phone portrait) ─────────────────────────────────── */
+
+html.phone-portrait .rotate-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  background:
+    radial-gradient(ellipse at 50% 20%, #2a203830 0%, transparent 60%),
+    linear-gradient(180deg, #0e0d1a 0%, #0a0a14 60%, #080814 100%);
+  color: var(--gold, #c9a44a);
+  text-align: center;
+}
+
+html.phone-portrait .rotate-gate-icon {
+  animation: rotate-gate-nudge 2.4s ease-in-out infinite;
+}
+
+@keyframes rotate-gate-nudge {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  70%, 85% { transform: rotate(-90deg); }
+}
+
+html.phone-portrait .rotate-gate-text {
+  font-family: var(--font-display, serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text, #e8e4da);
+}
+
+html.phone-portrait .rotate-gate-sub {
+  font-family: var(--font-body, sans-serif);
+  font-size: 0.85rem;
+  color: var(--text-dim, #9a94a8);
+}
+
+/* ── Board frame (phones) ─────────────────────────────────────────── */
+
+html.phone .game-board {
+  height: 100dvh;
+  padding: 0.3rem;
+  padding-left: max(0.3rem, env(safe-area-inset-left));
+  padding-right: max(0.3rem, env(safe-area-inset-right));
+  gap: 0.3rem;
+}
+
+/* ── Board zone tuning (phone landscape) ──────────────────────────── */
+
+/* Re-statement of App.css's useful @media (max-width: 900px) board rules,
+   class-scoped so 932px-wide phones (iPhone Pro Max landscape) get them
+   too. Narrow desktop windows keep using the originals. */
+
+html.phone-landscape .board-right {
+  width: calc(400px * var(--ui-scale, 1));
+}
+
+html.phone-landscape .mission-col {
+  padding: 0.35rem 0.15rem;
+}
+
+html.phone-landscape .right-footer {
+  align-items: flex-start;
+  min-height: 0;
+  /* Clears the fixed Undo (bottom 3.1rem) / Main Menu buttons. */
+  margin-bottom: 3rem;
+}
+
+/* Market: 2 columns × 3 rows instead of one wrapping flex row. */
+html.phone-landscape .market-zone .card-row {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  grid-auto-flow: row;
+  justify-content: center;
+}
+
+/* Ability buttons above the stats grid — matches the 900px block. */
+html.phone-landscape .player-info.you > .character-card-thumb { order: 1; }
+html.phone-landscape .player-info.you > .player-header        { order: 2; }
+html.phone-landscape .player-info.you > .char-abilities       { order: 3; margin-top: 0; margin-bottom: 0.3rem; }
+html.phone-landscape .player-info.you > .player-stats-grid    { order: 4; }
+html.phone-landscape .player-info.you > .player-action-btns   { order: 5; }
+
+/* Metal actions are surfaced inline on hand/ally cards; the vertical
+   strip just eats width on a phone. */
+html.phone-landscape .metal-col-zone {
+  display: none;
+}
+
+/* Tighter chrome at ~390px viewport height. */
+html.phone-landscape .left-main,
+html.phone-landscape .left-top-row {
+  gap: 0.25rem;
+}
+
+html.phone-landscape .activity-log {
+  min-height: 3rem; /* flex:1 shrinks it; never let it vanish */
+}
+
+/* ── Fixed-px elements that must shrink with the cards (phones) ───── */
+
+/* Cards are JS-sized (base × --ui-scale ≈ half size on phones) but these
+   overlays are fixed px in App.css — at phone scale they cover half the
+   card. Multiply them by the same scale the cards use. */
+html.phone .card-stack-count {
+  min-width: calc(28px * var(--ui-scale, 1));
+  height: calc(28px * var(--ui-scale, 1));
+  bottom: 3px;
+  left: 3px;
+  border-radius: 3px;
+}
+
+html.phone .card-copy-label {
+  width: calc(22px * var(--ui-scale, 1));
+  height: calc(22px * var(--ui-scale, 1));
+  top: 3px;
+  left: 3px;
+}
+
+/* Training track: the 24px bar plus 18px milestone icons hanging off its
+   right edge overflow the 90px×scale zone and clip under the market.
+   Scale the bar/markers like everything else (RewardIcon sizes are inline
+   styles, scaled in TrainingTrack.tsx via useIsPhone). */
+html.phone .training-v-bar {
+  width: calc(24px * var(--ui-scale, 1));
+}
+
+html.phone .training-v-cube {
+  width: calc(12px * var(--ui-scale, 1));
+  height: calc(12px * var(--ui-scale, 1));
+}
+
+html.phone .training-v-milestone {
+  margin-left: 2px;
+}
+
+html.phone .training-v-marker {
+  width: calc(18px * var(--ui-scale, 1));
+  height: calc(18px * var(--ui-scale, 1));
+  border-width: 1px;
+}
+
+/* ── Popovers, prompts, defense panels (phone landscape) ──────────── */
+
+/* CardActionMenu / BuyMenu / AllyActionMenu all render .hand-action-menu.
+   Their JS clamps position but never height. */
+html.phone-landscape .hand-action-menu {
+  max-height: calc(100dvh - 16px);
+}
+
+html.phone-landscape .prompt-dialog {
+  padding: 0.7rem 0.9rem;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+}
+
+html.phone-landscape .prompt-card-grid {
+  max-height: 55dvh;
+}
+
+/* RankingPanel: the 480px breakpoint in App.css targets portrait width
+   and never fires at 844px wide — height is the binding constraint here. */
+html.phone-landscape .modal-overlay {
+  padding: 8px;
+}
+
+html.phone-landscape .ranking-panel {
+  max-width: min(560px, calc(100vw - 24px));
+}
+
+html.phone-landscape .ranking-panel__frame {
+  padding: 12px 14px 10px;
+}
+
+html.phone-landscape .ranking-panel__list {
+  max-height: 40dvh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+html.phone-landscape .ranking-panel__status {
+  margin-top: 8px;
+}
+
+/* CardDetailPopup (long-press zoom) — already a row flex (sprite beside
+   text), which suits a short wide screen; just cap it to the viewport. */
+html.phone-landscape .card-detail-popup {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+}
+
+html.phone-landscape .card-detail-popup .card-tooltip {
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+html.phone-landscape .card-pile-content {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+}
+
+html.phone-landscape .turn-recap-panel {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+
+/* ── Menu shell / setup / lobby (phone landscape) ─────────────────── */
+
+/* The fixed 320px sidebar eats 38% of an 844px screen; drop it. Sign-in
+   stays reachable through OnlineSetupView's own auth gate. */
+html.phone-landscape .ms-shell {
+  grid-template-columns: 1fr;
+}
+
+html.phone-landscape .ms-sidebar {
+  display: none;
+}
+
+html.phone-landscape .ms-stage {
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+html.phone-landscape .ms-brand {
+  font-size: 2rem;
+}
+
+html.phone-landscape .ms-brand-sub {
+  letter-spacing: 0.3em;
+}
+
+/* Lobby / character select — .game-setup already scrolls vertically. */
+html.phone-landscape .game-setup {
+  min-height: 100dvh;
+  padding: 0.5rem 0;
+}

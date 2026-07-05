@@ -5,6 +5,7 @@ import { getCardSprite } from "../data/cardSprites";
 import type { CardSprite } from "../data/cardSprites";
 import { describeCard } from "../data/abilityText";
 import { useUIScale } from "../hooks/useUIScale";
+import { useLongPress, shouldSuppressClick, wasTouchInteraction } from "../hooks/useLongPress";
 
 interface Props {
   card: CardData;
@@ -210,6 +211,10 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
   useEffect(() => {
     if (!showTooltip) return;
     const close = (e: MouseEvent) => {
+      // Ignore the click dispatched by the finger-lift that ends the
+      // long-press which just opened this popup — it would close it
+      // in the same gesture.
+      if (shouldSuppressClick()) return;
       e.stopPropagation();
       e.preventDefault();
       setShowTooltip(false);
@@ -225,8 +230,13 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
   const handleContext = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Android synthesizes contextmenu on long-press; the useLongPress
+    // timer already opened the popup, so only suppress here for touch.
+    if (wasTouchInteraction()) return;
     setShowTooltip((v) => !v);
   }, []);
+
+  const longPress = useLongPress(() => setShowTooltip(true));
 
   const handleClick = useCallback(() => {
     if (showTooltip) {
@@ -237,7 +247,7 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
   }, [showTooltip, onClick]);
 
   return (
-    <div className="card-wrapper" onContextMenu={handleContext} onClick={handleClick}>
+    <div className="card-wrapper" onContextMenu={handleContext} onClick={handleClick} {...longPress}>
       <div ref={cardRef} className={borderClass} title={card.name}>
         {sprite ? (
           cropped && !sprite.rotated

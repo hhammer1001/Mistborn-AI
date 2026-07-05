@@ -7,6 +7,7 @@ import { AnimatedNumber } from "./AnimatedNumber";
 import { OpponentDetailPopup, CharacterCardPopup } from "./OpponentDetailPopup";
 import { MetalChoicePopup } from "./MetalChoicePopup";
 import { EyeIcon } from "./icons/EyeIcon";
+import { useLongPress, shouldSuppressClick, wasTouchInteraction } from "../hooks/useLongPress";
 
 const METAL_NAMES = ["pewter", "tin", "bronze", "copper", "zinc", "brass", "iron", "steel", "atium"];
 const CHARACTER_METAL: Record<string, number> = {
@@ -28,6 +29,7 @@ function CharacterCard({ character }: { character: string }) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const src = CHARACTER_IMAGES[character];
+  const longPress = useLongPress(() => setZoomed(true));
 
   useLayoutEffect(() => {
     if (!zoomed) { setPos(null); return; }
@@ -48,7 +50,13 @@ function CharacterCard({ character }: { character: string }) {
 
   useEffect(() => {
     if (!zoomed) return;
-    const close = (e: MouseEvent) => { e.preventDefault(); setZoomed(false); };
+    const close = (e: MouseEvent) => {
+      // Ignore the click from the finger-lift ending the long-press
+      // that just opened this zoom.
+      if (shouldSuppressClick()) return;
+      e.preventDefault();
+      setZoomed(false);
+    };
     const t = setTimeout(() => {
       window.addEventListener("click", close, true);
       window.addEventListener("contextmenu", close, true);
@@ -63,7 +71,14 @@ function CharacterCard({ character }: { character: string }) {
       <div
         ref={imgRef}
         className="character-card-thumb"
-        onContextMenu={(e) => { e.preventDefault(); setZoomed(v => !v); }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // Android fires contextmenu on long-press; the timer already
+          // opened the zoom, so only real right-clicks toggle.
+          if (wasTouchInteraction()) return;
+          setZoomed(v => !v);
+        }}
+        {...longPress}
       >
         <img src={src} alt={character} draggable={false} />
       </div>
