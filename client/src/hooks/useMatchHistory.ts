@@ -34,6 +34,10 @@ interface PlayerRow {
   training?: number;
   burns?: number;
   atium?: number;
+  /** Final HP snapshot (schemaVersion ≥ 2). */
+  health?: number;
+  /** Final rank on each of the match's 3 missions (seat's own ranks). */
+  missionRanks?: number[];
   finalDeck?: Record<string, number>;
 }
 
@@ -44,12 +48,24 @@ const VICTORY_LETTER_TO_LABEL: Record<string, VictoryType> = {
   F: "Forfeit",
 };
 
-// Starting HP for one player given who went first. Used to render life
-// remaining; will undercount if heals were applied during play (engine
-// tracks curHealth precisely but we don't snapshot it on the match record
-// yet). Routes through startingHealthForSeat to keep the rule centralized.
+// Starting HP for one player given who went first. Only used as the legacy
+// fallback for pre-schemaVersion-2 rows that lack the `health` snapshot.
+// Routes through startingHealthForSeat to keep the rule centralized.
 const startingHP = (seat: number, firstPlayer: number) =>
   startingHealthForSeat(seat, firstPlayer).health;
+
+// Final life for a row: prefer the persisted curHealth snapshot. The legacy
+// fallback (starting HP minus `damage`) is wrong in general — `damage` is the
+// per-turn attack pool, zeroed after each attack, not damage taken — but it's
+// the best available signal for old rows.
+const finalLife = (row: PlayerRow, firstPlayerIndex: number) =>
+  row.health ?? Math.max(0, startingHP(row.playerIndex, firstPlayerIndex) - (row.damage ?? 0));
+
+// Total mission progress for a row: sum of the seat's final rank on each
+// mission. The legacy `mission` field is the per-turn spendable pool (≈0 at
+// game end), so only fall back to it for rows without missionRanks.
+const totalMission = (row: PlayerRow) =>
+  row.missionRanks ? row.missionRanks.reduce((a, b) => a + b, 0) : (row.mission ?? 0);
 
 function formatDate(ts?: number): string {
   if (!ts) return "—";
@@ -106,8 +122,8 @@ export function useMatchHistory(userId: string | null): ChronicleEntry[] {
           m.firstPlayerIndex === myPlayerIndex ? "me" : "opp";
 
         const firstPlayerIndex = m.firstPlayerIndex ?? 0;
-        const myLife  = Math.max(0, startingHP(myPlayerIndex,    firstPlayerIndex) - (myRow.damage  ?? 0));
-        const oppLife = Math.max(0, startingHP(oppRow.playerIndex, firstPlayerIndex) - (oppRow.damage ?? 0));
+        const myLife  = finalLife(myRow, firstPlayerIndex);
+        const oppLife = finalLife(oppRow, firstPlayerIndex);
 
         return {
           id: m.id,
@@ -124,8 +140,8 @@ export function useMatchHistory(userId: string | null): ChronicleEntry[] {
           oppChar: oppRow.character,
           myLife,
           oppLife,
-          myMission: myRow.mission ?? 0,
-          oppMission: oppRow.mission ?? 0,
+          myMission: totalMission(myRow),
+          oppMission: totalMission(oppRow),
           myDeck: myRow.finalDeck ?? {},
           oppDeck: oppRow.finalDeck ?? {},
         };

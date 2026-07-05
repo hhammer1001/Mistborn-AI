@@ -97,6 +97,7 @@ export function PostgameDetailPopup({ gameState, you, opp, onClose }: Props) {
             onAction={() => {}}
             onAdvanceAll={() => {}}
             missionPoints={0}
+            myIndex={gameState.myPlayerIndex ?? 0}
           />
         </div>
         <div className="pg-players">

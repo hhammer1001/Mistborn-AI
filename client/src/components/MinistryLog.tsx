@@ -66,6 +66,13 @@ function resetPatch(key: LogFilterKey): Partial<Selections> {
 // Empty selection = no constraint; otherwise the value must be in the set.
 const inSet = (arr: string[], val: string | undefined) => arr.length === 0 || (val != null && arr.includes(val));
 
+// Pseudo-value for the Bot Strategy filter so Online (PvP) matches — which
+// have no botType — are a selectable option. Without it, "Select all" (every
+// bot checked) silently hid every Online match, diverging from the empty
+// "All" state.
+const ONLINE_BOT_OPTION = "__online__";
+const botFilterValue = (e: ChronicleEntry) => (e.kind === "mp" ? ONLINE_BOT_OPTION : e.botType);
+
 const VIC_ORDER: Record<VictoryType, number> = {
   Mission: 0, Combat: 1, Confrontation: 2, Forfeit: 3,
 };
@@ -126,7 +133,7 @@ export function MinistryLog({
         if (sel.dateFrom && e.createdAt < new Date(sel.dateFrom + "T00:00:00").getTime()) return false;
         if (sel.dateTo && e.createdAt > new Date(sel.dateTo + "T23:59:59.999").getTime()) return false;
       }
-      if (visible.has("bot") && !inSet(sel.bot, e.botType)) return false;
+      if (visible.has("bot") && !inSet(sel.bot, botFilterValue(e))) return false;
       if (visible.has("vic") && !inSet(sel.vic, e.victory)) return false;
       if (visible.has("char") && !inSet(sel.char, e.myChar)) return false;
       if (visible.has("oppChar") && !inSet(sel.oppChar, e.oppChar)) return false;
@@ -324,10 +331,13 @@ export function MinistryLog({
           <div className="fgroup">
             <label>Bot Strategy</label>
             <MultiSelect
-              options={BOT_TYPES.map((b) => ({ value: b, label: BOT_TYPE_LABELS[b] }))}
+              options={[
+                ...BOT_TYPES.map((b) => ({ value: b as string, label: BOT_TYPE_LABELS[b] })),
+                { value: ONLINE_BOT_OPTION, label: "Online (PvP)" },
+              ]}
               selected={sel.bot}
               onChange={(v) => updateSel({ bot: v })}
-              allLabel="All bots"
+              allLabel="All"
             />
           </div>
         )}

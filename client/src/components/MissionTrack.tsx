@@ -8,18 +8,22 @@ interface Props {
   onAction: (index: number) => void;
   onAdvanceAll: (missionName: string) => void;
   missionPoints: number;
+  /** Seat index of the viewer. playerRanks is seat-ordered, so the guest
+   *  (seat 1) needs this to see their own bar as "you". Defaults to 0. */
+  myIndex?: number;
 }
 
-function MissionColumn({ mission, action, onAction, onAdvanceAll, missionPoints, scale }: {
+function MissionColumn({ mission, action, onAction, onAdvanceAll, missionPoints, scale, myIndex }: {
   mission: MissionData;
   action?: GameAction;
   onAction: (index: number) => void;
   onAdvanceAll: (missionName: string) => void;
   missionPoints: number;
   scale: number;
+  myIndex: number;
 }) {
-  const you = mission.playerRanks[0];
-  const opp = mission.playerRanks[1];
+  const you = mission.playerRanks[myIndex];
+  const opp = mission.playerRanks[1 - myIndex];
   const max = mission.maxRank;
   const youPct = Math.min((you / max) * 100, 100);
   const oppPct = Math.min((opp / max) * 100, 100);
@@ -100,7 +104,7 @@ function MissionColumn({ mission, action, onAction, onAdvanceAll, missionPoints,
   );
 }
 
-export function MissionTrack({ missions, actions, onAction, onAdvanceAll, missionPoints }: Props) {
+export function MissionTrack({ missions, actions, onAction, onAdvanceAll, missionPoints, myIndex = 0 }: Props) {
   const missionActions = actions.filter((a) => a.code === 1);
   const scale = useUIScale();
 
@@ -119,6 +123,7 @@ export function MissionTrack({ missions, actions, onAction, onAdvanceAll, missio
               onAdvanceAll={onAdvanceAll}
               missionPoints={missionPoints}
               scale={scale}
+              myIndex={myIndex}
             />
           );
         })}

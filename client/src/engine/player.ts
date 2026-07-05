@@ -434,10 +434,18 @@ export class Player {
     this.resolve(ops[2 * choice], ops[2 * choice + 1]);
   }
 
-  refresh(_amount: number) {
-    const choice = this.refreshIn();
-    if (this.metalTokens[choice] === 2) this.metalTokens[choice] = 0;
-    if (this.metalTokens[choice] === 4) this.metalTokens[choice] = 3;
+  refresh(amount: number) {
+    // Loops like the other amount-bearing effects (eliminate/pull/train) —
+    // Skaa Caverns' first-to-top reward is R×8, i.e. up to 8 refreshes.
+    const n = Number.isFinite(amount) && amount > 0 ? amount : 1;
+    for (let i = 0; i < n; i++) {
+      // Stop early when nothing is refreshable so humans aren't prompted
+      // (and bots don't burn RNG) for guaranteed no-ops.
+      if (!this.metalTokens.some((v) => v === 2 || v === 4)) return;
+      const choice = this.refreshIn();
+      if (this.metalTokens[choice] === 2) this.metalTokens[choice] = 0;
+      else if (this.metalTokens[choice] === 4) this.metalTokens[choice] = 3;
+    }
   }
 
   push(_amount = 1) {
@@ -601,6 +609,7 @@ export class Player {
     const choices = this.game.market.discard.filter((c) => c.cost <= this.curMoney);
     const choice = this.soarIn(choices);
     if (choice === -1) return;
+    this.curMoney -= choices[choice].cost; // it's a buy — pay the cost
     this.deck.discard.push(choices[choice]);
     const idx = this.game.market.discard.indexOf(choices[choice]);
     if (idx !== -1) this.game.market.discard.splice(idx, 1);
@@ -674,6 +683,11 @@ export class Player {
     if (choice < 0 || choice >= choices.length) return;
     const card = choices[choice];
     if (card instanceof Funding) this.curMoney -= 1;
+    // Set-aside allies/funding must re-enter the hand as pending so the next
+    // turn's playPending actually plays them (ally → zone, funding → the
+    // money charged back on the line above). cleanUp pushes setAside cards
+    // to hand without touching pending, so mark it here.
+    if (card instanceof Funding || card instanceof Ally) card.pending = true;
     this.deck.setAside.push(card);
     const idx = this.deck.hand.indexOf(card);
     if (idx !== -1) this.deck.hand.splice(idx, 1);

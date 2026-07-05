@@ -157,6 +157,9 @@ export function reconstructPostgame(
   const gameState: GameState = {
     sessionId: match.id,
     phase: "game_over",
+    // Seat of the viewer — perspective-aware components (MissionTrack's
+    // you/opp bars) need this since missions/players stay seat-ordered.
+    myPlayerIndex: perspective,
     turnCount: match.turnCount ?? 0,
     winner: null,
     victoryType: match.victoryType ?? null,

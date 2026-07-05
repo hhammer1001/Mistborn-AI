@@ -24,8 +24,8 @@ const SPECIAL_TEXT: Record<string, string> = {
   special3:  "Draw a card for each Mission track you are the highest on",
   special4:  "Gain 3 Damage for each Mission track you are the highest on",
   special5:  "If you are the lowest on any Mission track, draw a card",
-  special6:  "Lose all Damage. Gain Money equal to the amount lost",
-  special7:  "Lose all Money. Gain Damage equal to the amount lost",
+  special6:  "Lose all Damage. Gain Mission equal to the amount lost",
+  special7:  "Lose all Mission. Gain Damage equal to the amount lost",
   special8:  "Gain a card in the market costing up to 5 to your discard pile",
   special9:  "You may buy an eliminated card",
   special10: "Gain an eliminated card to your hand",
@@ -39,10 +39,13 @@ const SPECIAL_TEXT: Record<string, string> = {
   special:   "Reduce all damage you take by 1",
 };
 
-const ACTIVE_TEXT: Record<string, string> = {
-  sense:  "Play off-turn to reduce an opponent's Money",
-  cloudP: "Play off-turn to reduce incoming Damage to you or another player",
-  cloudA: "Play off-turn to prevent an Ally from being eliminated",
+/** Text builders for active (off-turn) abilities. `n` is the card's active
+ *  amount; non-positive amounts (cloudA carries a meaningless "-1" in the
+ *  data) simply omit the numeric clause. */
+const ACTIVE_TEXT: Record<string, (n: number) => string> = {
+  sense:  (n) => `Reveal when the opponent advances a mission to block it${n > 0 ? ` (they lose ${n} Mission)` : ""}`,
+  cloudP: (n) => `Play off-turn to reduce incoming Damage to you${n > 0 ? ` by ${n}` : ""}`,
+  cloudA: () => "Play off-turn to prevent one of your Allies from being killed",
 };
 
 function effectName(code: string): string {
@@ -78,6 +81,13 @@ function parseCompound(effect: string, amount: string): string {
       parts.push(SPECIAL_TEXT[e]);
       continue;
     }
+    // Named effects that carry their own sentence — previously these fell
+    // through to the raw code when nested in a compound ("D.pull" → "pull").
+    if (e === "seek") { parts.push(seekText(a)); continue; }
+    if (e === "pull") { parts.push(pullText(a)); continue; }
+    if (e === "push") { parts.push(pushText(a)); continue; }
+    if (e === "riot") { parts.push(riotText(a)); continue; }
+    if (e === "choose") { parts.push(parseCompound("choose", a)); continue; }
 
     const name = EFFECT_NAMES[e];
     if (!name) {
@@ -93,9 +103,13 @@ function parseCompound(effect: string, amount: string): string {
   return parts.join(", ") || effect;
 }
 
-/** Describe seek effect */
+/** Describe seek effect. Negative amounts are engine flags: -6 = pick two
+ *  different Actions (Pierce), -5 = mark the pick as sought (Seeker). */
 function seekText(amount: string): string {
-  const n = Math.abs(parseInt(amount));
+  const raw = parseInt(amount);
+  const n = Math.abs(raw);
+  if (raw === -6) return `Use the top ability of two different Actions in the market costing ${n} or less`;
+  if (raw === -5) return `Use the top ability of an Action in the market costing ${n} or less and mark it as sought`;
   return `Use the top ability of an Action in the market costing ${n} or less`;
 }
 
@@ -144,6 +158,7 @@ export function describeCard(card: {
   health?: number;
   defender?: boolean;
   abilities?: { effect: string; amount: string }[];
+  abilitySlots?: ({ effect: string; amount: string } | null)[];
   activeAbility?: { effect: string; amount: string };
   burnAbility?: { effect: string; amount: string };
 }): AbilityLine[] {
@@ -155,26 +170,27 @@ export function describeCard(card: {
     return lines;
   }
 
-  if (card.type === "action" && card.abilities) {
-    // Ability 1 — base ability
-    if (card.abilities[0]) {
-      lines.push({ label: metal || "Play", text: describeEffect(card.abilities[0].effect, card.abilities[0].amount) });
-    }
-    // Ability 2 — requires burning 1 metal
-    if (card.abilities[1]) {
-      lines.push({ label: `+ 1 ${metal}`, text: describeEffect(card.abilities[1].effect, card.abilities[1].amount) });
-    }
-    // Ability 3 — requires burning 2 metals
-    if (card.abilities[2]) {
-      lines.push({ label: `+ 2 ${metal}`, text: describeEffect(card.abilities[2].effect, card.abilities[2].amount) });
-    }
+  if (card.type === "action") {
+    // Label abilities by their RAW slot index — the engine fires slot N on
+    // the Nth metal use, so a card with a gap (ability1 + ability3, no
+    // ability2) needs its slot-3 effect labeled "+ 2", not "+ 1". Prefer
+    // abilitySlots (positional, nulls for gaps); fall back to the compacted
+    // abilities list for callers that don't have slots.
+    const slots = card.abilitySlots ?? card.abilities ?? [];
+    slots.forEach((slot, i) => {
+      if (!slot) return;
+      lines.push({
+        label: i === 0 ? (metal || "Play") : `+ ${i} ${metal}`,
+        text: describeEffect(slot.effect, slot.amount),
+      });
+    });
     // Active/ongoing ability
     if (card.activeAbility) {
       const key = card.activeAbility.effect;
       const amt = card.activeAbility.amount;
-      if (ACTIVE_TEXT[key]) {
-        const n = parseInt(amt);
-        lines.push({ label: "Ongoing", text: `${ACTIVE_TEXT[key]}${n ? ` by ${n}` : ""}` });
+      const build = ACTIVE_TEXT[key];
+      if (build) {
+        lines.push({ label: "Ongoing", text: build(parseInt(amt, 10)) });
       } else {
         lines.push({ label: "Ongoing", text: describeEffect(key, amt) });
       }

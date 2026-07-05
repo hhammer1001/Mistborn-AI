@@ -857,8 +857,12 @@ export class GameSession {
     }
 
     // Log fields: cumulative by default (matches multiplayer semantics).
-    state["playerLog"] = this._logs[perspective];
-    state["botLog"] = this._logs[1 - perspective];
+    // turn_start entries are analysis-only (hand + token snapshot) and must
+    // never reach a live client — the opponent's copy would leak their hand
+    // in PvP. They stay in _logs so getActivityLogs still persists them;
+    // consumeLogDeltas applies the same filter on the SP delta path.
+    state["playerLog"] = this._logs[perspective].filter((e) => e.actionType !== "turn_start");
+    state["botLog"] = this._logs[1 - perspective].filter((e) => e.actionType !== "turn_start");
     // canUndo is perspective-aware: only true for whichever human is currently
     // on their turn and can legitimately roll back. Prevents the opponent's
     // undo button from lighting up during your turn in multiplayer.
@@ -912,12 +916,12 @@ export class GameSession {
     const action = this._cached_raw![actionIndex];
     p.clearPromptResponses?.();
 
-    // Record the call for replay before we mutate any state.
-    this._pushActionEvent("action", playerIndex, { actionIndex });
-
     // end_actions: session-managed flow (defer cleanUp until after damage phase
     // so the player can still see their hand during damage assignment).
     if (action.type === "end_actions") {
+      // end_actions is never undoable (the stack is cleared below), so the
+      // replay event can be recorded up front.
+      this._pushActionEvent("action", playerIndex, { actionIndex });
       const autoBoxings = Math.floor(p.curMoney / 2);
       if (autoBoxings > 0) {
         this._logs[playerIndex].push({
@@ -954,6 +958,17 @@ export class GameSession {
     }
 
     this._preActionSnapshot = this._takeSnapshot();
+    // Record the replay event AFTER the snapshot: undo trims _actionEvents
+    // back to the snapshot's actionEventsLength, so pushing first would leave
+    // the undone move in the persisted action log and corrupt replays.
+    this._pushActionEvent("action", playerIndex, { actionIndex });
+    // Set the prompt-replay pointer before any pause can return. The sense-
+    // defense pause below hands control to the defender; when the resumed
+    // advance later throws PromptNeeded (tier rewards K/E/R/choose all
+    // prompt), respondToPrompt replays _cached_raw[_pending_action_index] —
+    // which must be THIS action, not a stale index from a previous one.
+    this._pending_action_index = actionIndex;
+    this._accumulated_responses = [];
     this._playerSnapBefore = psnap(p);
     this._missionBefore = p.curMission;
     this._marketTrashIdsBefore = new Set(this.game.market.discard.map((c) => c.id));
@@ -995,8 +1010,6 @@ export class GameSession {
         return this._returnState(playerIndex);
       }
     }
-    this._pending_action_index = actionIndex;
-    this._accumulated_responses = [];
 
     return this._attemptAction(action, playerIndex);
   }
@@ -1617,27 +1630,32 @@ export class GameSession {
       cards.push(card);
     }
 
-    for (const card of cards) {
-      const reduction = parseInt(card.data[10], 10);
-      p.curHealth = Math.min(p.curHealth + reduction, 40);
-      const idx = p.deck.hand.indexOf(card);
-      if (idx !== -1) p.deck.hand.splice(idx, 1);
-      p.deck.discard.push(card);
-    }
-
+    // cloudP is damage REDUCTION, not a heal. The damage already landed (the
+    // attack resolves before this phase), so restore HP by the cards' total
+    // block capped at the damage actually taken — matching the bot defender
+    // path, where takeDamage floors the reduced amount at 0. Without the cap
+    // a human over-blocking (e.g. 4-block vs 2 damage) would net-heal, which
+    // the bot path never allows.
+    const totalReduction = cards.reduce((sum, c) => sum + parseInt(c.data[10], 10), 0);
+    const blocked = Math.min(totalReduction, this._cloud_damage);
     if (cards.length > 0) {
-      const totalReduction = cards.reduce((sum, c) => sum + parseInt(c.data[10], 10), 0);
+      p.curHealth = Math.min(p.curHealth + blocked, 40);
+      for (const card of cards) {
+        const idx = p.deck.hand.indexOf(card);
+        if (idx !== -1) p.deck.hand.splice(idx, 1);
+        p.deck.discard.push(card);
+      }
       const cardNames = cards.map((c) => c.name).join(" + ");
       const cardsData = cards.map((c) => c.toJSON() as CardData);
       this._logs[playerIndex].push({
         turn: this.game.turncount,
-        text: `${cardNames} blocked ${totalReduction} damage`,
+        text: `${cardNames} blocked ${blocked} damage`,
         cards: cardsData,
         actionType: "cloud_block",
       });
       this._logs[attackerIndex].push({
         turn: this.game.turncount,
-        text: `Opponent's ${cardNames} blocked ${totalReduction} damage`,
+        text: `Opponent's ${cardNames} blocked ${blocked} damage`,
         cards: cardsData,
         actionType: "cloud_block",
       });

@@ -672,7 +672,7 @@ function GameBoard({
       <div className="board-right">
         <PlayerInfo player={opp} isOpponent />
         <AllyZone allies={opp.allies} actions={[]} onAction={() => {}} label="Opponent Allies" />
-        <MissionTrack missions={gameState.missions} actions={actions} onAction={handleAction} onAdvanceAll={(name) => { if (!loading) advanceAllMission(name); }} missionPoints={you.mission} />
+        <MissionTrack missions={gameState.missions} actions={actions} onAction={handleAction} onAdvanceAll={(name) => { if (!loading) advanceAllMission(name); }} missionPoints={you.mission} myIndex={gameState.myPlayerIndex ?? 0} />
         <ActivityLog log={log} />
         <div className="right-footer">
           {gameState.phase === "damage" && isMyTurn ? (

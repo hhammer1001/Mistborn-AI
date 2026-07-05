@@ -111,9 +111,11 @@ export function useMultiplayerGame(
           session.playAction(pi, pending.actionIndex as number);
           break;
         case "undo":
-          // Guest requested undo. Only valid if it's still their turn and the
-          // session's canUndo check passes (intra-turn, no info revealed).
-          session.undo();
+          // Guest requested undo. Only apply when the requester is still the
+          // active player — a stale undo arriving after the turn handed off
+          // would otherwise revert the HOST's own action (session.undo takes
+          // no player argument and canUndo only checks the active seat).
+          if (pi === session.activePlayer) session.undo();
           break;
         case "composite": {
           // Two-step action (e.g. burn_card + use_metal). Atomic single undo.
