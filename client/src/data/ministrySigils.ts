@@ -24,11 +24,12 @@ export const MINISTRY_METALS: MetalSigil[] = [
 
 export const MINISTRY_SYMBOL_SRC = "/ministry/symbol.png";
 
-export const BOT_TYPES = ["hulk", "squashV2", "zoom", "squash", "twonky", "synergy", "random"] as const;
+export const BOT_TYPES = ["anvil", "hulk", "squashV2", "zoom", "squash", "twonky", "synergy", "random"] as const;
 export type BotType = (typeof BOT_TYPES)[number];
 
 /** Display label for each bot type (shown in menus, logs, opponent name). */
 export const BOT_TYPE_LABELS: Record<BotType, string> = {
+  anvil:    "Anvil",
   hulk:     "Hulk X90",
   squashV2: "Hammer Bot",
   zoom:     "Zoom Bot",
@@ -40,6 +41,7 @@ export const BOT_TYPE_LABELS: Record<BotType, string> = {
 
 /** Short, colloquial blurb shown next to the bot picker in the setup menu. */
 export const BOT_TYPE_BLURBS: Record<BotType, string> = {
+  anvil:    "Hulk's successor — evolved buy policies plus a learned win-odds model that overrides its play on big strategic calls. Beats Hulk head-to-head.",
   hulk:     "Best of both worlds — Hammer Bot when going first, Zoom Bot when going second.",
   squashV2: "The strongest going-first bot. Thinks a move ahead and pounces when it sees lethal.",
   zoom:     "Going-second specialist. Wins by spotting angles the opponent overlooked.",

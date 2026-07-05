@@ -855,3 +855,341 @@ V2-seat-2 vs V2-seat-1 (mirror) wins 32%; Zoom-seat-2 vs V2-seat-1 wins 29.6%. S
 - [benchmark.ts](benchmark.ts) — `BOT_FACTORIES.Hulk`
 - [data/ministrySigils.ts](../data/ministrySigils.ts) — `BOT_TYPES` includes "hulk"
 - [hooks/useMinistryPrefs.ts](../hooks/useMinistryPrefs.ts) — `DEFAULT_BOT_CONFIG.botType = "hulk"` (new default for UI bot play)
+
+---
+
+# Anvil — evolved-policy composite bot (candidate successor to Hulk X90)
+
+Anvil is Hulk's seat composition (SquashV3 going first, Zoom going second)
+plus a per-character, per-seat **evolved policy** trained directly against the
+Hulk counterpart it has to beat. It is the first bot here built on the
+BOT_RESEARCH.md Provincial finding ("most leverage is in *what you buy*, not
+what you play") plus joint multi-knob tuning of the heuristic's assumptions.
+
+## Headline (all on seed ranges never used in training or selection)
+
+| Matchup | Result |
+|---|---|
+| **Anvil (r7) vs Hulk, coin-flipped seats** | **51.7%** pooled, 4650/9000, ≈3.2σ (n=3000 ranges: 51.4% @2.9B, 51.4% @3.1B, 52.2% @3.3B) |
+| Anvil (r3 roster, superseded) vs Hulk | 51.5% pooled, 4787/9300 (52.2/49.6/52.8 @1.3/1.9/2.1B) |
+| Anvil (r7) vs Squash flip | **61.0%** vs Hulk-control 58.2% — league training generalizes (+2.8pp) |
+| Anvil seat0 vs Zoom 2nd | 71.7% vs zero-control 71.3% (1.3B) |
+| Anvil seat1 vs SquashV3 1st | 32.5% vs zero-control 30.4% (1.3B) |
+| Anvil vs Squash flip (gauntlet) | 59.7% vs Hulk-control 59.0% (no regression) |
+| Anvil vs V1 flip (gauntlet) | 83.1% vs Hulk-control 83.0% (no regression) |
+
+Range-to-range variance in the flip is large (±2-3pp at n=3000) — quote the
+POOLED number, not a single range. Paired seat benches were positive on all
+three held-out ranges (900M / 1.1B / 1.3B): seat0 ≈ +1.1pp avg, seat1 ≈
++1.6pp avg. Modest but real — same size class as the compounding layers that
+built Zoom. Biggest per-char lifts: Marsh-first (+5.3 to +7.5pp on three
+independent ranges — the single strongest policy), Kelsier-second
+(+2.8/+3.2/+5.3), Vin-second, Prodigy-second.
+
+## Architecture
+
+- **[anvilBot.ts](anvilBot.ts)** — `AnvilFirstBot extends SquashV3Bot`,
+  `AnvilSecondBot extends ZoomBot`, `createAnvilBot` dispatcher. Policy =
+  `{deltas, knobs}` per (seat, character), committed in
+  [data/anvil_policy.json](data/anvil_policy.json). Empty policy ≡ Hulk
+  exactly (verified game-for-game on seeds).
+- **deltas** — per-market-card rating deltas injected at `cardRating`, so they
+  flow through buys, boxing redemption, eliminates, pulls, market pushes AND
+  the chain lookahead. Sidesteps Known Weakness #3 (cards stuck below the buy
+  buffer never get self-play data): the ES explores by mutation, not by
+  current rating.
+- **knobs** — 19 scalars: additive/multiplicative shifts on the heuristic's
+  core assumptions (mission/useMetal/ally/charAbility bases, buy mult+bias,
+  end-turn bias, flare/burnMetal/burnCard/refresh/atium/boxing costs) plus
+  lookahead shape (`lookTopK`, `lookDepth`, `lookFollowupWeight`,
+  `lookLethalThreshold`, `lookGapGate`). Enabled by refactoring
+  SquashV2Bot/ZoomBot's hardcoded lookahead statics into protected instance
+  getters (behavior-neutral — exact seeded-bench match) and flipping 4
+  scoring methods private→protected.
+- **`lookGapGate`** (new) — skip chain lookahead when the heuristic best
+  beats the runner-up by ≥ gate. Prunes wasted simulation on decided picks.
+
+## Training — [anvilEvolve.ts](anvilEvolve.ts)
+
+(μ+λ) evolution strategy per (seat, character): pop 16, 4 elites, ~20-25 gens,
+fitness = win rate over 160-200 seeded games vs the frozen Hulk counterpart
+(AnvilFirst vs Zoom-second / SquashV3-first vs AnvilSecond), opponent sweeping
+the other 4 characters.
+
+Guards that mattered (all inherited from earlier methodology lessons):
+- **Common random numbers** within a generation; **fresh seeds every
+  generation** (elites re-evaluated — lucky-seed genomes don't stick).
+- **Held-out validation block** with the zero genome included: a run that
+  can't beat zero outputs "rejected", not noise.
+- **Cross-range replication before shipping.** Every val-accepted policy was
+  re-benched on 2-3 further disjoint ranges with paired zero controls; only
+  never-negative policies shipped. This killed ~half of val-accepted
+  policies (see below) — the val gate alone is NOT sufficient.
+
+Three rounds: r1 deltas-only from zero; r2 deltas-only, keepers continued +
+rejects retried at a new seed base; r3 (KNOBS=1) joint deltas+knobs from the
+promoted best-of-r1/r2. ~10 min per (seat,char) per round with all 10 jobs
+parallel (run_r2.sh / run_r3.sh in data/anvil_evolve/).
+
+## Final roster (data/anvil_policy.json)
+
+| Seat | Kelsier | Shan | Vin | Marsh | Prodigy |
+|---|---|---|---|---|---|
+| first | **r4-league** | **r4-league** | r3 | **r3** | r3 |
+| second | r3 | r2 | r4-league | r2 | r3 |
+
+r4 = league round: fitness vs {frozen committed Anvil, Hulk specialist,
+Squash} with successive-halving evaluation (480-game finalists) and an
+in-run double validation gate (must beat zero on two disjoint held-out
+blocks). It cracked the two previously-dead slots — first/Kelsier
+(+3.0/+3.8pp vs Zoom on two fresh ranges) and first/Shan (+2.0/+3.2pp) —
+and improved second/Vin. Its other winners did NOT transfer to the
+vs-Zoom/V3 metric (they gained on the league mix instead) or flip-flopped
+across ranges (second/Kelsier +1.5 then -3.0) and were not shipped.
+first/Marsh-r4 regressed -4.2 vs Zoom (league pull off the anti-Zoom
+optimum) — the r3 crown jewel stays.
+
+"zero" = no policy (plays exactly like Hulk's specialist). first/Kelsier and
+first/Shan had val-accepted policies that flipped sign across seed ranges —
+dropped.
+
+## What the knobs discovered (Henry's "multiple at a time" hypothesis)
+
+- **Depth-2 lookahead is net-positive when jointly tuned.** 5 of 9 r3 winners
+  kept `lookDepth=2` — but always with a retuned follow-up discount
+  (0.5-0.68 vs default 0.6 applied twice) and usually a gap gate. Isolated
+  depth-2 at default weights regressed in both the Zoom and V2 sessions;
+  joint tuning is what makes deeper search pay.
+- **Buy less, more selectively.** Nearly every winner carries negative
+  `buyAdd` (-1.5 to -12) and/or `buyMult` < 1 on top of per-card deltas.
+  The Shan "precision beats volume" lesson generalizes.
+- **Kelsier-second re-discovered anti-correlation by evolution**:
+  missionAdd=-15.8, allyAdd=+10.9 — it shifts off the mission race onto
+  ally/board value without being told about victory paths.
+- first/Marsh (the strongest policy): lookTopK=4 + gapGate + depth 2 —
+  wider AND deeper search, paid for by pruning.
+
+## Honest failures / lessons
+
+- **Seed-range false positives are the norm, not the exception.** r1
+  second/Kelsier: +4.0pp on its val block, -3.3pp on a fresh range. r3
+  second/Marsh: +3.2 val, -5.0 fresh. Two ranges minimum, three preferred.
+- Evolving vs one frozen opponent risks exploiting that opponent; the
+  Squash/V1 gauntlet was the guard. Result: no regression (the policies
+  generalize, they don't just exploit Hulk's determinism).
+- Two configs can produce byte-identical aggregate win counts on 400 games
+  by coincidence — check the bench's policy-load lines before concluding a
+  policy "didn't load" (or didn't matter).
+- Wall-clock lookahead budgets make heavily-loaded benches *slightly*
+  nondeterministic. All ship/kill decisions were made on paired runs under
+  equal load.
+
+## Scripts
+
+```bash
+# Bench the shipped (committed) Anvil
+npx tsx client/src/engine/anvilBench.ts flip Hulk 150 1300000001
+npx tsx client/src/engine/anvilBench.ts seat0 Zoom 100 900000001
+npx tsx client/src/engine/anvilBench.ts seat1 SquashV3 100 900000001
+ANVIL_ZERO=1 ... # zero-policy control (≡ Hulk)
+ANVIL_SUFFIX=r3 ... # bench a specific evolution round's outputs
+
+# Evolve one (seat, character); KNOBS=1 adds joint knob evolution
+KNOBS=1 npx tsx client/src/engine/anvilEvolve.ts second Kelsier 25 16 50 101 [initFile] [outSuffix]
+```
+
+## Open paths
+
+1. **Co-evolution / league play** — evolve vs a mix of opponents (Hulk +
+   Squash + past Anvil generations) to push generality instead of a single
+   frozen target.
+2. **Round 4+ with bigger eval blocks** — selection noise (σ≈3-4pp at 160
+   games) is the current bottleneck; 500-game evals would let smaller real
+   gains survive selection.
+3. **Seat0 Kelsier/Shan** — no stable policy found; both may genuinely be at
+   their ceiling, or need knob-only runs (deltas froze to noise first).
+4. **Wire into the app** (session.ts PlayerKind "bot_anvil", ministrySigils
+   BOT_TYPES, useMinistryPrefs default) — deliberately NOT done yet.
+
+---
+
+# Value model — learned P(win) + veto integration (Anvil seat 2)
+
+The first learned evaluation in the codebase: a small MLP predicting P(win)
+from end-of-turn states, integrated into AnvilSecondBot as a **confidence-
+gated veto** over the heuristic's action choice. This finally moved the
+seat-2 needle that all prior tuning could not.
+
+## Headline (fresh seed ranges, paired controls)
+
+| Matchup | With veto | Control |
+|---|---|---|
+| Anvil seat1 vs SquashV3 1st (3 ranges) | +1.7 / +5.2 / +2.8pp (**avg +3.2pp**) | 33.1 / 31.1 / 31.8% |
+| **Anvil vs Hulk, coin-flipped (n=9000)** | **54.3%** (54.3/54.0/54.6 per range) | prev roster: 51.7% |
+| Anvil vs Squash flip | 61.9% | Hulk same seeds: 57.3% |
+| Anvil vs V1 flip | 82.0% | Hulk: 81.4% |
+
+## Architecture
+
+- **[valueModel.ts](valueModel.ts)** — 60-feature end-of-turn featurizer
+  (HP, per-mission aggregates incl. min-rank, deck composition for BOTH
+  players — opp's is derivable from public buys —, allies/defenders,
+  training, perms, characters, seat) + logistic/MLP inference.
+  Weights: [data/value_weights.json](data/value_weights.json).
+- **[valueDataGen.ts](valueDataGen.ts)** — self-play data: one row per
+  player-turn at the post-playTurn boundary, labeled with the final outcome.
+  Mixed bot pool weighted toward V3-vs-Anvil. ~100k games total (incl. one
+  DAgger iteration adding the value-bot's own trajectories).
+- **[valueTrain.ts](valueTrain.ts)** — streaming SGD in plain TS. Logistic
+  and 1-hidden-layer MLP (48 ReLU units, shipped). Held-out split BY GAME.
+  MLP: 74.7% acc / AUC 0.837 on pre-DAgger data (baseline hpDiff+missionDiff:
+  64.6% / 0.708). Exploitable mid-turn resource features are masked at train
+  time (see below).
+- **Integration (anvilBot.ts AnvilSecondBot)** — veto mode, ON by default at
+  margin 0.08: compute the heuristic's pick normally, then end-of-turn
+  rollout (greedy heuristic completion → assignDamage → attack → P(win)) for
+  the top-6 candidates; play the value model's choice only when it beats the
+  heuristic pick's P(win) by ≥ 0.08. Margin is flat 0.05-0.12 (robust).
+  Env overrides in benches: ANVIL_VALUE_LEAF=0 (off), ANVIL_VL_VETO/BLEND/TOPK.
+
+## The failure catalog (read before "improving" this)
+
+Four integration attempts FAILED before the veto worked — each is a lesson:
+
+1. **Immediate post-action P(win) as lookahead leaf → 0.1% win rate.** The
+   bot farmed causally-invertible mid-turn features: flare-everything
+   (+metalsAvailable), burn-everything (deck "thinning"). A cross-state
+   observational model rewards winner-CORRELATES, and argmax finds them.
+2. **Masking the 8 exploitable resource features → 6%.** Whack-a-mole:
+   argmax finds the next hole. (The masked features carried ~no unique
+   signal — 71.6% → 71.6% acc — confirming they were pure correlates.)
+3. **End-of-turn rollout leaf + logistic → 26-27% (sane but -5pp).** The
+   turn-boundary evaluation kills the farming exploits structurally, but a
+   linear model can't out-discriminate a tuned heuristic between candidates
+   whose turn-end states differ only subtly.
+4. **Same + MLP → 1.5%; + one DAgger iteration → still 1.7%.** Nonlinear
+   models have richer blind-spot surfaces; one aggregation round didn't
+   close them. Pure value ARGMAX against an observationally-trained model
+   is adversarially unstable in this codebase. Full stop.
+5. **Additive blend (heuristic + λ·value): neutral at λ=0.3, harmful at 0.7.**
+6. **Veto (margin-gated override) → +3.2pp avg, 3/3 ranges positive.** The
+   bot is the heuristic by default; the model only overrides on large,
+   high-confidence strategic disagreements — no gradient to farm, and the
+   model's real skill (game-level strategic assessment) is exactly what
+   crosses the margin.
+
+## Retraining pipeline
+
+```bash
+# 1. Generate end-of-turn data (10 parallel shards, ~40k games, ~10 min)
+for i in 0 1 2 3 4 5 6 7 8 9; do
+  npx tsx client/src/engine/valueDataGen.ts $i 6000 <seedBase> &
+done; wait
+# (optional DAgger shards: prefix ANVIL_VALUE_LEAF=1, shard ids 10+)
+
+# 2. Train (MLP=48 hidden units; ~5 min)
+MLP=48 NODE_OPTIONS=--max-old-space-size=8192 npx tsx client/src/engine/valueTrain.ts 4 0.1 1e-6
+
+# 3. A/B with paired controls on fresh seed ranges
+npx tsx client/src/engine/anvilBench.ts seat1 SquashV3 100 <freshSeed>
+ANVIL_VALUE_LEAF=0 npx tsx client/src/engine/anvilBench.ts seat1 SquashV3 100 <freshSeed>
+```
+
+## Arc 2: opponent-reply rollout (SHIPPED — the biggest single lift)
+
+The evaluation boundary moved from "my turn just ended" to "the opponent's
+reply just resolved": after the greedy turn completion + attack, the veto now
+simulates the opponent's ENTIRE reply turn (heuristic-only — lookahead
+statics disabled, recursion-guarded via _simulating, turncount bumped and
+snapshot-restored) and evaluates P(win) there. This sees "if I end my turn
+like this, the opponent kills me / closes a mission" — invisible before.
+
+- Featurizer v2: 61 features (+ postOppTurn phase flag). Training rows come
+  in pairs per turn boundary: actor perspective (phase 0) + passive
+  perspective (phase 1) of the same game moment. 60k games, ~2.4M rows.
+- Falls back to phase-0 evaluation when the opponent isn't a simulatable
+  bot (not a SquashBot subclass — e.g. a human in the app).
+- Seat1 vs SquashV3: 39.3/37.3/38.6 on the reference ranges (prev veto:
+  34.8/36.3/34.6; no-veto: ~32) + 37.8 vs 32.6 paired on a 4th fresh range.
+- **Anvil vs Hulk flip: 55.3% pooled (4974/9000; 56.8/55.0/54.0)**, was 54.3.
+- vs Squash flip: 66.3% vs Hulk-control 59.5%. V1 flat (81.0).
+
+Seat-2 vs V3 across the whole campaign: Zoom 29.5% → evolved policies ~32% →
+turn-end veto ~35% → opp-reply veto ~38.4%.
+
+## Post-ship experiments on the TURN-END veto (both dead before arc 2)
+
+- **Seat-0 veto (margin 0.08)**: flip-flopped across fresh ranges (+1.8pp
+  @5.1B, -2.9pp @5.3B) — killed. The tempo-setting seat's heuristic is
+  already strong; the model's edge is underdog strategy. AnvilFirstBot has
+  the integration behind ANVIL_VL_SEAT0 (default off) if revisited.
+- **DAgger-2 (+40k veto-bot games) + wider MLP (64 hidden)**: 34.4/35.1/34.8
+  vs shipped model's 34.8/36.3/34.6 on the same ranges — statistically
+  identical. The veto overrides rarely, so behavior barely shifts with model
+  refreshes. Shipped weights stay v1 (48 hidden, three-range evidence).
+
+## Open paths
+
+1. **Opponent-reply rollout** — extend the evaluation boundary past the
+   opponent's predicted reply turn. Needs a phase-aware featurizer (passive-
+   perspective training rows + a postOppTurn flag → full retrain) and cheap
+   opp-turn simulation (temporarily disable the opp's lookahead statics
+   inside the sim). The most direct extension of what worked.
+2. **Deeper model / more data for margin-level discrimination** — neutral so
+   far at 64 hidden; likely needs the sharper target from (1) first.
+4. **Train on Henry's games** — the InstantDB match history is (state,
+   outcome) data against the opponent that actually matters.
+5. **Opponent-turn rollout** — current rollout stops at own turn end; one
+   opp reply (predicted by heuristic) would sharpen the P(win) target.
+
+## Arc 3: learning from Henry's games (SHIPPED)
+
+Henry has a positive winrate going second vs Hulk — the strongest seat-2
+play the system has data access to. Pipeline:
+
+- **[henryReplayGen.ts](henryReplayGen.ts)** — fetches recorded matches from
+  InstantDB (seed + structured actionLog) and reconstructs them by
+  deterministic replay through GameSession: human events feed the session
+  entry-points 1:1; bot turns regenerate from the seed. **Fidelity gate**:
+  rows are emitted only when the replayed end state exactly reproduces the
+  stored ground truth (winner, victoryType, turnCount, missionRanks,
+  training). Engine drift since recording breaks old matches — they are
+  DROPPED, never approximated. Pre-SquashV3 matches retry with V3's flags
+  off (= exact V2). Result: 273/664 matches kept -> 10,182 dual-phase rows.
+- **Model transfers to human play**: arc-1 model scored AUC 0.817 on
+  Henry-perspective states it had never seen a distribution like.
+- **The learnable signal, quantified**: in 24% of Henry's late-game (t16+)
+  WINNING states, the model gave him < 35% — positions the bot's worldview
+  writes off, which Henry systematically converts.
+- **Fine-tune** (`HENRY_W=25 MLP=48 valueTrain.ts`): Henry rows mixed in at
+  25x duplication (~10% of effective training mass), held-out split by whole
+  match. Three ship-gates, all passed:
+  | Gate | arc-1 | Henry-tuned |
+  |---|---|---|
+  | Henry held-out matches (Henry-perspective acc / AUC) | 73.2% / 0.810 | **76.4% / 0.850** |
+  | Self-play held-out (no degradation) | 85.25% / 0.3733 | 85.22% / 0.3692 |
+  | seat1 vs V3 (3 ranges) | 39.3/37.3/38.6 | 39.4/38.9/38.6 |
+  | flip vs Hulk (fresh range) | 54-57 band | 54.9% |
+
+Caveat stated honestly: benches measure vs bots. The tuning's real target —
+playing better against HENRY — is only testable by Henry playing Anvil.
+New matches feed the same pipeline: re-run `henryReplayGen.ts fetch/replay`,
+retrain with `HENRY_W=25`, re-gate.
+
+## Follow-ups after arc 3
+
+- **Move-order feature fix**: `mySeat` encoded turnOrder, which equals move
+  order in ALL self-play data but NOT in Henry's matches (he is turnOrder 0
+  moving second when firstPlayerIndex=1). Now `movesSecond` =
+  (turnOrder !== game.firstPlayer); Game stores firstPlayer. Self-play data
+  values are unchanged (firstPlayer=0 there); henry.csv regenerated and the
+  model retrained. Henry-held-out AUC held (0.844 vs 0.850, n=467); the
+  fixed-threshold accuracy dipped because the model now correctly applies
+  the second-mover discount to Henry's states — the old semantics had been
+  accidentally crediting him as a first-mover, which happened to fit his
+  above-baseline seat-2 results. Correct semantics matter now that Henry is
+  switching to RANDOM seat order (previously always second).
+- **Seat-0 veto, second kill**: retested with the opp-reply Henry-tuned
+  model at margin 0.08 — still range-flip-flops, now violently (−5.2pp
+  @6.9B, +5.7pp @7.1B). The veto changes seat-0 play a lot with directionless
+  outcomes. OFF for good barring a seat-0-specific investigation.
