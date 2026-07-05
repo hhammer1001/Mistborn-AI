@@ -1,0 +1,10 @@
+{
+  "seat": "first",
+  "character": "Shan",
+  "status": "done",
+  "accepted": false,
+  "deltas": {},
+  "valWinRate": 0.5625,
+  "zeroWinRate": 0.5625,
+  "liftPp": 0
+}

@@ -1,0 +1,10 @@
+{
+  "seat": "first",
+  "character": "Vin",
+  "status": "done",
+  "accepted": false,
+  "deltas": {},
+  "valWinRate": 0.7083333333333334,
+  "zeroWinRate": 0.7083333333333334,
+  "liftPp": 0
+}

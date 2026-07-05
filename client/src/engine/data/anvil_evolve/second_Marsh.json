@@ -1,0 +1,10 @@
+{
+  "seat": "second",
+  "character": "Marsh",
+  "status": "done",
+  "accepted": false,
+  "deltas": {},
+  "valWinRate": 0.32083333333333336,
+  "zeroWinRate": 0.32083333333333336,
+  "liftPp": 0
+}

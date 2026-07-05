@@ -225,3 +225,9 @@ CLAUDE.md
 
 # Local InstantDB admin token for analyze-bot-games skill (secret, do not commit)
 .claude/skills/analyze-bot-games/token.local.txt
+
+# Anvil evolution round outputs (committed experiment record)
+!client/src/engine/data/anvil_evolve/*.json
+# Value-model training data stays local (hundreds of MB of CSV)
+client/src/engine/data/value_data/
+client/src/engine/data/value_data_henry/

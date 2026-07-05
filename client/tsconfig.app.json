@@ -47,6 +47,11 @@
     "src/engine/twitchEval.ts",
     "src/engine/v3head2head.ts",
     "src/engine/v3ablation.ts",
+    "src/engine/anvilEvolve.ts",
+    "src/engine/anvilBench.ts",
+    "src/engine/valueDataGen.ts",
+    "src/engine/valueTrain.ts",
+    "src/engine/henryReplayGen.ts",
     "src/engine/selfplaySquashV2VsZoomBase.ts",
     "src/engine/selfplaySquashV3Mirror.ts"
   ]

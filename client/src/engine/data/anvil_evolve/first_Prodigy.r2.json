@@ -1,0 +1,10 @@
+{
+  "seat": "first",
+  "character": "Prodigy",
+  "status": "done",
+  "accepted": false,
+  "deltas": {},
+  "valWinRate": 0.66875,
+  "zeroWinRate": 0.66875,
+  "liftPp": 0
+}

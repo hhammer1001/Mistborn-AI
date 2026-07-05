@@ -1,0 +1,11 @@
+{
+  "seat": "first",
+  "character": "Kelsier",
+  "status": "done",
+  "accepted": false,
+  "deltas": {},
+  "knobs": {},
+  "valWinRate": 0.8283333333333334,
+  "zeroWinRate": 0.8283333333333334,
+  "liftPp": 0
+}
