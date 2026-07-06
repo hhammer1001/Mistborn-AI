@@ -27,6 +27,24 @@ function optionLabel(opt: PromptOption): string {
   return `Option ${opt.index}`;
 }
 
+function optionHighlightColor(
+  opt: PromptOption,
+  card: CardData,
+  prompt: GamePrompt,
+  gameState: GameState
+): "gold" | "green" {
+  if (opt.highlightColor === "gold" || opt.highlightColor === "green") {
+    return opt.highlightColor;
+  }
+  if (prompt.type === "soar") {
+    const me = gameState.myPlayerIndex ?? 0;
+    const player = gameState.players[me];
+    const cost = opt.cost ?? card.cost;
+    return cost <= player.money ? "green" : "gold";
+  }
+  return "gold";
+}
+
 interface Props {
   prompt: GamePrompt;
   gameState: GameState;
@@ -97,7 +115,7 @@ export function PromptDialog({ prompt, gameState, onRespond }: Props) {
                   <Card
                     card={card}
                     highlighted
-                    highlightColor="gold"
+                    highlightColor={optionHighlightColor(opt, card, prompt, gameState)}
                     baseWidth={130}
                     onClick={() => onRespond(prompt.type, opt.index)}
                   />

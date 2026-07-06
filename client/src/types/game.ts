@@ -124,6 +124,9 @@ export interface PromptOption {
   cardId?: number;
   name?: string;
   cost?: number;
+  card?: CardData;
+  highlightColor?: "gold" | "green";
+  boxingsCost?: number;
   source?: string;
   effect?: string;
   amount?: string;

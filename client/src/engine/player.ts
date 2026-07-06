@@ -597,12 +597,20 @@ export class Player {
     this.deck.discard.push(choices[choice]);
     this.game.market.buy(choices[choice]);
   }
-  special9() { // Soar: buy an eliminated card at or below money
-    const choices = this.game.market.discard.filter((c) => c.cost <= this.curMoney);
+  special9() { // Soar: buy an eliminated card using money/boxings
+    const choices = this.game.market.discard.filter((c) => c.cost <= this.curMoney + this.curBoxings);
     const choice = this.soarIn(choices);
     if (choice === -1) return;
-    this.deck.discard.push(choices[choice]);
-    const idx = this.game.market.discard.indexOf(choices[choice]);
+    const card = choices[choice];
+    if (card.cost <= this.curMoney) {
+      this.curMoney -= card.cost;
+    } else {
+      const boxingsCost = card.cost - this.curMoney;
+      this.curMoney = 0;
+      this.curBoxings -= boxingsCost;
+    }
+    this.deck.discard.push(card);
+    const idx = this.game.market.discard.indexOf(card);
     if (idx !== -1) this.game.market.discard.splice(idx, 1);
   }
   special10() { // Precise Shot: gain any eliminated card to hand

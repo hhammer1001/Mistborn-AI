@@ -142,10 +142,17 @@ export class WebPlayer extends Player {
     if (resp !== undefined) return Number(resp);
 
     const options: PromptOption[] = choices.map((c, i) => ({
-      index: i, name: c.name, cardId: c.id, source: "market-discard",
+      index: i,
+      name: c.name,
+      cost: c.cost,
+      cardId: c.id,
+      source: "market-discard",
+      card: c.toJSON(),
+      highlightColor: c.cost <= this.curMoney ? "green" : "gold",
+      boxingsCost: Math.max(0, c.cost - this.curMoney),
     }));
     options.push({ index: -1, name: "Skip", source: "skip" });
-    throw new PromptNeeded("soar", options, "Choose an eliminated card to gain");
+    throw new PromptNeeded("soar", options, "Choose an eliminated card to buy");
   }
 
   override confrontationIn(choices: Action[]): number {
