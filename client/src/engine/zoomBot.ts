@@ -84,6 +84,12 @@ export class ZoomBot extends SquashBot {
    * beats the runner-up by at least this margin. 0 = off. */
   protected get lookGapGate(): number { return 0; }
 
+  /** Whether an action may serve as the credited follow-up in the chain
+   * lookahead. Default: all. Subclasses exclude EV-neutral resource
+   * conversions (use_boxing/buy_boxing) — crediting them lets buy_boxing
+   * "earn" the value of the use_boxing it enables (a -1 money round trip). */
+  protected followupEligible(_action: GameActionInternal): boolean { return true; }
+
   // ── Simulated-candidate valuation hooks ──
   // Defaults reproduce the validated heuristic-chain behavior exactly.
   // Subclasses (AnvilSecondBot's value-leaf mode) swap in a learned state
@@ -103,12 +109,13 @@ export class ZoomBot extends SquashBot {
     const nextActions = this.availableActions(game);
     if (nextActions.length === 0) return immediateScore;
     const { scored: nextScored } = this.scoreAndSortActions(nextActions, game);
-    let followup = nextScored[0]?.score ?? 0;
+    const fu = nextScored.find((s) => this.followupEligible(s.action));
+    let followup = fu?.score ?? 0;
     // 2-ply: recurse one more level on the best follow-up
-    if (this.lookDepth >= 2 && nextScored.length > 0 && nextScored[0].action.type !== "end_actions") {
+    if (this.lookDepth >= 2 && fu && fu.action.type !== "end_actions") {
       const innerSnap = snapshotGame(game);
       try {
-        this.performAction(nextScored[0].action, game);
+        this.performAction(fu.action, game);
         if (game.winner === this) followup += 1000;
         else if (game.winner && game.winner !== this) followup -= 1000;
         else {

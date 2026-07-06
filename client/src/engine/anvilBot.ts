@@ -30,6 +30,7 @@ import { SquashV3Bot } from "./squashV3Bot";
 import { SquashV2Bot } from "./squashV2Bot";
 import { ZoomBot } from "./zoomBot";
 import { winProb, valueModelAvailable } from "./valueModel";
+import { dynamicBuffer } from "./squashBotEval";
 import { snapshotGame, restoreGame } from "./gameSnapshot";
 import committedPolicy from "./data/anvil_policy.json";
 
@@ -227,6 +228,13 @@ function vetoSelect(
   return heuristicPick;
 }
 
+/** True when the market offers an above-buffer card affordable with money +
+ * banked boxings — i.e., banking MORE money into boxings is wrong. */
+function reachableAboveBuffer(game: Game, snap: GameStateSnapshot, character: string, rate: (c: Card) => number): boolean {
+  const buffer = dynamicBuffer(character, snap);
+  return game.market.hand.some((c) => c.cost <= snap.curMoney + snap.curBoxings && rate(c) > buffer);
+}
+
 // The two seat classes carry identical one-line overrides delegating to the
 // shared lookups above (a TS mixin over protected members doesn't typecheck,
 // so the pairing is kept trivially thin instead — all logic lives in the
@@ -297,6 +305,16 @@ export class AnvilFirstBot extends SquashV3Bot {
   }
   protected override scoreUseBoxing(s: GameStateSnapshot): number {
     return super.scoreUseBoxing(s) + kAdd("first", this.character, "boxingUseAdd");
+  }
+  protected override scoreBuyBoxing(snap: GameStateSnapshot): number {
+    // Don't bank money into a boxing while an on-strategy buy is reachable —
+    // paired with followupEligible below, kills the buy_boxing -> use_boxing
+    // -1 money round trip observed in live play.
+    if (reachableAboveBuffer(this.game, snap, this.character, (c) => this.cardRating(c, snap))) return -6;
+    return super.scoreBuyBoxing(snap);
+  }
+  protected override followupEligible(a: GameActionInternal): boolean {
+    return a.type !== "use_boxing" && a.type !== "buy_boxing";
   }
   protected override scoreUseAtium(a: GameActionInternal & { type: "use_atium" }, s: GameStateSnapshot): number {
     return super.scoreUseAtium(a, s) + kAdd("first", this.character, "atiumAdd");
@@ -456,6 +474,16 @@ export class AnvilSecondBot extends ZoomBot {
   }
   protected override scoreUseBoxing(s: GameStateSnapshot): number {
     return super.scoreUseBoxing(s) + kAdd("second", this.character, "boxingUseAdd");
+  }
+  protected override scoreBuyBoxing(snap: GameStateSnapshot): number {
+    // Don't bank money into a boxing while an on-strategy buy is reachable —
+    // paired with followupEligible below, kills the buy_boxing -> use_boxing
+    // -1 money round trip observed in live play.
+    if (reachableAboveBuffer(this.game, snap, this.character, (c) => this.cardRating(c, snap))) return -6;
+    return super.scoreBuyBoxing(snap);
+  }
+  protected override followupEligible(a: GameActionInternal): boolean {
+    return a.type !== "use_boxing" && a.type !== "buy_boxing";
   }
   protected override scoreUseAtium(a: GameActionInternal & { type: "use_atium" }, s: GameStateSnapshot): number {
     return super.scoreUseAtium(a, s) + kAdd("second", this.character, "atiumAdd");
