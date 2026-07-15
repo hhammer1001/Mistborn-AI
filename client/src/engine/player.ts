@@ -434,10 +434,15 @@ export class Player {
     this.resolve(ops[2 * choice], ops[2 * choice + 1]);
   }
 
-  refresh(_amount: number) {
-    const choice = this.refreshIn();
-    if (this.metalTokens[choice] === 2) this.metalTokens[choice] = 0;
-    if (this.metalTokens[choice] === 4) this.metalTokens[choice] = 3;
+  refresh(amount: number) {
+    // R rewards can refresh more than one metal. In particular, the first
+    // player to reach the top of Skaa Caverns receives R × 8 (all eight
+    // non-atium metals), so each refresh must consume one unit of the reward.
+    for (let i = 0; i < amount; i++) {
+      const choice = this.refreshIn();
+      if (this.metalTokens[choice] === 2) this.metalTokens[choice] = 0;
+      if (this.metalTokens[choice] === 4) this.metalTokens[choice] = 3;
+    }
   }
 
   push(_amount = 1) {
