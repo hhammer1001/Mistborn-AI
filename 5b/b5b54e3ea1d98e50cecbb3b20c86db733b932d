@@ -1,0 +1,21 @@
+client/src/components/Card.tsx
+  s_e3ed8d7ed9b3b7::t_5024031a162148 13,199,202-206,248-251,259-315,317-327
+client/src/components/Hand.tsx
+  s_e3ed8d7ed9b3b7::t_10acf928984640 54-57,378-406,438-447,456,470
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5bb5b54e3ea1d98e50cecbb3b20c86db733b932d",
+  "prompts": {},
+  "sessions": {
+    "s_e3ed8d7ed9b3b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f675c-62af-7223-9ac0-43c17e1c53d9",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
