@@ -35,7 +35,7 @@ const TOKEN_PATH = new URL("../../../.claude/skills/analyze-bot-games/token.loca
 const DATA_DIR = new URL("./data/value_data_henry/", import.meta.url).pathname;
 const MATCHES_JSON = `${DATA_DIR}henry_matches.json`;
 
-interface MatchRow {
+export interface MatchRow {
   id: string;
   kind: string;
   botStrategy?: string;
@@ -48,7 +48,7 @@ interface MatchRow {
   createdAt?: number | string;
   actionLog?: { type: string; playerIndex: 0 | 1; args: Record<string, unknown>; turncount: number }[];
 }
-interface MatchPlayerRow {
+export interface MatchPlayerRow {
   matchId: string;
   playerIndex: number;
   userId?: string;
@@ -110,13 +110,23 @@ function hookCapture(game: Game, rows: Row[], henryIndex: number): void {
   };
 }
 
-interface ReplayResult {
+export interface ReplayResult {
   ok: boolean;
   reason?: string;
   rows: Row[];
 }
 
-function replayMatch(m: MatchRow, mps: MatchPlayerRow[], v2Mode: boolean): ReplayResult {
+export type ReplayEvent = { type: string; playerIndex: 0 | 1; args: Record<string, unknown>; turncount: number };
+
+/** Replay one recorded match. `onHumanEvent` (if given) fires BEFORE each
+ * human-originated event is applied — the session is exactly at the state
+ * where the human made that decision. Used by the divergence analyzer. */
+export function replayMatch(
+  m: MatchRow,
+  mps: MatchPlayerRow[],
+  v2Mode: boolean,
+  onHumanEvent?: (session: GameSession, ev: ReplayEvent, humanIndex: number) => void,
+): ReplayResult {
   const p0 = mps.find((p) => p.playerIndex === 0);
   const p1 = mps.find((p) => p.playerIndex === 1);
   if (!p0 || !p1 || m.seed === undefined || !m.actionLog?.length) return { ok: false, reason: "missing data", rows: [] };
@@ -153,6 +163,7 @@ function replayMatch(m: MatchRow, mps: MatchPlayerRow[], v2Mode: boolean): Repla
     for (const ev of m.actionLog) {
       if (ev.type === "bot_action") continue; // regenerated deterministically
       if (session.phase === "game_over") break;
+      if (onHumanEvent && ev.playerIndex === humanIndex) onHumanEvent(session, ev as ReplayEvent, humanIndex);
       const a = ev.args ?? {};
       let r: Record<string, unknown>;
       switch (ev.type) {
@@ -203,8 +214,12 @@ function replayMatch(m: MatchRow, mps: MatchPlayerRow[], v2Mode: boolean): Repla
   }
 }
 
+export function loadMatches(): { matches: MatchRow[]; players: MatchPlayerRow[] } {
+  return JSON.parse(readFileSync(MATCHES_JSON, "utf8")) as { matches: MatchRow[]; players: MatchPlayerRow[] };
+}
+
 async function replayAll(): Promise<void> {
-  const { matches, players } = JSON.parse(readFileSync(MATCHES_JSON, "utf8")) as { matches: MatchRow[]; players: MatchPlayerRow[] };
+  const { matches, players } = loadMatches();
   const byMatch = new Map<string, MatchPlayerRow[]>();
   for (const p of players) {
     if (!byMatch.has(p.matchId)) byMatch.set(p.matchId, []);
@@ -250,7 +265,11 @@ async function replayAll(): Promise<void> {
   console.log("skips:", JSON.stringify(report), "fail reasons:", JSON.stringify(failReasons));
 }
 
-const mode = process.argv[2];
-if (mode === "fetch") fetchAll().catch((e) => { console.error(e); process.exit(1); });
-else if (mode === "replay") replayAll().catch((e) => { console.error(e); process.exit(1); });
-else { console.error("Usage: henryReplayGen.ts <fetch|replay>"); process.exit(1); }
+// CLI — only when this file is the entry module (it is also imported as a
+// library by henryDivergence.ts, whose argv must not trigger this).
+if (process.argv[1]?.includes("henryReplayGen")) {
+  const mode = process.argv[2];
+  if (mode === "fetch") fetchAll().catch((e) => { console.error(e); process.exit(1); });
+  else if (mode === "replay") replayAll().catch((e) => { console.error(e); process.exit(1); });
+  else { console.error("Usage: henryReplayGen.ts <fetch|replay>"); process.exit(1); }
+}

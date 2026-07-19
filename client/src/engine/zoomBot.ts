@@ -76,6 +76,12 @@ export class ZoomBot extends SquashBot {
   // Default to the class statics (behavior-neutral). Subclasses (AnvilBot)
   // override per evolved policy without touching the shared statics — statics
   // are shared with any same-class opponent in a bench.
+  /** Seat gate for the seat-2 stack (lookahead, lethal, veto in subclasses).
+   * Default: this player sits at index 1 (== moves second in benches). The
+   * divergence analyzer's shadow bot overrides to run the full stack from
+   * the human's seat. */
+  protected get seatGateOk(): boolean { return this.turnOrder === 1; }
+
   protected get lookTopK(): number { return ZoomBot.lookaheadTopK; }
   protected get lookFollowupWeight(): number { return ZoomBot.followupWeight; }
   protected get lookDepth(): number { return ZoomBot.lookaheadDepth; }
@@ -143,7 +149,7 @@ export class ZoomBot extends SquashBot {
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
     if (
       !ZoomBot.lookaheadEnabled ||
-      this.turnOrder !== 1 ||
+      !this.seatGateOk ||
       SquashBot.explorationRate > 0 ||
       actions.length < 2
     ) {

@@ -112,13 +112,13 @@ function kDelta(seat: keyof AnvilPolicy, character: string, cardName: string): n
 // closure over its protected scoreAndSortActions so there is exactly one
 // implementation of the rollout and the veto (CLAUDE.md: no parallel copies).
 
-type RankFn = (actions: GameActionInternal[], game: Game) => { action: GameActionInternal; score: number }[];
+export type RankFn = (actions: GameActionInternal[], game: Game) => { action: GameActionInternal; score: number }[];
 
 /** Greedily play out the rest of the turn (heuristic-best actions, stop when
  * end_actions tops the ranking), then mirror playTurn's close (assignDamage →
  * attack → damage reset) and return the P(win)-scaled value of the boundary
  * state. Mutates `game`; caller restores. */
-function rolloutTurnEndValue(bot: Player, game: Game, rank: RankFn): number {
+export function rolloutTurnEndValue(bot: Player, game: Game, rank: RankFn): number {
   for (let step = 0; step < 15; step++) {
     if (game.winner) break;
     const actions = bot.availableActions(game);
@@ -142,7 +142,7 @@ function rolloutTurnEndValue(bot: Player, game: Game, rank: RankFn): number {
  * turn like this, the opponent kills me / closes a mission" — invisible to
  * the own-turn-end evaluation. Falls back to the own-turn-end phase
  * (postOppTurn=0) when the opponent can't be simulated (e.g. a human). */
-function finishTurnAndEvaluate(bot: Player, game: Game): number {
+export function finishTurnAndEvaluate(bot: Player, game: Game): number {
   if (!game.winner) {
     bot.assignDamage(game);
     game.attack(bot);
@@ -358,7 +358,7 @@ export class AnvilSecondBot extends ZoomBot {
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
     const margin = AnvilSecondBot.valueVetoMargin;
     const simulating = (this as Player & { _simulating?: boolean })._simulating;
-    if (!this.valueLeafOn || margin <= 0 || this.turnOrder !== 1 || actions.length < 2 || simulating) {
+    if (!this.valueLeafOn || margin <= 0 || !this.seatGateOk || actions.length < 2 || simulating) {
       return super.selectAction(actions, game);
     }
     // Heuristic decision first (value hooks stay heuristic in veto mode).
