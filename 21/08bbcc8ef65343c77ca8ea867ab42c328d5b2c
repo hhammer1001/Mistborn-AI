@@ -1,0 +1,31 @@
+client/src/engine/henryReplayGen.ts
+  s_bdb5d65f96d656::t_e647777cba2abc 38,51,113,119-129,166,217-220,222
+  s_bdb5d65f96d656::t_96fdebc7d617b2 268-275
+client/src/engine/henryDivergence.ts
+  s_bdb5d65f96d656::t_d54f1fb4e2a8d4 1-30,35-64,75-114,123,126-144,146-149,151-158,160-161,163,165,167-178,180-182,184-185,190-228
+  s_bdb5d65f96d656::t_d1ff0ebfd20eca 65-74,150,162,164
+  s_bdb5d65f96d656::t_ec4da4dc73f4eb 31-34,122,124-125
+  s_bdb5d65f96d656::t_e53f85f7e1eba5 115-121,145,159,166,179,183,186-189
+client/src/engine/zoomBot.ts
+  s_bdb5d65f96d656::t_8caa7af8ee6691 79-84,152
+client/src/engine/anvilBot.ts
+  s_bdb5d65f96d656::t_8caa7af8ee6691 115,121,145,361
+client/tsconfig.app.json
+  s_bdb5d65f96d656::t_98b21327e37df2 55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "2108bbcc8ef65343c77ca8ea867ab42c328d5b2c",
+  "prompts": {},
+  "sessions": {
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
