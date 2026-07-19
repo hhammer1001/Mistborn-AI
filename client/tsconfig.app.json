@@ -53,6 +53,7 @@
     "src/engine/valueTrain.ts",
     "src/engine/henryReplayGen.ts",
     "src/engine/henryDivergence.ts",
+    "src/engine/twinReport.ts",
     "src/engine/selfplaySquashV2VsZoomBase.ts",
     "src/engine/selfplaySquashV3Mirror.ts"
   ]

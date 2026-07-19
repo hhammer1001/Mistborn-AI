@@ -1193,3 +1193,39 @@ retrain with `HENRY_W=25`, re-gate.
   model at margin 0.08 — still range-flip-flops, now violently (−5.2pp
   @6.9B, +5.7pp @7.1B). The veto changes seat-0 play a lot with directionless
   outcomes. OFF for good barring a seat-0-specific investigation.
+
+## Twin-seed case study (2026-07-18): the mission-burst gap
+
+Henry beat Anvil twice on seed 2485000322 from BOTH roles (Shan-first and
+Marsh-second) — the only pair of three twin-seed experiments where the
+player, not the role, decided the outcome (seeds 60818057 and 905579475
+were role-decided: same role won regardless of pilot).
+
+Decisive evidence from the Marsh-second role, turn 10 (Henry at 8% model
+P(win), 7/14 missions behind — jumped to 85%):
+
+- Bot-Marsh's t10 (twin game): singles into Luthadel Garrison 3->8, one
+  boxing banked. Linear grind.
+- Henry's t10: Deceive eliminating 2 Fundings mid-combo, Inspire, Soother,
+  CLOSE Kredik Shaw 7->12 (+hand-size reward), flare, open Pits 0->4 (+2
+  money reward), bank 8 money -> 4 boxings. Multi-source burst crossing two
+  reward thresholds that feed the same turn.
+
+The bot's greedy scoring + 1-2 ply lookahead cannot see 10-action
+compounding chains; the value model shares the blindness (it scored the 8%
+state as lost). This also reframes the divergence-analyzer finding that
+"Anvil's mission picks score better on average": Henry's picks are
+threshold/reward-aware in ways neither the heuristic nor the model
+represents.
+
+**Next structural idea: MISSION-BURST SOLVER** — mirror of findLethalAction:
+when the hand+board's total realizable mission points this turn can cross a
+completion or first-reward threshold, search the action chain explicitly
+(bounded, budgeted) instead of trusting greedy per-action scores. Candidate
+trigger: sum of available Mi effects >= min(distanceToComplete,
+distanceToNextFirstReward) on any mission.
+
+Tooling: [twinReport.ts](twinReport.ts) — P(win) trajectories + per-turn
+state for both games of a twin seed. (Game A of the pair rejects replay on
+a prompt mismatch — recorded on the same evening as engine fixes; the
+fidelity gate is doing its job.)
