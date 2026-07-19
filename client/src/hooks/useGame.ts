@@ -326,7 +326,7 @@ export function useGame() {
   // diffs → recap. End-turn fires the "opponent" banner imperatively below
   // because there is no isMyTurn=false interval for it to observe.
   const sideEffects = useTurnSideEffects({ gameState, perspective: 0, isMyTurn: true });
-  const { flashQueue, recap, banner, recapEntries, consumeFlash, consumeRecap, consumeBanner, clearRecapEntries, setBanner, pushRecap, flagExpectYourBanner, skipTurnAnimations } = sideEffects;
+  const { flashQueue, recap, banner, recapEntries, consumeFlash, consumeRecap, consumeBanner, resetTurnSideEffects, setBanner, pushRecap, flagExpectYourBanner, skipTurnAnimations } = sideEffects;
 
   /** Commit a state update either immediately or behind the opponent-turn
    *  banner. Used whenever a session call may have run the bot's turn inline. */
@@ -365,7 +365,7 @@ export function useGame() {
       setError(null);
       setRawLog([]);
       rawLogRef.current = [];
-      clearRecapEntries();
+      resetTurnSideEffects();
       playerName.current = pName;
       botName.current = botLabel(opponentType);
 

@@ -158,6 +158,22 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
   /** Drop all collected recap log entries — call when starting a new game. */
   const clearRecapEntries = useCallback(() => setRecapEntries([]), []);
 
+  /** Reset every animation and comparison baseline before replacing a game.
+   *  A new bot game reuses this hook instance, so clearing only the rendered
+   *  recap leaves the previous match's state available for a false diff. */
+  const resetTurnSideEffects = useCallback(() => {
+    expectYourBannerRef.current = false;
+    prevGameStateRef.current = null;
+    prevIsMyTurnRef.current = null;
+    seenBotLogLenRef.current = 0;
+    turnStartStateRef.current = null;
+    turnStartBotLogLenRef.current = 0;
+    setFlashQueue([]);
+    setRecap(null);
+    setBanner(null);
+    setRecapEntries([]);
+  }, []);
+
   /** Drop any queued card flashes and the recap modal. Call when the player
    *  takes an action: they're playing now and shouldn't be ambushed mid-turn
    *  by leftover opponent-turn animations. The recap log entry (already
@@ -335,6 +351,7 @@ export function useTurnSideEffects(opts: UseTurnSideEffectsOpts) {
     consumeRecap,
     consumeBanner,
     clearRecapEntries,
+    resetTurnSideEffects,
     setBanner,
     pushRecap,
     flagExpectYourBanner,
