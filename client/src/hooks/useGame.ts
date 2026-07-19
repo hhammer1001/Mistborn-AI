@@ -36,6 +36,14 @@ export interface LogEntry {
   recap?: TurnRecap;
 }
 
+export interface OppositeSideReplay {
+  seed: number;
+  botType: string;
+  humanCharacter: string;
+  botCharacter: string;
+  botFirst: boolean;
+}
+
 /** A reactive entry is a defense (Sense / Cloud) that fires during the
  *  other player's action, not a turn-taking action. Used to suppress the
  *  "bot's turn" header when the delta contains only reactive entries. */
@@ -775,6 +783,21 @@ export function useGame() {
     await writeMatchIfNeeded();
   }, [writeMatchIfNeeded]);
 
+  /** Recreate this seeded matchup with the human in the bot's former seat. */
+  const getOppositeSideReplay = useCallback((): OppositeSideReplay | null => {
+    const session = sessionRef.current;
+    const meta = matchMetaRef.current;
+    if (!session || !meta) return null;
+    return {
+      seed: session.game.seed,
+      botType: meta.botStrategy,
+      humanCharacter: session.players[1].character,
+      botCharacter: session.players[0].character,
+      // The original human was seat 0. Preserve who goes first after seats swap.
+      botFirst: session.firstPlayer === 0,
+    };
+  }, []);
+
   return {
     gameState,
     loading,
@@ -799,5 +822,6 @@ export function useGame() {
     undo,
     canUndo: gameState?.canUndo ?? false,
     forfeit,
+    getOppositeSideReplay,
   };
 }

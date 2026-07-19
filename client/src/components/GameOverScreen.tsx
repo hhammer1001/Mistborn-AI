@@ -12,6 +12,8 @@ interface Props {
   youWon: boolean;
   backLabel: string;
   onBack: () => void;
+  /** Start a fresh game from the other player's seat. */
+  onReplayOpposite?: () => void;
 }
 
 const VICTORY_LABEL: Record<string, string> = {
@@ -22,7 +24,7 @@ const VICTORY_LABEL: Record<string, string> = {
   F: "by Forfeit",
 };
 
-export function GameOverScreen({ gameState, you, opp, log, youWon, backLabel, onBack }: Props) {
+export function GameOverScreen({ gameState, you, opp, log, youWon, backLabel, onBack, onReplayOpposite }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const outcome = youWon ? "Victorious" : "Defeated";
   const tone = youWon ? "win" : "loss";
@@ -76,6 +78,11 @@ export function GameOverScreen({ gameState, you, opp, log, youWon, backLabel, on
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
         </button>
+        {onReplayOpposite && (
+          <button className="gg-btn gg-btn-ghost" onClick={onReplayOpposite}>
+            Replay as {opp.name}
+          </button>
+        )}
         <button className="gg-btn gg-btn-primary" onClick={onBack}>{backLabel}</button>
       </footer>
 

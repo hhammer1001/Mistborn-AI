@@ -31,6 +31,7 @@ const _schema = i.schema({
       p1Prompt: i.any().optional(),
       p1State: i.any().optional(),
       pendingAction: i.any().optional(),
+      matchSetup: i.any().optional(),
       phase: i.any().optional(),
       roomId: i.any().optional(),
       stateVersion: i.number().optional(),

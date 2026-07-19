@@ -48,6 +48,9 @@ const schema = i.schema({
       stateVersion: i.number(), // optimistic lock counter
       // Guest action queue: guest writes here, host processes and clears
       pendingAction: i.any(), // { type, playerId, ...params } or null
+      // Deterministic setup used when a rematch swaps which browser hosts
+      // the in-memory multiplayer session.
+      matchSetup: i.any(),
     }),
     // ── Finished-match log ─────────────────────────────────────────
     // Written after each game ends (natural end or forfeit). Enables

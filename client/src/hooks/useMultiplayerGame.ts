@@ -4,6 +4,7 @@ import type { GameState } from "../types/game";
 import type { LogEntry } from "./useGame";
 import { useTurnSideEffects } from "./useTurnSideEffects";
 import { GameSession } from "../engine/session";
+import { resetCardIds } from "../engine/card";
 import { saveMatchRecord, type MatchIdentity } from "../lib/matchLog";
 
 /**
@@ -25,6 +26,7 @@ export function useMultiplayerGame(
 
   // The HOST holds the session in memory
   const sessionRef = useRef<GameSession | null>(null);
+  const sessionRefId = useRef<string | null>(null);
 
   // Match-log: host writes exactly once at game_over.
   const matchWrittenRef = useRef(false);
@@ -52,6 +54,32 @@ export function useMultiplayerGame(
   }, [gameRecord, userId]);
 
   const isHost = myPlayerIndex === 0;
+
+  // The player in seat 0 owns the authoritative in-memory engine. This is
+  // especially important after an opposite-side rematch, where the former
+  // guest becomes seat 0 in a freshly-created game row.
+  useEffect(() => {
+    if (sessionRefId.current !== sessionId) {
+      sessionRef.current = null;
+      sessionRefId.current = sessionId;
+    }
+    if (!sessionId || !isHost || sessionRef.current) return;
+    const setup = gameRecord?.matchSetup as {
+      players?: Array<{ name: string; character: string }>;
+      firstPlayer?: 0 | 1;
+      seed?: number;
+    } | undefined;
+    if (!setup?.players || setup.players.length !== 2 || typeof setup.seed !== "number") return;
+    resetCardIds();
+    sessionRef.current = new GameSession({
+      players: [
+        { kind: "human", name: setup.players[0].name, character: setup.players[0].character },
+        { kind: "human", name: setup.players[1].name, character: setup.players[1].character },
+      ],
+      firstPlayer: setup.firstPlayer ?? 0,
+      seed: setup.seed,
+    });
+  }, [sessionId, isHost, gameRecord]);
 
   // Derive game state from InstantDB record
   const gameState = useMemo<GameState | null>(() => {
@@ -378,6 +406,11 @@ export function useMultiplayerGame(
   // (snapshot stack non-empty, not dirty, phase=actions).
   const canUndo = gameState?.canUndo ?? false;
 
+  const matchSetup = gameRecord?.matchSetup as {
+    players?: Array<{ name: string; character: string }>;
+    firstPlayer?: 0 | 1;
+  } | undefined;
+
   // Capture start timestamp on first gameRecord load.
   useEffect(() => {
     if (gameRecord && startedAtRef.current === null) {
@@ -456,5 +489,6 @@ export function useMultiplayerGame(
     undo,
     canUndo,
     sessionRef,
+    matchSetup,
   };
 }

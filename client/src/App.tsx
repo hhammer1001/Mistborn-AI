@@ -37,6 +37,7 @@ import type { LandsBotKind } from "./lands/hooks/useLandsGame";
 import { BOT_TYPES, CHARACTERS } from "./data/ministrySigils";
 import type { BotSetupConfig } from "./hooks/useMinistryPrefs";
 import type { GameState } from "./types/game";
+import { randomSeed } from "./engine/rng";
 
 type AppMode =
   | "menu"
@@ -233,6 +234,14 @@ function App() {
         db.tx.games[gameId].update({
           roomId: lobby.room.id,
           ...payload,
+          matchSetup: {
+            players: [
+              { name: lobby.room.hostName, character: hostChar },
+              { name: lobby.room.guestName, character: guestChar },
+            ],
+            firstPlayer,
+            seed: session.game.seed,
+          },
           p0Id: lobby.room.hostId,
           p1Id: lobby.room.guestId,
           stateVersion: 0,
@@ -245,11 +254,52 @@ function App() {
         })
       );
 
-      mpGame.sessionRef.current = session;
       setMpSessionId(gameId);
       setMode("mp_game");
     } catch (e) {
       console.error("Failed to start game:", e);
+    }
+  };
+
+  const handlePlayOppositeMultiplayer = async (
+    players: [PlayerData, PlayerData],
+    firstPlayer: 0 | 1,
+  ) => {
+    const room = lobby.room;
+    if (!room) return;
+    try {
+      const swappedFirstPlayer: 0 | 1 = firstPlayer === 0 ? 1 : 0;
+      const session = new GameSession({
+        players: [
+          { kind: "human", name: players[1].name, character: players[1].character },
+          { kind: "human", name: players[0].name, character: players[0].character },
+        ],
+        firstPlayer: swappedFirstPlayer,
+        seed: randomSeed(),
+      });
+      const gameId = instantId();
+      await db.transact(
+        db.tx.games[gameId].update({
+          roomId: room.id,
+          ...session.getInstantDBPayload(),
+          matchSetup: {
+            players: [
+              { name: players[1].name, character: players[1].character },
+              { name: players[0].name, character: players[0].character },
+            ],
+            firstPlayer: swappedFirstPlayer,
+            seed: session.game.seed,
+          },
+          p0Id: room.guestId,
+          p1Id: room.hostId,
+          stateVersion: 0,
+          pendingAction: null,
+        }),
+      );
+      await db.transact(db.tx.rooms[room.id].update({ status: "in_game", sessionId: gameId }));
+      setMpSessionId(gameId);
+    } catch (e) {
+      console.error("Failed to start opposite-side rematch:", e);
     }
   };
 
@@ -359,6 +409,18 @@ function App() {
     return (
       <BotGameBoard
         game={botGame}
+        onPlayOpposite={() => {
+          const replay = botGame.getOppositeSideReplay();
+          if (!replay) return;
+          const displayName = auth.profile?.name ?? auth.user?.email?.split("@")[0] ?? "Guest";
+          startBot({
+            myChar: replay.humanCharacter,
+            oppChar: replay.botCharacter,
+            botType: replay.botType as BotSetupConfig["botType"],
+            firstPlayer: replay.botFirst ? "bot" : "you",
+            testDeck: false,
+          }, displayName, replay.seed);
+        }}
         onMainMenu={() => {
           setMode("menu");
           window.location.reload();
@@ -372,6 +434,7 @@ function App() {
     return (
       <MultiplayerGameBoard
         game={mpGame}
+        onPlayOpposite={handlePlayOppositeMultiplayer}
         onMainMenu={() => {
           setMpSessionId(null);
           lobby.leaveRoom();
@@ -454,9 +517,11 @@ function App() {
 function BotGameBoard({
   game,
   onMainMenu,
+  onPlayOpposite,
 }: {
   game: ReturnType<typeof useGame>;
   onMainMenu: () => void;
+  onPlayOpposite: () => void;
 }) {
   const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, resolveAllyDefense, respondToPrompt, undo, canUndo, forfeit } = game;
 
@@ -482,6 +547,7 @@ function BotGameBoard({
         youWon={gameState.winner === you.name}
         backLabel="New Game"
         onBack={onMainMenu}
+        onReplayOpposite={onPlayOpposite}
       />
     );
   }
@@ -521,9 +587,11 @@ function BotGameBoard({
 function MultiplayerGameBoard({
   game,
   onMainMenu,
+  onPlayOpposite,
 }: {
   game: ReturnType<typeof useMultiplayerGame>;
   onMainMenu: () => void;
+  onPlayOpposite: (players: [PlayerData, PlayerData], firstPlayer: 0 | 1) => void;
 }) {
   const { gameState, loading, log, flashQueue, consumeFlash, recap, consumeRecap, banner, consumeBanner, isMyTurn, myPlayerIndex, playAction, advanceAllMission, playTwoActions, assignDamage, resolveSense, resolveCloud, resolveAllyDefense, respondToPrompt, forfeit, undo, canUndo } = game;
 
@@ -551,6 +619,10 @@ function MultiplayerGameBoard({
         youWon={iWon}
         backLabel="Back to Lobby"
         onBack={onMainMenu}
+        onReplayOpposite={() => {
+          const firstPlayer = game.matchSetup?.firstPlayer ?? 0;
+          onPlayOpposite([gameState.players[0], gameState.players[1]], firstPlayer);
+        }}
       />
     );
   }
