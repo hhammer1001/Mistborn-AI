@@ -1,0 +1,31 @@
+client/src/hooks/useGame.ts
+  s_815cb114313e21::t_a2e47cc26a2278 39-46,786-800,825
+client/src/instant.schema.ts
+  s_815cb114313e21::t_a2e47cc26a2278 34
+client/src/App.tsx
+  s_815cb114313e21::t_192ced687e1093 40,237-244,264-305,412-423,437,520,524,550,590,594,622-625
+client/src/components/GameOverScreen.tsx
+  s_815cb114313e21::t_d7db350e12abbd 83
+  s_815cb114313e21::t_a2e47cc26a2278 15-16,27,81-82,84-85
+client/src/lib/instantdb.ts
+  s_815cb114313e21::t_a2e47cc26a2278 51-53
+client/src/hooks/useMultiplayerGame.ts
+  s_815cb114313e21::t_a2e47cc26a2278 7,58-61,66-83,409-413,492
+  s_815cb114313e21::t_192ced687e1093 29,62-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e5171f532df39a8d8a56d86220967350d4457374",
+  "prompts": {},
+  "sessions": {
+    "s_815cb114313e21": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f7819-b559-7ae1-a25e-91bf3d73407f",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
