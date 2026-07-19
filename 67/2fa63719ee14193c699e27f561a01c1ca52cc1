@@ -1,0 +1,21 @@
+client/src/hooks/useTurnSideEffects.ts
+  s_815cb114313e21::t_8f5a09453e5afc 161-176,354
+client/src/hooks/useGame.ts
+  s_815cb114313e21::t_8f5a09453e5afc 329,368
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "672fa63719ee14193c699e27f561a01c1ca52cc1",
+  "prompts": {},
+  "sessions": {
+    "s_815cb114313e21": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f7819-b559-7ae1-a25e-91bf3d73407f",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
