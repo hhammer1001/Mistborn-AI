@@ -1,0 +1,23 @@
+client/src/engine/twinReport.ts
+  s_bdb5d65f96d656::t_3cc03f4dabd830 1-39
+client/tsconfig.app.json
+  s_bdb5d65f96d656::t_3cc03f4dabd830 56
+client/src/engine/BOT_NOTES.md
+  s_bdb5d65f96d656::t_a3d7b0aa7d3a1d 1196-1231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a85bd3e33eed2d26684f935b5af0a2aa8bc582c6",
+  "prompts": {},
+  "sessions": {
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
