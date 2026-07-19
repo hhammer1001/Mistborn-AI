@@ -51,6 +51,10 @@ export interface CompositeAction {
   secondMatch: { code: number; cardIds?: number[] };
 }
 
+type BottomMenuOption =
+  | { type: "action"; actionIndex: number }
+  | { type: "composite"; firstActionIndex: number; secondMatch: CompositeAction["secondMatch"] };
+
 interface Props {
   cards: CardData[];
   actions: GameAction[];
@@ -371,6 +375,35 @@ function getCompositeActions(
   return composites;
 }
 
+/** Return the action represented by the lowest item in an action card's
+ * popup menu. This keeps the double-click shortcut in sync with the visual
+ * menu order: use-metal actions come last, followed by burn/flare composites
+ * when a metal still needs to be supplied. */
+function getBottomMenuOption(
+  card: CardData,
+  actions: GameAction[],
+  composites: CompositeAction[],
+): BottomMenuOption | null {
+  if (card.type !== "action") return null;
+
+  const isAtiumCard = actions.filter((a) => a.code === 2).length > 2;
+  const normalActions = isAtiumCard ? actions.filter((a) => a.code !== 2) : actions;
+  const useMetalAction = normalActions.filter((a) => a.code === 4).at(-1);
+  if (useMetalAction) return { type: "action", actionIndex: useMetalAction.index };
+
+  const composite = composites.at(-1);
+  if (composite) {
+    return {
+      type: "composite",
+      firstActionIndex: composite.firstActionIndex,
+      secondMatch: composite.secondMatch,
+    };
+  }
+
+  const setupAction = normalActions.filter((a) => a.code !== 4).at(-1);
+  return setupAction ? { type: "action", actionIndex: setupAction.index } : null;
+}
+
 export function Hand({ cards, actions, player, onAction, onCompositeAction, deckSize, discardSize }: Props) {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [pulsingCardId, setPulsingCardId] = useState<number | null>(null);
@@ -402,6 +435,16 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
     setSelectedGroup(null);
   }, []);
 
+  const handleDoubleClick = useCallback((cardId: number, option: BottomMenuOption) => {
+    handleClose();
+    triggerPulse(cardId);
+    if (option.type === "action") {
+      onAction(option.actionIndex);
+    } else {
+      onCompositeAction(option.firstActionIndex, option.secondMatch);
+    }
+  }, [handleClose, onAction, onCompositeAction, triggerPulse]);
+
   return (
     <div className="hand-zone">
       <h3>Your Hand <span className="subtle">Deck: {deckSize ?? "?"} | Discard: {discardSize ?? "?"}</span></h3>
@@ -410,6 +453,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
           const groupActions = getGroupActions(group.allIds);
           const composites = getCompositeActions(group.card, group.allIds, actions, player, copyLabels);
           const hasActions = groupActions.length > 0 || composites.length > 0;
+          const bottomMenuOption = getBottomMenuOption(group.card, groupActions, composites);
           const isSelected = selectedGroup === group.card.id;
           return (
             <div
@@ -423,6 +467,7 @@ export function Hand({ cards, actions, player, onAction, onCompositeAction, deck
                 stackCount={group.count > 1 ? group.count : undefined}
                 copyLabel={copyLabels.get(group.card.id)}
                 onClick={hasActions ? () => handleCardClick(group.card.id) : undefined}
+                onDoubleClick={bottomMenuOption ? () => handleDoubleClick(group.card.id, bottomMenuOption) : undefined}
               />
               {isSelected && hasActions && (
                 <CardActionMenu

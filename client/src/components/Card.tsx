@@ -10,6 +10,7 @@ import { useLongPress, shouldSuppressClick, wasTouchInteraction } from "../hooks
 interface Props {
   card: CardData;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   highlighted?: boolean;
   highlightColor?: "gold" | "green";
   noTypeBorder?: boolean;
@@ -195,9 +196,14 @@ function CardDetailPopup({ card, sprite, cardRef, scale }: {
   return createPortal(popup, document.body);
 }
 
-export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder, small, cropped, baseWidth, stackCount, copyLabel }: Props) {
+export function Card({ card, onClick, onDoubleClick, highlighted, highlightColor, noTypeBorder, small, cropped, baseWidth, stackCount, copyLabel }: Props) {
   const [showTooltip, setShowTooltip] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const touchStartRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const previousTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const touchMovedRef = useRef(false);
+  const skipNextClickRef = useRef(false);
+  const lastTouchDoubleTapRef = useRef(0);
   const sprite = getCardSprite(card.name);
   const scale = useUIScale();
   const cardWidth = (baseWidth ?? (small ? 80 : 130)) * scale;
@@ -239,6 +245,10 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
   const longPress = useLongPress(() => setShowTooltip(true));
 
   const handleClick = useCallback(() => {
+    if (skipNextClickRef.current) {
+      skipNextClickRef.current = false;
+      return;
+    }
     if (showTooltip) {
       setShowTooltip(false);
       return;
@@ -246,8 +256,75 @@ export function Card({ card, onClick, highlighted, highlightColor, noTypeBorder,
     onClick?.();
   }, [showTooltip, onClick]);
 
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    // A mobile double-tap is handled from pointer events below. Some browsers
+    // also emit a synthetic dblclick afterwards, which must not play twice.
+    if (performance.now() - lastTouchDoubleTapRef.current < 500) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onDoubleClick?.();
+  }, [onDoubleClick]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    longPress.onPointerDown(e);
+    if (e.pointerType !== "touch" || !onDoubleClick) return;
+    touchStartRef.current = { time: performance.now(), x: e.clientX, y: e.clientY };
+    touchMovedRef.current = false;
+  }, [longPress, onDoubleClick]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    longPress.onPointerMove(e);
+    const start = touchStartRef.current;
+    if (e.pointerType !== "touch" || !start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (dx * dx + dy * dy > 100) touchMovedRef.current = true;
+  }, [longPress]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    longPress.onPointerUp(e);
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (e.pointerType !== "touch" || !start || touchMovedRef.current || !onDoubleClick) return;
+
+    const now = performance.now();
+    // Long-press owns slower touch interactions and opens the card preview.
+    if (now - start.time > 350) return;
+
+    const previous = previousTouchTapRef.current;
+    if (previous && now - previous.time <= 350) {
+      const dx = e.clientX - previous.x;
+      const dy = e.clientY - previous.y;
+      if (dx * dx + dy * dy <= 576) {
+        previousTouchTapRef.current = null;
+        skipNextClickRef.current = true;
+        lastTouchDoubleTapRef.current = now;
+        onDoubleClick();
+        return;
+      }
+    }
+    previousTouchTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+  }, [longPress, onDoubleClick]);
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent) => {
+    longPress.onPointerCancel(e);
+    touchStartRef.current = null;
+    previousTouchTapRef.current = null;
+    touchMovedRef.current = false;
+  }, [longPress]);
+
   return (
-    <div className="card-wrapper" onContextMenu={handleContext} onClick={handleClick} {...longPress}>
+    <div
+      className="card-wrapper"
+      onContextMenu={handleContext}
+      onClick={handleClick}
+      onDoubleClick={onDoubleClick ? handleDoubleClick : undefined}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onClickCapture={longPress.onClickCapture}
+    >
       <div ref={cardRef} className={borderClass} title={card.name}>
         {sprite ? (
           cropped && !sprite.rotated
