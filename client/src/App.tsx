@@ -423,7 +423,6 @@ function App() {
         }}
         onMainMenu={() => {
           setMode("menu");
-          window.location.reload();
         }}
       />
     );
