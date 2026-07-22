@@ -1,0 +1,21 @@
+client/src/engine/game.ts
+  s_12c4dc937c7e91::t_1c5104e862a5e6 129-136
+client/src/engine/replayTest.ts
+  s_12c4dc937c7e91::t_1c5104e862a5e6 8,84-120,144,201,223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "27c35a1f96500a09198e8565de0a7e96df4f5a20",
+  "prompts": {},
+  "sessions": {
+    "s_12c4dc937c7e91": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f830a-ca57-7b53-a04a-67840f493a59",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
