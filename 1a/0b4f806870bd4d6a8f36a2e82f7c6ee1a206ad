@@ -1,0 +1,20 @@
+client/src/components/AllyZone.tsx
+  s_a1fde182144b98::t_8989608393c00b 319
+  s_a1fde182144b98::t_3ea3a7e0739dc8 320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "1a0b4f806870bd4d6a8f36a2e82f7c6ee1a206ad",
+  "prompts": {},
+  "sessions": {
+    "s_a1fde182144b98": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8b5d-e6c7-7831-9dc4-f354a59f2c89",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
