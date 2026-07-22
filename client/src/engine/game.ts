@@ -126,9 +126,14 @@ export class Game {
 
     // Create decks
     this.decks = [];
-    for (let i = 0; i < numPlayers; i++) {
-      const initRng = subRng(this.seed, `p${i}_init`);
-      this.decks.push(new PlayerDeck(this.characters[i], initRng, this.gameRng));
+    for (let seat = 0; seat < numPlayers; seat++) {
+      // Opening draws belong to the player's position in turn order, not the
+      // numeric seat used to store them. Opposite-side replays swap seats and
+      // firstPlayer together; assigning by turn position keeps each player's
+      // initial deck ordering stable across that swap.
+      const turnPosition = (seat - firstPlayer + numPlayers) % numPlayers;
+      const initRng = subRng(this.seed, `p${turnPosition}_init`);
+      this.decks.push(new PlayerDeck(this.characters[seat], initRng, this.gameRng));
     }
 
     // Create players

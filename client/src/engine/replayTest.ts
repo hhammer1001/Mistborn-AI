@@ -5,6 +5,7 @@
  *
  * Asserts:
  *  - same seed produces identical post-init market/initial decks
+ *  - swapping seats preserves opening draws for the same turn positions
  *  - same seed produces identical end state for a bot-vs-bot game
  *  - splitSeed labels produce uncorrelated streams
  *  - GameSession with the same seed reproduces the same trajectory
@@ -80,7 +81,43 @@ function testInitDeterminism(): void {
   console.log("OK init determinism");
 }
 
-// ── 3. Same seed → identical bot-vs-bot trajectory ──
+// ── 3. Opposite-side replay keeps turn-position draws ──
+
+function testSwappedSeatOpeningDraws(): void {
+  const seed = 0x51DE5;
+  resetCardIds();
+  const original = new Game({
+    seed,
+    chars: ["Kelsier", "Marsh"],
+    firstPlayer: 0,
+  });
+  resetCardIds();
+  const swapped = new Game({
+    seed,
+    chars: ["Marsh", "Kelsier"],
+    firstPlayer: 1,
+  });
+
+  const cardNames = (cards: readonly { name: string }[]) => cards.map((card) => card.name);
+  const assertSameDeck = (originalSeat: 0 | 1, swappedSeat: 0 | 1) => {
+    assert(
+      JSON.stringify(cardNames(original.decks[originalSeat].hand))
+        === JSON.stringify(cardNames(swapped.decks[swappedSeat].hand)),
+      `seat-swapped replay preserves p${originalSeat}'s opening hand`,
+    );
+    assert(
+      JSON.stringify(cardNames(original.decks[originalSeat].cards))
+        === JSON.stringify(cardNames(swapped.decks[swappedSeat].cards)),
+      `seat-swapped replay preserves p${originalSeat}'s remaining initial deck`,
+    );
+  };
+
+  assertSameDeck(0, 1);
+  assertSameDeck(1, 0);
+  console.log("OK swapped-seat opening draws");
+}
+
+// ── 4. Same seed → identical bot-vs-bot trajectory ──
 
 function testGameDeterminism(): void {
   const seed = 0xBADF00D;
@@ -104,7 +141,7 @@ function testGameDeterminism(): void {
   console.log(`OK game determinism (winner=${g1.winner?.name}, type=${g1.victoryType}, turns=${g1.turncount})`);
 }
 
-// ── 4. GameSession bot-vs-bot determinism + action log shape ──
+// ── 5. GameSession bot-vs-bot determinism + action log shape ──
 
 function testSessionDeterminism(): void {
   const seed = 0xDEADBEEF;
@@ -161,7 +198,7 @@ function testSessionDeterminism(): void {
   console.log(`OK session determinism (events=${log1.length})`);
 }
 
-// ── 5. Rng.clone independence ──
+// ── 6. Rng.clone independence ──
 
 function testRngClone(): void {
   const a = new Rng(42);
@@ -183,6 +220,7 @@ function testRngClone(): void {
 testSplitSeed();
 testRngClone();
 testInitDeterminism();
+testSwappedSeatOpeningDraws();
 testGameDeterminism();
 testSessionDeterminism();
 console.log("All replay tests passed.");
