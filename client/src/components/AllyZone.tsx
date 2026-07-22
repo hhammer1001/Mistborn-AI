@@ -304,8 +304,6 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
   const [metalChoice, setMetalChoice] = useState<{ allyId: number; composite: CompositeAllyAction } | null>(null);
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  if (allies.length === 0) return null;
-
   const isInteractive = !!player && !!onCompositeAction;
   const copyLabels = isInteractive ? copyLabelsForHand(player!.hand) : new Map<number, string>();
 
@@ -317,6 +315,8 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
       onCompositeAction?.(option.firstActionIndex, option.secondMatch);
     }
   }, [onAction, onCompositeAction]);
+
+  if (allies.length === 0) return null;
 
   return (
     <div className="ally-zone">
