@@ -1,0 +1,21 @@
+client/src/components/AllyZone.tsx
+  s_e3ed8d7ed9b3b7::t_1fe2b4bc94050e 1,27-30,283-301,312-320,329,343
+client/src/components/Market.tsx
+  s_e3ed8d7ed9b3b7::t_b2042f43214c54 110-114,127-129,147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "62a3df2d7ba1cbabf1d285ad69593786689b64e2",
+  "prompts": {},
+  "sessions": {
+    "s_e3ed8d7ed9b3b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f675c-62af-7223-9ac0-43c17e1c53d9",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
