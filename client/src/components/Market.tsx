@@ -107,6 +107,11 @@ export function Market({ market, actions, onAction }: Props) {
     setSelectedCard(null);
   }, []);
 
+  const handleQuickBuy = useCallback((action: GameAction) => {
+    handleClose();
+    onAction(action.index);
+  }, [handleClose, onAction]);
+
   return (
     <div className="market-zone">
       <h3>
@@ -119,6 +124,9 @@ export function Market({ market, actions, onAction }: Props) {
         {market.hand.map((card) => {
           const buyActions = getBuyActions(card.id);
           const hasBuy = buyActions.length > 0;
+          // Never use Buy + Eliminate for the shortcut. Code 6 spends money;
+          // code 13 is the same normal buy with boxing(s) making up the cost.
+          const normalBuy = buyActions.find((a) => a.code === 6 || a.code === 13);
           const hasBoxingBuy = buyActions.some((a) => a.code === 13 || a.code === 14);
           const color = hasBoxingBuy ? "gold" : "green";
           const isSelected = selectedCard === card.id;
@@ -136,6 +144,7 @@ export function Market({ market, actions, onAction }: Props) {
                 cropped={card.type !== "ally"}
                 baseWidth={160}
                 onClick={hasBuy ? () => handleCardClick(card.id) : undefined}
+                onDoubleClick={normalBuy ? () => handleQuickBuy(normalBuy) : undefined}
               />
               {isSelected && hasBuy && (
                 <BuyMenu

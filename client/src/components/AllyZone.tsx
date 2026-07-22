@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, GameAction, PlayerData } from "../types/game";
 import { Card } from "./Card";
@@ -23,6 +23,10 @@ interface CompositeAllyAction {
   // pick what metal to burn atium as, mirroring the Ability III flow.
   metalChoice?: Record<number, number>;
 }
+
+type AllyQuickPlay =
+  | { type: "action"; actionIndex: number }
+  | { type: "composite"; firstActionIndex: number; secondMatch: CompositeAllyAction["secondMatch"] };
 
 interface Props {
   allies: CardData[];
@@ -276,6 +280,25 @@ function AllyActionMenu({ allyActions, composites, onAction, onCompositeAction, 
   return createPortal(menu, document.body);
 }
 
+/** Ally menus run top-down: Ability 1, then Ability 2, followed by their
+ * metal-setup composites. Keep the quick-play gesture in that same order. */
+function getAllyQuickPlay(
+  allyActions: GameAction[],
+  composites: CompositeAllyAction[],
+): AllyQuickPlay | null {
+  const directAction = allyActions.find((a) => a.code === 8)
+    ?? allyActions.find((a) => a.code === 9);
+  if (directAction) return { type: "action", actionIndex: directAction.index };
+
+  // A metal-choice composite needs an explicit player selection, so it has
+  // no safe automatic shortcut.
+  const composite = composites.find((c) => c.secondMatch.code === 8 && !c.metalChoice)
+    ?? composites.find((c) => c.secondMatch.code === 9 && !c.metalChoice);
+  return composite
+    ? { type: "composite", firstActionIndex: composite.firstActionIndex, secondMatch: composite.secondMatch }
+    : null;
+}
+
 export function AllyZone({ allies, actions, player, onAction, onCompositeAction, label }: Props) {
   const [selectedAlly, setSelectedAlly] = useState<number | null>(null);
   const [metalChoice, setMetalChoice] = useState<{ allyId: number; composite: CompositeAllyAction } | null>(null);
@@ -286,6 +309,15 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
   const isInteractive = !!player && !!onCompositeAction;
   const copyLabels = isInteractive ? copyLabelsForHand(player!.hand) : new Map<number, string>();
 
+  const handleQuickPlay = useCallback((option: AllyQuickPlay) => {
+    setSelectedAlly(null);
+    if (option.type === "action") {
+      onAction(option.actionIndex);
+    } else {
+      onCompositeAction?.(option.firstActionIndex, option.secondMatch);
+    }
+  }, [onAction, onCompositeAction]);
+
   return (
     <div className="ally-zone">
       <h3>{label}</h3>
@@ -294,6 +326,7 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
           const allyActions = actions.filter((a) => a.cardId === ally.id && [8, 9].includes(a.code));
           const composites = isInteractive ? getCompositeAllyActions(ally, actions, player!, copyLabels) : [];
           const hasMenu = allyActions.length > 0 || composites.length > 0;
+          const quickPlay = isInteractive ? getAllyQuickPlay(allyActions, composites) : null;
           const isSelected = selectedAlly === ally.id;
 
           return (
@@ -307,6 +340,7 @@ export function AllyZone({ allies, actions, player, onAction, onCompositeAction,
                 highlighted={hasMenu}
                 small
                 onClick={hasMenu ? () => setSelectedAlly(prev => prev === ally.id ? null : ally.id) : undefined}
+                onDoubleClick={quickPlay ? () => handleQuickPlay(quickPlay) : undefined}
               />
               {isSelected && hasMenu && isInteractive && (
                 <AllyActionMenu
