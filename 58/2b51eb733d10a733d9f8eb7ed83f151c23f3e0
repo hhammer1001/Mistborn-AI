@@ -1,0 +1,19 @@
+client/src/engine/BOT_NOTES.md
+  s_bdb5d65f96d656::t_77af866e669a93 1232-1261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "582b51eb733d10a733d9f8eb7ed83f151c23f3e0",
+  "prompts": {},
+  "sessions": {
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
