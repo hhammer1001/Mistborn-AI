@@ -1229,3 +1229,33 @@ Tooling: [twinReport.ts](twinReport.ts) — P(win) trajectories + per-turn
 state for both games of a twin seed. (Game A of the pair rejects replay on
 a prompt mismatch — recorded on the same evening as engine fixes; the
 fidelity gate is doing its job.)
+
+## Twin-seed case study 2 (seed 3820987199): identical buys, different tempo
+
+Prodigy-first vs Shan-second; Henry won BOTH roles. The first-mover role
+opened identically in both games (buy Lookout, start Keep Venture) — so the
+divergences are unusually clean:
+
+1. **Early tempo spent on self vs on opponent.** Same turn-1, same role:
+   Henry burned BRASS (+1 money +1 mission) into the Lookout buy + mission;
+   the bot burned PEWTER (+2 damage) and FLARED IRON (+2 more damage) at a
+   38-HP opponent, ending with 4 chip damage and a spent flare token.
+   Henry's t1 compounds (money/mission/training feed later turns); early
+   chip damage vs full HP converts to almost nothing. Game A trajectory:
+   Henry-Prodigy 80% model P(win) at t1 and monotonically up.
+2. **Second-mover mission anti-contest.** As Shan-second the bot immediately
+   raced Keep Venture (the first mover's own mission) and by its 3rd turn
+   was spending Eavesdrop reactively to block; Henry opened Canton instead
+   and compounded training. The oppLead penalty only fires at lead>=2 — too
+   late; the contest decision happens at rank 0-1.
+
+Bot-testable hypotheses (n=1 pair + consistent with the 162-game burst
+analysis; NOT conclusions until benched):
+- Early-phase damage discount when opp HP high and victory path != damage.
+- Stronger early-flare reluctance (flare spends a refreshable token for
+  tempo the turn may not need).
+- Second-mover early anti-contest: penalty for advancing a mission the
+  first mover opened, at lead >= 1, during the first ~6 turns.
+- Plus the mission-burst solver (case study 1), aimed at the measured
+  ~3-point burst gap (Henry p50 max-burst 8-9 vs bot 5-6; burst>=10 =>
+  Henry wins 86%).
