@@ -1,0 +1,35 @@
+client/src/engine/anvilBench.ts
+  s_bdb5d65f96d656::t_8512cf020e28bd 38
+client/src/engine/anvilBot.ts
+  s_bdb5d65f96d656::t_8512cf020e28bd 443,446,551-553,558-561,563-564
+  s_bdb5d65f96d656::t_60e011210a376e 235-244,246-256,690-692
+  s_bdb5d65f96d656::t_c20c1b291cc6b3 192,198-200,340,405,557,562,566-570,573-575,577
+  s_bdb5d65f96d656::t_f6f6d6c12e7ab7 257,259-339,341-404,406-417
+  s_0f7c8566253ac8::t_99484a4fb2490c 258,438-442,498-501,546-550
+client/src/engine/BOT_NOTES.md
+  s_bdb5d65f96d656::t_f19561f2e9aaa5 1262-1292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "bfe691b8d074ed53ba20d26d3fb976ae0883c70e",
+  "prompts": {},
+  "sessions": {
+    "s_0f7c8566253ac8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9614-daa5-7832-a6b7-8062e8317cb5",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
