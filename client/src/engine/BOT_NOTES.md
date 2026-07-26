@@ -1259,3 +1259,34 @@ analysis; NOT conclusions until benched):
 - Plus the mission-burst solver (case study 1), aimed at the measured
   ~3-point burst gap (Henry p50 max-burst 8-9 vs bot 5-6; burst>=10 =>
   Henry wins 86%).
+
+## Mission-burst solver + buy-or-bank (from Henry's games) — SHIPPED on AnvilSecond only
+
+Two features motivated by the twin-seed studies, validated with the usual
+kill discipline. Key architectural lesson, twice-confirmed: **solvers may
+propose, only the value model may dispose.**
+
+- **findMissionBurstAction** (anvilBot.ts): lethal-solver mirror for the
+  mission win condition — when realizable Mi this turn can cross a
+  completion or first-reward threshold, search bounded greedy chains.
+  - As a hard OVERRIDE it fails: seat-1 override 24% (vs 39 ref); seat-0
+    completion-only override 67.0 (vs 72.5). The solver's route to a
+    crossing is often worse than the greedy line.
+  - As a VETO CANDIDATE (chain's first action joins the candidate set, the
+    P(win) model arbitrates): bench-neutral (39.4/38.4 vs 39.3/38.6 refs).
+    Shipped default-ON in AnvilSecondBot; killed in AnvilFirstBot.
+- **buyOrBank** (anvilBot.ts): refines the anti-bank guard — buy_boxing
+  scores +4 when a card rated >=2.5 above the best affordable sits within
+  one banked turn's reach (observed live: bot bought Coppercloud@2 twice in
+  a twin pair while Pierce@6 rotted in the market; Henry banked and won
+  both). On AnvilFirst the bank verdict regressed -3.9pp vs Zoom — the old
+  "save-for-6-cost" rejection replicating — so AnvilFirst keeps only the
+  spend-guard. AnvilSecond (veto-arbitrated) keeps the full verdict.
+
+NOTE the live-app asymmetry: session bots always sit at index 1, so the app
+bot is ALWAYS AnvilSecondBot regardless of move order (dispatch is by
+index). Bench results for AnvilFirst matter only bench-world; features for
+the bot Henry faces belong in AnvilSecondBot. (The index-vs-move-order
+dispatch question is a known open item.)
+
+Final sanity: seat0 72.5% (exact revert), seat1 39.4%, both at reference.

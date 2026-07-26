@@ -189,10 +189,14 @@ function vetoSelect(
   topK: number,
   margin: number,
   rank: RankFn,
+  extraCandidate: GameActionInternal | null = null,
 ): GameActionInternal {
   const candidates = rank(actions, game).slice(0, topK);
   if (!candidates.some((c) => c.action === heuristicPick)) {
     candidates.push({ action: heuristicPick, score: 0 });
+  }
+  if (extraCandidate && !candidates.some((c) => c.action === extraCandidate)) {
+    candidates.push({ action: extraCandidate, score: 0 });
   }
   const self = bot as Player & { _simulating?: boolean };
   const wasSimulating = self._simulating;
@@ -228,11 +232,189 @@ function vetoSelect(
   return heuristicPick;
 }
 
-/** True when the market offers an above-buffer card affordable with money +
- * banked boxings — i.e., banking MORE money into boxings is wrong. */
-function reachableAboveBuffer(game: Game, snap: GameStateSnapshot, character: string, rate: (c: Card) => number): boolean {
+/** Buy-vs-bank verdict for scoreBuyBoxing. Returns:
+ *  "spend" — an above-buffer card is affordable and nothing much better is
+ *            within banking reach: banking is wrong (the -1 money round trip
+ *            fix, observed live).
+ *  "bank"  — a clearly better card sits just beyond reach (affordable with
+ *            one more banked turn): banking toward it beats a mediocre buy
+ *            (observed live: bot bought Coppercloud@2 and left Pierce@6 on
+ *            the table in both games of a twin pair; Henry banked and won).
+ *  "base"  — neither signal; fall through to the base heuristic. */
+function buyOrBank(game: Game, snap: GameStateSnapshot, character: string, rate: (c: Card) => number): "spend" | "bank" | "base" {
   const buffer = dynamicBuffer(character, snap);
-  return game.market.hand.some((c) => c.cost <= snap.curMoney + snap.curBoxings && rate(c) > buffer);
+  const reach = snap.curMoney + snap.curBoxings;
+  let bestNow = -Infinity;
+  let bestTarget = -Infinity;
+  for (const c of game.market.hand) {
+    const r = rate(c);
+    if (c.cost <= reach) bestNow = Math.max(bestNow, r);
+    else if (c.cost <= reach + 3) bestTarget = Math.max(bestTarget, r); // one banked turn away
+  }
+  if (bestTarget > buffer && bestTarget >= bestNow + 2.5) return "bank";
+  if (bestNow > buffer) return "spend";
+  return "base";
+}
+
+// ── Mission-burst solver ──
+// Mirror of the lethal solver, for the OTHER win condition. Motivated by
+// Henry's twin-seed games (BOT_NOTES case studies 1-2): across 181 games his
+// max single-turn mission gain beats the bot's by ~3 points in both seats,
+// and burst>=10 turns predict an 86% win rate. Greedy per-action scoring
+// cannot assemble multi-source threshold-crossing turns; this searches for
+// them explicitly, bounded and budgeted like findLethalAction.
+
+/** Sum of Mi amounts in an effect/amount string pair ("M.Mi", "2.3" -> 3). */
+function miIn(effect: string | undefined, amount: string | undefined): number {
+  if (!effect) return 0;
+  const es = effect.split(".");
+  const as_ = (amount ?? "").split(".");
+  let mi = 0;
+  for (let i = 0; i < es.length; i++) if (es[i] === "Mi") mi += parseInt(as_[i] ?? "0", 10) || 0;
+  return mi;
+}
+
+/** Optimistic estimate of mission points realizable this turn. */
+function missionPotential(bot: Player): number {
+  let pts = bot.curMission;
+  for (const c of bot.deck.hand) {
+    const card = c as Card & { data?: string[]; metalUsed?: number; capacity?: number; burned?: boolean };
+    if (!card.data) continue;
+    const tierIdx = (card.metalUsed ?? 0);
+    if (!card.burned && tierIdx < (card.capacity ?? 0)) {
+      pts += miIn(card.data[3 + tierIdx * 2], card.data[4 + tierIdx * 2]);
+    }
+    pts += miIn(card.data[11], card.data[12]); // burn effect
+  }
+  for (const a of bot.allies) {
+    const ally = a as { data?: string[]; available1?: boolean; available2?: boolean };
+    if (ally.data && ally.available1) pts += miIn(ally.data[3], ally.data[4]);
+    if (ally.data && ally.available2) pts += miIn(ally.data[5], ally.data[6]);
+  }
+  if (bot.charAbility1 && bot.training >= 5) pts += miIn(bot.ability1effect, bot.ability1amount);
+  return pts;
+}
+
+/** Threshold targets worth bursting for: completion always; tier thresholds
+ * only when we would be FIRST to them (first-reward bonus). Returns the
+ * smallest gap and a scorer for post-chain evaluation. */
+function burstTargets(bot: Player, game: Game): { minGap: number; score: (ranksBefore: number[], ranksAfter: number[]) => number } {
+  const idx = bot.turnOrder;
+  let minGap = Infinity;
+  for (let mi = 0; mi < game.missions.length; mi++) {
+    const m = game.missions[mi];
+    const my = m.playerRanks[idx];
+    if (my < 12) minGap = Math.min(minGap, 12 - my);
+    for (const t of m.tiers) {
+      if (my < t.threshold && Math.max(...m.playerRanks) < t.threshold) {
+        minGap = Math.min(minGap, t.threshold - my);
+      }
+    }
+  }
+  const score = (before: number[], after: number[]): number => {
+    let sc = 0;
+    for (let mi = 0; mi < game.missions.length; mi++) {
+      const m = game.missions[mi];
+      const b = before[mi], a = after[mi];
+      if (b < 12 && a >= 12) sc += 100; // completion
+      for (const t of m.tiers) {
+        if (b < t.threshold && a >= t.threshold) sc += t.firstReward ? 12 : 5;
+      }
+      sc += (a - b); // raw rank gain
+    }
+    return sc;
+  };
+  return { minGap, score };
+}
+
+/** Search for a burst chain: for each candidate first action, greedily chain
+ * Mi-producing actions / mission advances and score threshold crossings.
+ * Returns the first action of the best chain that crosses at least one
+ * completion or first-reward threshold, else null. Budgeted + capped by the
+ * callers (same discipline as findLethalAction). */
+export function findMissionBurstAction(
+  bot: Player,
+  game: Game,
+  actions: GameActionInternal[],
+  rank: RankFn,
+  minScore = 12, // 12 = any first-reward crossing; 100 = completions only
+): GameActionInternal | null {
+  const { minGap, score } = burstTargets(bot, game);
+  if (!isFinite(minGap) || missionPotential(bot) < minGap) return null;
+
+  const idx = bot.turnOrder;
+  const ranksNow = game.missions.map((m) => m.playerRanks[idx]);
+  const baselineScore = score(ranksNow, ranksNow); // 0 — crossings only count
+
+  const candidates = actions.filter((a) => a.type !== "end_actions" && !a.type.startsWith("buy"));
+  if (candidates.length === 0) return null;
+
+  const startTime = Date.now();
+  const budgetMs = 50;
+  const stateBefore = snapshotGame(game);
+  const self = bot as Player & { _simulating?: boolean };
+  const wasSim = self._simulating;
+  self._simulating = true;
+
+  // Inner greedy: prefer mission advances, then Mi-producing actions, then
+  // the heuristic's pick. Uses the rank fn only as a tiebreak source.
+  const burstPick = (avail: GameActionInternal[]): GameActionInternal | null => {
+    const adv = avail.filter((a) => a.type === "advance_mission");
+    if (adv.length > 0) {
+      // advance the mission closest to a target threshold
+      let best: GameActionInternal | null = null;
+      let bestGap = Infinity;
+      for (const a of adv) {
+        const m = (a as GameActionInternal & { mission: { name: string; playerRanks: number[]; tiers: { threshold: number }[] } }).mission;
+        const my = m.playerRanks[idx];
+        const gaps = [12 - my, ...m.tiers.map((t) => t.threshold - my).filter((g) => g > 0)];
+        const g = Math.min(...gaps.filter((x) => x > 0));
+        if (g < bestGap) { bestGap = g; best = a; }
+      }
+      return best;
+    }
+    const ranked = rank(avail.filter((a) => a.type !== "end_actions" && !a.type.startsWith("buy")), game);
+    return ranked[0]?.action ?? null;
+  };
+
+  let bestFirst: GameActionInternal | null = null;
+  let bestScore = baselineScore;
+  try {
+    for (const first of candidates) {
+      if (Date.now() - startTime > budgetMs) break;
+      try {
+        bot.performAction(first, game);
+        game.drainPendingKills();
+        if (game.winner === bot) { restoreGame(game, stateBefore); return first; }
+        if (!game.winner) {
+          for (let depth = 0; depth < 14; depth++) {
+            if (Date.now() - startTime > budgetMs) break;
+            const avail = bot.availableActions(game);
+            const pick = burstPick(avail);
+            if (!pick) break;
+            try { bot.performAction(pick, game); game.drainPendingKills(); } catch { break; }
+            if (game.winner === bot) { restoreGame(game, stateBefore); return first; }
+            if (game.winner) break;
+          }
+        }
+        if (!game.winner) {
+          const after = game.missions.map((m) => m.playerRanks[idx]);
+          const sc = score(ranksNow, after);
+          // Require a real crossing (completion=100 or first-reward=12), not
+          // just rank accumulation the greedy heuristic would find anyway.
+          const crossed = sc - after.reduce((s, a, i) => s + (a - ranksNow[i]), 0) >= minScore;
+          if (crossed && sc > bestScore) { bestScore = sc; bestFirst = first; }
+        }
+      } catch {
+        // skip failed branches
+      } finally {
+        restoreGame(game, stateBefore);
+      }
+    }
+  } finally {
+    self._simulating = wasSim;
+  }
+  return bestFirst;
 }
 
 // The two seat classes carry identical one-line overrides delegating to the
@@ -253,9 +435,15 @@ export class AnvilFirstBot extends SquashV3Bot {
 
   private rankFn: RankFn = (as, g) => this.scoreAndSortActions(as, g).scored;
 
+  // Mission-burst solver: KILLED for this class. Both integration shapes
+  // regressed vs Zoom @2.5B without a value arbiter (override-mode -5.5pp,
+  // and buy-or-bank banking -3.9pp — the BOT_NOTES "save-for-6-cost"
+  // rejection replicating). The live app bot is always AnvilSecondBot
+  // (index dispatch), which carries both features under veto arbitration.
+
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
-    const margin = AnvilFirstBot.valueVetoMargin;
     const simulating = (this as Player & { _simulating?: boolean })._simulating;
+    const margin = AnvilFirstBot.valueVetoMargin;
     if (margin <= 0 || !valueModelAvailable() || this.turnOrder !== 0 || actions.length < 2 || simulating) {
       return super.selectAction(actions, game);
     }
@@ -307,10 +495,10 @@ export class AnvilFirstBot extends SquashV3Bot {
     return super.scoreUseBoxing(s) + kAdd("first", this.character, "boxingUseAdd");
   }
   protected override scoreBuyBoxing(snap: GameStateSnapshot): number {
-    // Don't bank money into a boxing while an on-strategy buy is reachable —
-    // paired with followupEligible below, kills the buy_boxing -> use_boxing
-    // -1 money round trip observed in live play.
-    if (reachableAboveBuffer(this.game, snap, this.character, (c) => this.cardRating(c, snap))) return -6;
+    // Spend-guard only: the "bank toward a better card" verdict regressed
+    // this class -3.9pp vs Zoom (no value arbiter here); AnvilSecondBot
+    // keeps the full buy-or-bank under veto arbitration.
+    if (buyOrBank(this.game, snap, this.character, (c) => this.cardRating(c, snap)) === "spend") return -6;
     return super.scoreBuyBoxing(snap);
   }
   protected override followupEligible(a: GameActionInternal): boolean {
@@ -355,15 +543,38 @@ export class AnvilSecondBot extends ZoomBot {
   /** Veto margin: see valueLeafEnabled. 0 = pure value selection (unstable). */
   static valueVetoMargin = 0.08;
 
+  /** Mission-burst solver (see findMissionBurstAction): burst chains join
+   * the veto's candidate set; the value model arbitrates grind vs burst.
+   * Bench-neutral vs bots (39.4/38.4 on reference ranges), motivated by the
+   * measured ~3-point burst gap vs Henry. Default ON. */
+  static missionBurstEnabled = true;
+  private burstCallsTurn = -1;
+  private burstCallsThisTurn = 0;
+
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
     const margin = AnvilSecondBot.valueVetoMargin;
     const simulating = (this as Player & { _simulating?: boolean })._simulating;
+    let burst: GameActionInternal | null = null;
+    if (AnvilSecondBot.missionBurstEnabled && !simulating && actions.length >= 2) {
+      if (this.burstCallsTurn !== game.turncount) { this.burstCallsTurn = game.turncount; this.burstCallsThisTurn = 0; }
+      if (this.burstCallsThisTurn < 6) {
+        this.burstCallsThisTurn++;
+        burst = findMissionBurstAction(this, game, actions, this.rankFn);
+      }
+    }
     if (!this.valueLeafOn || margin <= 0 || !this.seatGateOk || actions.length < 2 || simulating) {
+      // No veto to arbitrate — take completion-level bursts only.
+      if (burst) {
+        const strict = findMissionBurstAction(this, game, actions, this.rankFn, 100);
+        if (strict) return strict;
+      }
       return super.selectAction(actions, game);
     }
-    // Heuristic decision first (value hooks stay heuristic in veto mode).
+    // Heuristic decision first (value hooks stay heuristic in veto mode);
+    // the burst chain's first action joins the veto's candidate set — the
+    // value model arbitrates between grind and burst.
     const heuristicPick = super.selectAction(actions, game);
-    return vetoSelect(this, game, actions, heuristicPick, AnvilSecondBot.valueLeafTopK, margin, this.rankFn);
+    return vetoSelect(this, game, actions, heuristicPick, AnvilSecondBot.valueLeafTopK, margin, this.rankFn, burst);
   }
 
   private rankFn: RankFn = (as, g) => this.scoreAndSortActions(as, g).scored;
@@ -476,10 +687,9 @@ export class AnvilSecondBot extends ZoomBot {
     return super.scoreUseBoxing(s) + kAdd("second", this.character, "boxingUseAdd");
   }
   protected override scoreBuyBoxing(snap: GameStateSnapshot): number {
-    // Don't bank money into a boxing while an on-strategy buy is reachable —
-    // paired with followupEligible below, kills the buy_boxing -> use_boxing
-    // -1 money round trip observed in live play.
-    if (reachableAboveBuffer(this.game, snap, this.character, (c) => this.cardRating(c, snap))) return -6;
+    const verdict = buyOrBank(this.game, snap, this.character, (c) => this.cardRating(c, snap));
+    if (verdict === "bank") return 4;  // save toward the better just-out-of-reach card
+    if (verdict === "spend") return -6; // no banking while a good buy is affordable
     return super.scoreBuyBoxing(snap);
   }
   protected override followupEligible(a: GameActionInternal): boolean {
