@@ -373,7 +373,7 @@ export class SquashBot extends Player {
     return rating * 1.5 * phaseMultiplier + allyBonus - deckPenalty;
   }
 
-  private scoreBuyEliminate(
+  protected scoreBuyEliminate(
     action: GameActionInternal & { type: "buy_eliminate" },
     snap: GameStateSnapshot,
   ): number {

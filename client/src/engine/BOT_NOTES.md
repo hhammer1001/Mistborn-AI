@@ -1290,3 +1290,28 @@ the bot Henry faces belong in AnvilSecondBot. (The index-vs-move-order
 dispatch question is a known open item.)
 
 Final sanity: seat0 72.5% (exact revert), seat1 39.4%, both at reference.
+
+## Iteration: model v3 + reward-aware bursts + buy-eliminate damp
+
+From divergence run 3 (64 matches, 7k decisions, burst-equipped shadow):
+- Mission SELECTION stayed the top gap (n=273, delta +0.117) — a MODEL
+  feature gap, not a Henry leak (case study 1). **Featurizer v3** adds
+  my/oppMinTierGap + first-reward-near flags (65 features). Held-out:
+  74.2% -> **78.0% acc, AUC 0.864**.
+- buy_eliminate tell: Henry advancing where the bot wanted buy_eliminate =
+  96% Henry win rate (n=74). **buyElimDamp=0.75** on AnvilSecond
+  (bench-neutral; the bias only loses vs Henry-style play).
+- Henry's fresh-mission money-tier line ("dump the turn into an unstarted
+  mission, collect the M tier, buy the bomb"): **burst targets are now
+  reward-weighted** (M/A/T/C/perm rewards + first-to-tier contents) so the
+  solver proposes those chains; the veto judges them.
+- **Era-ladder replay**: bot feature ships orphan earlier recordings; replay
+  now retries with per-era configs (burst/bankVerdict/damp off) before the
+  SquashV2 fallback. Coverage 33 -> 72 matches. Remaining loss = veto-model
+  version drift (accepted). value_weights.v2-61feat.json kept for reference.
+
+Post-burst-ship live signal (27 games): bot maxBurst 6.34 -> 7.15; Henry
+responded 8.86 -> 9.93 and won 11/12 moving first. The arms race is the
+data engine working as designed.
+
+All gates at reference: seat1 39.1/38.8, seat0 72.5 exact, Squash flip 66.3.

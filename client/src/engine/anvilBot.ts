@@ -311,6 +311,26 @@ function burstTargets(bot: Player, game: Game): { minGap: number; score: (ranksB
       }
     }
   }
+  // Reward-type weights: crossings that pay resources which convert THIS
+  // turn (money -> buys, atium, training toward unlocks, draws) are worth
+  // chasing even on unstarted missions — Henry's observed line: dump the
+  // whole turn's mission output into a fresh mission, collect the money
+  // tier, buy the bomb the same turn.
+  const rewardWeight = (code: string, amt: number): number => {
+    if (!code) return 0;
+    let w = 0;
+    const as_ = String(amt).split(".");
+    code.split(".").forEach((c, i) => {
+      const a = parseInt(as_[i] ?? as_[0] ?? "1", 10) || 1;
+      if (c === "M") w += 2.5 * a;
+      else if (c === "A") w += 3 * a;
+      else if (c === "T") w += 2 * a;
+      else if (c === "C") w += 2 * a;
+      else if (c === "Pc" || c === "Pd" || c === "Pm") w += 8;
+      else w += a;
+    });
+    return w;
+  };
   const score = (before: number[], after: number[]): number => {
     let sc = 0;
     for (let mi = 0; mi < game.missions.length; mi++) {
@@ -318,7 +338,12 @@ function burstTargets(bot: Player, game: Game): { minGap: number; score: (ranksB
       const b = before[mi], a = after[mi];
       if (b < 12 && a >= 12) sc += 100; // completion
       for (const t of m.tiers) {
-        if (b < t.threshold && a >= t.threshold) sc += t.firstReward ? 12 : 5;
+        if (b < t.threshold && a >= t.threshold) {
+          sc += 5 + rewardWeight(t.reward, t.rewardAmount);
+          if (t.firstReward && Math.max(...m.playerRanks) < t.threshold) {
+            sc += 7 + rewardWeight(t.firstReward, t.firstRewardAmount);
+          }
+        }
       }
       sc += (a - b); // raw rank gain
     }
@@ -686,9 +711,12 @@ export class AnvilSecondBot extends ZoomBot {
   protected override scoreUseBoxing(s: GameStateSnapshot): number {
     return super.scoreUseBoxing(s) + kAdd("second", this.character, "boxingUseAdd");
   }
+  /** Era toggle for replay fidelity: the "bank" verdict shipped with the
+   * burst solver; pre-ship recordings replay with it off. */
+  static bankVerdictEnabled = true;
   protected override scoreBuyBoxing(snap: GameStateSnapshot): number {
     const verdict = buyOrBank(this.game, snap, this.character, (c) => this.cardRating(c, snap));
-    if (verdict === "bank") return 4;  // save toward the better just-out-of-reach card
+    if (verdict === "bank" && AnvilSecondBot.bankVerdictEnabled) return 4;
     if (verdict === "spend") return -6; // no banking while a good buy is affordable
     return super.scoreBuyBoxing(snap);
   }
@@ -697,6 +725,13 @@ export class AnvilSecondBot extends ZoomBot {
   }
   protected override scoreUseAtium(a: GameActionInternal & { type: "use_atium" }, s: GameStateSnapshot): number {
     return super.scoreUseAtium(a, s) + kAdd("second", this.character, "atiumAdd");
+  }
+  /** Divergence run 3: in games where Henry advanced a mission while the bot
+   * wanted buy_eliminate, Henry won 96% (n=74) — the buy-eliminate appetite
+   * is a self-play-bred bias. Damp it; the veto still arbitrates. */
+  static buyElimDamp = 0.75;
+  protected override scoreBuyEliminate(a: GameActionInternal & { type: "buy_eliminate" }, s: GameStateSnapshot): number {
+    return super.scoreBuyEliminate(a, s) * AnvilSecondBot.buyElimDamp;
   }
 
   // ── Lookahead-shape knobs ── (lookTopK lives above with the value-leaf mode)

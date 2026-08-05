@@ -35,6 +35,7 @@ if (process.env.ANVIL_VALUE_LEAF === "0") {
   if (process.env.ANVIL_VL_BLEND) { AnvilSecondBot.valueBlend = parseFloat(process.env.ANVIL_VL_BLEND); AnvilSecondBot.valueVetoMargin = 0; }
   if (process.env.ANVIL_VL_VETO) AnvilSecondBot.valueVetoMargin = parseFloat(process.env.ANVIL_VL_VETO);
   if (process.env.ANVIL_VL_SEAT0) AnvilFirstBot.valueVetoMargin = parseFloat(process.env.ANVIL_VL_SEAT0);
+  if (process.env.ANVIL_BE_DAMP) AnvilSecondBot.buyElimDamp = parseFloat(process.env.ANVIL_BE_DAMP);
   if (process.env.ANVIL_BURST === "1") { AnvilFirstBot.missionBurstEnabled = true; AnvilSecondBot.missionBurstEnabled = true; console.log("Mission-burst solver ON"); }
   console.log(`Value-leaf mode ON (topK=${AnvilSecondBot.valueLeafTopK}, blend=${AnvilSecondBot.valueBlend}, veto=${AnvilSecondBot.valueVetoMargin})`);
 }

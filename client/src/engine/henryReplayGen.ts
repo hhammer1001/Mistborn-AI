@@ -27,6 +27,7 @@ import type { Game } from "./game";
 import type { Player } from "./player";
 import { resetCardIds } from "./card";
 import { SquashV3Bot } from "./squashV3Bot";
+import { AnvilSecondBot } from "./anvilBot";
 import { featurize } from "./valueModel";
 
 const APP_ID = "f31200dd-1c19-4cb6-9187-2e4cf731bb55";
@@ -236,6 +237,24 @@ async function replayAll(): Promise<void> {
     const mps = byMatch.get(m.id) ?? [];
     if (m.forfeiter != null && m.forfeiter >= 0) { report.forfeit = (report.forfeit ?? 0) + 1; continue; }
     let res = replayMatch(m, mps, false);
+    if (!res.ok) {
+      // Era ladder: bot features ship over time; recordings replay with the
+      // era's config. Attempt 2 = pre-burst-solver era (burst + bank verdict
+      // + buy-elim damp all absent). Attempt 3 = pre-SquashV3 era.
+      const b = AnvilSecondBot.missionBurstEnabled;
+      const bv = AnvilSecondBot.bankVerdictEnabled;
+      const bd = AnvilSecondBot.buyElimDamp;
+      AnvilSecondBot.missionBurstEnabled = false;
+      AnvilSecondBot.bankVerdictEnabled = false;
+      AnvilSecondBot.buyElimDamp = 1.0;
+      try {
+        res = replayMatch(m, mps, false);
+      } finally {
+        AnvilSecondBot.missionBurstEnabled = b;
+        AnvilSecondBot.bankVerdictEnabled = bv;
+        AnvilSecondBot.buyElimDamp = bd;
+      }
+    }
     if (!res.ok) {
       const retry = replayMatch(m, mps, true); // pre-V3-era bot
       if (retry.ok) res = retry;

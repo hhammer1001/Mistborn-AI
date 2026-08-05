@@ -45,6 +45,9 @@ export const VALUE_FEATURE_NAMES: string[] = [
   "charK", "charS", "charV", "charM", "charP",
   "oppCharK", "oppCharS", "oppCharV", "oppCharM", "oppCharP",
   "postOppTurn",
+  // v3: mission threshold proximity — the dimension of Henry's mission
+  // selection the model previously couldn't see (divergence runs 1+3).
+  "myMinTierGap", "oppMinTierGap", "myFirstRewardNear", "oppFirstRewardNear",
 ];
 
 /** postOppTurn: 0 = my turn just ended (opp about to move); 1 = the
@@ -59,6 +62,8 @@ export function featurize(player: Player, game: Game, postOppTurn: 0 | 1 = 0): n
 
   let myTotal = 0, oppTotal = 0, myMin = 12, oppMin = 12, myMax = 0, oppMax = 0;
   let myCompleted = 0, oppCompleted = 0, iLead = 0;
+  let myTierGap = 6, oppTierGap = 6; // distance to nearest uncrossed tier threshold (capped)
+  let myFirstNear = 0, oppFirstNear = 0; // a first-to-tier bonus within 3 points
   for (const m of game.missions) {
     const mr = m.playerRanks[player.turnOrder];
     const or = m.playerRanks[opp.turnOrder];
@@ -68,6 +73,17 @@ export function featurize(player: Player, game: Game, postOppTurn: 0 | 1 = 0): n
     if (mr >= 12) myCompleted++;
     if (or >= 12) oppCompleted++;
     if (mr > or) iLead++;
+    const top = Math.max(mr, or);
+    for (const t of m.tiers) {
+      if (mr < t.threshold) {
+        myTierGap = Math.min(myTierGap, t.threshold - mr);
+        if (top < t.threshold && t.threshold - mr <= 3) myFirstNear = 1;
+      }
+      if (or < t.threshold) {
+        oppTierGap = Math.min(oppTierGap, t.threshold - or);
+        if (top < t.threshold && t.threshold - or <= 3) oppFirstNear = 1;
+      }
+    }
   }
 
   const allyHP = (p: Player) => p.allies.reduce((s, a) => s + a.health, 0);
@@ -97,6 +113,8 @@ export function featurize(player: Player, game: Game, postOppTurn: 0 | 1 = 0): n
     ...CHARS.map((c) => (player.character === c ? 1 : 0)),
     ...CHARS.map((c) => (opp.character === c ? 1 : 0)),
     postOppTurn,
+    Math.min(myTierGap, 6) / 6, Math.min(oppTierGap, 6) / 6,
+    myFirstNear, oppFirstNear,
   ];
 }
 
