@@ -1,0 +1,35 @@
+client/src/engine/henryReplayGen.ts
+  s_bdb5d65f96d656::t_ad38f0543b4197 30,240-257
+client/src/engine/data/value_weights.v2-61feat.json
+  s_bdb5d65f96d656::t_ad38f0543b4197 1
+client/src/engine/anvilBench.ts
+  s_bdb5d65f96d656::t_eaccb89bfa9f7f 38
+client/src/engine/squashBot.ts
+  s_bdb5d65f96d656::t_eaccb89bfa9f7f 376
+client/src/engine/valueModel.ts
+  s_bdb5d65f96d656::t_eaccb89bfa9f7f 48-50,65-66,76-86,116-117
+client/src/engine/anvilBot.ts
+  s_bdb5d65f96d656::t_ad38f0543b4197 714-716,719
+  s_bdb5d65f96d656::t_eaccb89bfa9f7f 729-735
+  s_bdb5d65f96d656::t_7e30613a6a946a 314-333,341-346
+client/src/engine/BOT_NOTES.md
+  s_bdb5d65f96d656::t_01cc78546372b8 1293-1317
+client/src/engine/data/value_weights.json
+  s_bdb5d65f96d656::t_93e22557c5bfc4 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "7d087cd5522b60916bd8a2ce3aec1e49c06dfb31",
+  "prompts": {},
+  "sessions": {
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
