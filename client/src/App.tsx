@@ -7,6 +7,7 @@ import { useLobby } from "./hooks/useLobby";
 import { useMultiplayerGame } from "./hooks/useMultiplayerGame";
 import { GameSession } from "./engine/session";
 import { db, id as instantId } from "./lib/instantdb";
+import { retryPendingMatchSaves } from "./lib/matchLog";
 import { CardGallery } from "./components/CardGallery";
 import { Lobby } from "./components/Lobby";
 import { MenuShell } from "./components/MenuShell";
@@ -91,6 +92,17 @@ function App() {
   const mpGame  = useMultiplayerGame(mpSessionId, auth.user?.id ?? null);
   const landsLobby = useLandsLobby(auth.user?.id, auth.profile?.name);
   const landsMpGame = useLandsMultiplayerGame(landsMpSessionId, auth.user?.id ?? null);
+
+  // A finished match is first queued locally. Flush that queue once the owner
+  // is authenticated, and again whenever the browser reconnects.
+  useEffect(() => {
+    const userId = auth.user?.id;
+    if (!userId) return;
+    const retry = () => { void retryPendingMatchSaves(userId); };
+    retry();
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [auth.user?.id]);
 
   // Waiting rooms live inside the menu shell (OnlineSetupView shows the code).
   // Only promote to the dedicated Lobby view once a guest joins and we hit character select.
