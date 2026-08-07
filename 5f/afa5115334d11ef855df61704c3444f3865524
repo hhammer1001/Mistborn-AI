@@ -1,0 +1,38 @@
+client/src/App.tsx
+  s_a1fde182144b98::t_f2bac800e1a99b 10,96-105
+  s_e8cdb82e6dbab5::t_761b3340dcb688 106
+client/src/lib/matchLog.ts
+  s_16794e6dbb6474::t_76435aa0565ace 26-116,149,156,240-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "5fafa5115334d11ef855df61704c3444f3865524",
+  "prompts": {},
+  "sessions": {
+    "s_16794e6dbb6474": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4e1b-ff2a-71a1-ae0c-e497f52212b6",
+        "model": "unknown"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_a1fde182144b98": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8b5d-e6c7-7831-9dc4-f354a59f2c89",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_e8cdb82e6dbab5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acb93389-916c-4898-a6bf-0591d453ec4e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
