@@ -26,7 +26,10 @@ function canCombine(a: LogEntry | undefined, b: LogEntry | undefined): boolean {
   return sourceMetal === targetMetal;
 }
 
-function groupLog(log: LogEntry[]): Row[] {
+function groupLog(logInput: LogEntry[]): Row[] {
+  // turn_start entries are analysis-only hand/token snapshots persisted for
+  // post-game review; never render them in the visible feed.
+  const log = logInput.filter((e) => e.actionType !== "turn_start");
   const rows: Row[] = [];
   let i = 0;
   while (i < log.length) {
