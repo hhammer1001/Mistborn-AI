@@ -1,0 +1,27 @@
+client/src/engine/session.ts
+  s_e3ed8d7ed9b3b7::t_cdb0ac25551fc6 121,485,561
+client/src/engine/card.ts
+  s_e3ed8d7ed9b3b7::t_5a1542b4538437 229-230,265-273,277-285,289-292,294-298,308,340
+client/src/engine/gameSnapshot.ts
+  s_e3ed8d7ed9b3b7::t_69a19736aa6401 58,130,206
+client/src/engine/seekerTargetTest.ts
+  s_e3ed8d7ed9b3b7::t_d15dccbcb6588e 1-53
+client/src/engine/player.ts
+  s_e3ed8d7ed9b3b7::t_dab46a1ee215b7 506,516,526,529,734-750
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "5f8d9d764d33c320c354dc9169af0f65f4e97979",
+  "prompts": {},
+  "sessions": {
+    "s_e3ed8d7ed9b3b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f675c-62af-7223-9ac0-43c17e1c53d9",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
