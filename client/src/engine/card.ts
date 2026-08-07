@@ -226,6 +226,8 @@ export class Ally extends Card {
   available1: boolean = false;
   available2: boolean = false;
   availableRiot: boolean = false;
+  /** The exact market Action selected by this Seeker's first ability. */
+  soughtCardId: number | null = null;
 
   private _ab1Eff: string;
   private _ab1Amt: string;
@@ -260,19 +262,40 @@ export class Ally extends Card {
     ];
   }
 
-  ability1(player: { resolve(effect: string, amount: string): void }) {
-    player.resolve(this._ab1Eff, this._ab1Amt);
+  ability1(player: {
+    resolve(effect: string, amount: string): void;
+    resolveSeekerAbility1?: (seeker: Ally) => void;
+  }) {
+    if (this.name === "Seeker" && player.resolveSeekerAbility1) {
+      player.resolveSeekerAbility1(this);
+    } else {
+      player.resolve(this._ab1Eff, this._ab1Amt);
+    }
     this.available1 = false;
   }
 
-  ability2(player: { resolve(effect: string, amount: string): void }) {
-    player.resolve(this._ab2Eff, this._ab2Amt);
+  ability2(player: {
+    resolve(effect: string, amount: string): void;
+    resolveSeekerAbility2?: (seeker: Ally) => void;
+  }) {
+    if (this.name === "Seeker" && player.resolveSeekerAbility2) {
+      player.resolveSeekerAbility2(this);
+    } else {
+      player.resolve(this._ab2Eff, this._ab2Amt);
+    }
     this.available2 = false;
   }
 
-  riot(player: { resolve(effect: string, amount: string): void }) {
+  riot(player: {
+    resolve(effect: string, amount: string): void;
+    resolveSeekerAbility1?: (seeker: Ally) => void;
+  }) {
     this.availableRiot = false;
-    player.resolve(this._ab1Eff, this._ab1Amt);
+    if (this.name === "Seeker" && player.resolveSeekerAbility1) {
+      player.resolveSeekerAbility1(this);
+    } else {
+      player.resolve(this._ab1Eff, this._ab1Amt);
+    }
   }
 
   play(player: { extraBurn(n: number): void; permDraw(n: number): void; smoking: boolean }) {
@@ -282,6 +305,7 @@ export class Ally extends Card {
   }
 
   override reset() {
+    this.soughtCardId = null;
     if (this._ab1Eff) {
       this.available1 = true;
       this.availableRiot = true;
@@ -313,6 +337,7 @@ export class Ally extends Card {
     c.available1 = this.available1;
     c.available2 = this.available2;
     c.availableRiot = this.availableRiot;
+    c.soughtCardId = this.soughtCardId;
     return c;
   }
 }

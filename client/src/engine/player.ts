@@ -503,7 +503,7 @@ export class Player {
     }
   }
 
-  seek(amount: number) {
+  seek(amount: number): Action | null {
     let seeker = false;
     let twice = false;
     if (amount === -6) { amount = 6; twice = true; }
@@ -513,7 +513,7 @@ export class Player {
     for (const c of this.game.market.hand) {
       if (c.cost <= amount && c instanceof Action) choices.push(c);
     }
-    if (choices.length === 0) return;
+    if (choices.length === 0) return null;
     if (choices.length === 1) twice = false;
 
     const [choice, choice2] = this.seekIn(twice, seeker, choices);
@@ -523,8 +523,10 @@ export class Player {
         this._applySeekChoice(choices[choice2]);
       } else if (seeker) {
         choices[choice].sought = true;
+        return choices[choice];
       }
     }
+    return null;
   }
 
   /** Apply one seek pick: snapshot stats before/after ability1 and emit a
@@ -729,11 +731,23 @@ export class Player {
     const idx = this.deck.hand.indexOf(card);
     if (idx !== -1) this.deck.hand.splice(idx, 1);
   }
-  special16() { // Seeker 2: play first ability of a sought market card
-    const soughtCards = this.game.market.hand.filter((c) => c.sought);
-    if (soughtCards.length > 0) {
-      (soughtCards[0] as Action).ability1(this);
-    }
+  /** Seeker 1: seek an Action and keep the selected card on this exact ally.
+   * The market-wide `sought` marker remains useful for UI state, but is not
+   * reliable when more than one Seeker has been used in the same turn. */
+  resolveSeekerAbility1(seeker: Ally) {
+    const soughtCard = this.seek(-5);
+    seeker.soughtCardId = soughtCard?.id ?? null;
+  }
+
+  /** Seeker 2: replay only the card selected by this Seeker's ability 1. */
+  resolveSeekerAbility2(seeker: Ally) {
+    const soughtCard = this.game.market.hand.find((c) => c.id === seeker.soughtCardId);
+    if (soughtCard instanceof Action) soughtCard.ability1(this);
+  }
+
+  special16() { // Legacy fallback for effects that still resolve special16 directly
+    const soughtCard = this.game.market.hand.find((c) => c.sought);
+    if (soughtCard instanceof Action) soughtCard.ability1(this);
   }
   special17() { // Mercenary: gain any eliminated card to discard
     const choices = this.game.market.discard;

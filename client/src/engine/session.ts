@@ -118,6 +118,7 @@ interface CardStateSnap {
   available1?: boolean;
   available2?: boolean;
   availableRiot?: boolean;
+  soughtCardId?: number | null;
 }
 
 interface GameSnapshot {
@@ -481,6 +482,7 @@ export class GameSession {
         s.available1 = c.available1;
         s.available2 = c.available2;
         s.availableRiot = c.availableRiot;
+        s.soughtCardId = c.soughtCardId;
       }
       cardStates.set(c.id, s);
     }
@@ -556,6 +558,7 @@ export class GameSession {
         c.available1 = s.available1 ?? false;
         c.available2 = s.available2 ?? false;
         c.availableRiot = s.availableRiot ?? false;
+        c.soughtCardId = s.soughtCardId ?? null;
       }
     }
     this.game.deckEvents = snap.deckEvents.map((e) => ({ ...e }));

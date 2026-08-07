@@ -55,6 +55,7 @@ interface CardStateSnap {
   available1?: boolean;
   available2?: boolean;
   availableRiot?: boolean;
+  soughtCardId?: number | null;
 }
 
 export interface GameStateSnap {
@@ -126,6 +127,7 @@ export function snapshotGame(game: Game): GameStateSnap {
       s.available1 = c.available1;
       s.available2 = c.available2;
       s.availableRiot = c.availableRiot;
+      s.soughtCardId = c.soughtCardId;
     }
     cardStates.set(c.id, s);
   }
@@ -201,6 +203,7 @@ export function restoreGame(game: Game, snap: GameStateSnap): void {
       c.available1 = s.available1 ?? false;
       c.available2 = s.available2 ?? false;
       c.availableRiot = s.availableRiot ?? false;
+      c.soughtCardId = s.soughtCardId ?? null;
     }
   }
 
