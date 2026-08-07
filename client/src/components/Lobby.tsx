@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Room, FirstPlayerChoice } from "../hooks/useLobby";
-
-const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+import { CHARACTER_OPTIONS, RANDOM_ANY } from "../data/ministrySigils";
+import { characterOptionLabel } from "../data/characterCards";
 
 interface LobbyProps {
   room: Room | null;
@@ -202,13 +202,12 @@ function CharacterSelect({
         <label>
           Your Character
           <select
-            value={myCharacter || "Random"}
+            value={myCharacter || RANDOM_ANY}
             onChange={(e) => onSelectCharacter(e.target.value)}
           >
-            <option value="Random">Random</option>
-            {CHARACTERS.map((c) => (
+            {CHARACTER_OPTIONS.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {characterOptionLabel(c)}
               </option>
             ))}
           </select>

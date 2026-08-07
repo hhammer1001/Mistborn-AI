@@ -55,6 +55,7 @@
     "src/engine/henryDivergence.ts",
     "src/engine/twinReport.ts",
     "src/engine/selfplaySquashV2VsZoomBase.ts",
-    "src/engine/selfplaySquashV3Mirror.ts"
+    "src/engine/selfplaySquashV3Mirror.ts",
+    "src/engine/vsOppStore.ts"
   ]
 }

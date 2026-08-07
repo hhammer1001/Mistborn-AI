@@ -349,7 +349,7 @@ export class SquashBot extends Player {
   }
 
   protected scoreCharAbility3(snap: GameStateSnapshot): number {
-    const effectVal = estimateEffectValue("D.Mi", "3.3", snap);
+    const effectVal = estimateEffectValue(this.ability3effect, this.ability3amount, snap);
     return 35 + effectVal;
   }
 
@@ -560,6 +560,18 @@ export class SquashBot extends Player {
 
     if (sorted.length > 0 && sorted[0].score > 0.5) return sorted[0].i;
     return -1;
+  }
+
+  override discardIn(choices: Card[]): number {
+    if (choices.length === 0) return -1;
+    const snap = buildSnapshot(this, this.game, this.evalProfile);
+    const sorted = choices
+      .map((c, i) => ({ i, score: this.cardRating(c, snap) }))
+      .sort((a, b) => a.score - b.score);
+
+    // Cycling is only worth it when the card leaving is worse than the buffer;
+    // otherwise the draw is a wash and we've thrown away live value.
+    return sorted[0].score < dynamicBuffer(this.character, snap) ? sorted[0].i : -1;
   }
 
   override subdueIn(choices: Card[]): number {

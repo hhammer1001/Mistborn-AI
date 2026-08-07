@@ -259,6 +259,16 @@ export class Twonky extends Player {
     return sorted.length > 0 ? sorted[0].i : -1;
   }
 
+  override discardIn(choices: Card[]): number {
+    if (choices.length === 0) return -1;
+    // Ditch the worst card in hand — the replacement draw is strictly better
+    // in expectation than anything already rated below the buy buffer.
+    const sorted = choices
+      .map((c, i) => ({ i, score: this.sortingAlgo(c) }))
+      .sort((a, b) => a.score - b.score);
+    return sorted[0].score < this.buffer ? sorted[0].i : -1;
+  }
+
   override subdueIn(choices: Card[]): number {
     const sorted = choices
       .map((c, i) => ({ i, score: this.sortingAlgo(c) }))

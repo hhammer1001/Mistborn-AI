@@ -34,7 +34,8 @@ import { useLandsLobby } from "./lands/hooks/useLandsLobby";
 import { useLandsMultiplayerGame } from "./lands/hooks/useLandsMultiplayerGame";
 import { LandsSession } from "./lands/engine/session";
 import type { LandsBotKind } from "./lands/hooks/useLandsGame";
-import { BOT_TYPES, CHARACTERS } from "./data/ministrySigils";
+import { BOT_TYPES, CHARACTERS, RANDOM_ANY, RANDOM_NEW } from "./data/ministrySigils";
+import { EXPANSION_CHARACTERS } from "./engine/types";
 import type { BotSetupConfig } from "./hooks/useMinistryPrefs";
 import type { GameState } from "./types/game";
 import { randomSeed } from "./engine/rng";
@@ -50,15 +51,23 @@ type AppMode =
   | "lands_lobby"
   | "lands_mp_game";
 
-function pickRandomChar(): string {
-  return CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+function pickFrom(pool: readonly string[]): string {
+  return pool[Math.floor(Math.random() * pool.length)];
 }
+/** Turn a picker value into a concrete character. Handles the "Random"
+ *  sentinels; anything else is already a character and passes through.
+ *  `avoid` keeps a random roll from mirroring the other seat when it can. */
 function resolveChar(c: string, avoid?: string): string {
-  if (c !== "Random" && c) return c;
-  let pick = pickRandomChar();
-  if (avoid) {
+  const pool =
+    c === RANDOM_ANY ? CHARACTERS :
+    c === RANDOM_NEW ? EXPANSION_CHARACTERS :
+    null;
+  if (pool === null && c) return c;
+  const from = pool ?? CHARACTERS;
+  let pick = pickFrom(from);
+  if (avoid && from.length > 1) {
     let guard = 0;
-    while (pick === avoid && guard++ < 16) pick = pickRandomChar();
+    while (pick === avoid && guard++ < 16) pick = pickFrom(from);
   }
   return pick;
 }

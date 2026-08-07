@@ -4,15 +4,7 @@ import type { PlayerData } from "../types/game";
 import { PlayerInfo } from "./PlayerInfo";
 import { TrainingTrack } from "./TrainingTrack";
 import { MetalTokens } from "./MetalTokens";
-
-const P = "/cards/httpssteamusercontentaakamaihdnetugc";
-const CHARACTER_IMAGES: Record<string, string> = {
-  Kelsier: `${P}96933575893836348543557D24AEEE1F012C3CAD29954EF6814E760FC9D.jpg`,
-  Vin:     `${P}1345520488082639487110C19C4ACDC3BB4A6DED9A5BF2E459BE380AC1E6.jpg`,
-  Marsh:   `${P}109539518916106846249A7A17D9C6BE1C03FF4CA5B6C5F9A8955B0722D3.jpg`,
-  Shan:    `${P}175380882799496743833A2ED5F67A4F055DBA77817F4E1E3182320AC66E.jpg`,
-  Prodigy: "/cards/Vin%20Prodigy%20copy.png",
-};
+import { CHARACTER_IMAGES } from "../data/characterCards";
 
 function usePopupClose(onClose: () => void, skipSelector?: string) {
   useEffect(() => {

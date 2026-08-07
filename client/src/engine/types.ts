@@ -28,10 +28,19 @@ export interface StarterCardDef extends CardDef {
 }
 
 export interface CharacterDef {
+  /** Engine key — unique. Two cards can share a person (Vin appears as both
+   *  "Prodigy" and "Empress"), so the key is the card, not the person. */
   name: string;
+  /** Name printed on the card. Defaults to `name` when omitted. */
+  displayName?: string;
+  /** Subtitle printed under the name ("The Empress"). */
+  title?: string;
   ability1Metal: number; // metal index for character ability 1
   ability1Effect: string;
   ability1Amount: string;
+  /** Ability III — the atium ability. */
+  ability3Effect: string;
+  ability3Amount: string;
 }
 
 // ── Action type system ──
@@ -132,13 +141,26 @@ export const METAL_NAMES = [
   "atium",
 ] as const;
 
-export const CHARACTERS = [
+/** The original five. Also the fixed opponent pool for Anvil evolution — held
+ *  constant so fitness stays comparable across training campaigns. */
+export const BASE_CHARACTERS = [
   "Kelsier",
   "Shan",
   "Vin",
   "Marsh",
   "Prodigy",
 ] as const;
+
+/** Added 2026-08-06 from the expansion card set. */
+export const EXPANSION_CHARACTERS = [
+  "Empress",
+  "Zane",
+  "Kar",
+  "Elend",
+] as const;
+
+/** The full playable roster. */
+export const CHARACTERS = [...BASE_CHARACTERS, ...EXPANSION_CHARACTERS] as const;
 
 // ── Mission tier definition ──
 

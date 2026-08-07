@@ -2,7 +2,19 @@ import { Card, Ally, Funding, createCard } from "./card";
 import type { CardDef } from "./types";
 import { STARTER_DECKS } from "./data/starterDecks";
 import { MARKET_DECK } from "./data/marketDeck";
+import { CHARACTER_DEFS } from "./data/characters";
 import { Rng } from "./rng";
+
+/** Which of the two starter decks a character opens with. The two groups split
+ *  the eight Training cards by metal, and every character's group is the one
+ *  holding the Training card in their own ability-I metal (Kelsier → Steel
+ *  Training → group 0, Marsh → Bronze Training → group 1, and so on). Deriving
+ *  it keeps new characters working without editing a name list. */
+export function starterDeckGroup(characterCode: string): 0 | 1 {
+  const metal = CHARACTER_DEFS[characterCode]?.ability1Metal;
+  const owner = STARTER_DECKS.find((d) => d.cardType === 2 && d.metal === metal);
+  return owner ? owner.deckGroup : 1;
+}
 
 function shuffle<T>(arr: T[], rng: Rng): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -67,9 +79,7 @@ export class PlayerDeck extends Deck {
   constructor(characterCode: string, initRng: Rng, gameRng: Rng) {
     super();
     this.rng = gameRng;
-    // Select starter deck group based on character
-    const deckGroup = ["Kelsier", "Shan"].includes(characterCode) ? 0 : 1;
-    const defs = STARTER_DECKS.filter((d) => d.deckGroup === deckGroup);
+    const defs = STARTER_DECKS.filter((d) => d.deckGroup === starterDeckGroup(characterCode));
     for (const def of defs) {
       this.cards.push(createCard(def));
     }

@@ -43,8 +43,13 @@ import { createZoomBot } from "./zoomBot";
 import { createSquashBot } from "./squashBot";
 import { createAnvilBot, setAnvilPolicy, ANVIL_KNOB_DEFS, type AnvilDeltas, type AnvilKnobs } from "./anvilBot";
 import { MARKET_DECK } from "./data/marketDeck";
+import { CHARACTERS, BASE_CHARACTERS } from "./types";
 
-const CHARS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+// Opponent pool stays the five characters with trained weight tables — they
+// are the meaningful benchmark, and holding the pool fixed keeps fitness
+// comparable across campaigns. Any character on the full roster may be the
+// one being trained.
+const CHARS = [...BASE_CHARACTERS];
 const CARD_NAMES = [...new Set(MARKET_DECK.map((c) => c.name))];
 const KNOB_KEYS = Object.keys(ANVIL_KNOB_DEFS);
 // Base-bot values for look* knobs; add-knobs default 0, mult-knobs default 1.
@@ -65,7 +70,7 @@ const STAGE1_PER_OPP = parseInt(argv[4] || "10", 10);
 const SEED_BASE = parseInt(argv[5] || "1", 10);
 const EVOLVE_KNOBS = process.env.KNOBS === "1";
 const EVOLVE_DELTAS = process.env.DELTAS !== "0";
-if ((seat !== "first" && seat !== "second") || !CHARS.includes(character)) {
+if ((seat !== "first" && seat !== "second") || !(CHARACTERS as readonly string[]).includes(character)) {
   console.error("Usage: anvilEvolve.ts <first|second> <Character> [gens] [pop] [stage1GamesPerOpp] [seedBase] [initFile] [outSuffix]");
   process.exit(1);
 }

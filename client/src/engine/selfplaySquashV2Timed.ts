@@ -16,6 +16,7 @@
 import { Game, type PlayerFactory } from "./game";
 import { createSquashV2Bot, SquashV2Bot } from "./squashV2Bot";
 import { resetCardIds } from "./card";
+import { trainingChars } from "./trainingChars";
 import type { Player } from "./player";
 import type { GameActionInternal } from "./types";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
@@ -45,7 +46,7 @@ function emptyTiming(): CardTimingData {
 }
 
 function runSelfPlay(gamesPerChar: number, outputDir: string) {
-  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+  const chars = trainingChars();
 
   const stats: Record<string, Record<string, CardTimingData>> = {};
   for (const c of chars) stats[c] = {};

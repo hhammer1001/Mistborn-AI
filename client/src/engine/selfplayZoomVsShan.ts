@@ -18,14 +18,14 @@ import { Game, type PlayerFactory } from "./game";
 import { createSquashBot } from "./squashBot";
 import { createZoomBot, ZoomBot } from "./zoomBot";
 import { resetCardIds } from "./card";
+import { trainingChars } from "./trainingChars";
 import type { Player } from "./player";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { mergeVsOpp, type VsOppTable, type WeightData } from "./vsOppStore";
 
 ZoomBot.seat2Variance = 0;
 ZoomBot.lookaheadEnabled = false;
 
 interface CardStat { wins: number; total: number; }
-type WeightData = Record<string, [number, number, number]>;
 
 function getOwnedCardNames(player: Player): Set<string> {
   const names = new Set<string>();
@@ -36,8 +36,8 @@ function getOwnedCardNames(player: Player): Set<string> {
   return names;
 }
 
-function run(gamesPerChar: number, oppChar: string, outputDir: string) {
-  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+function run(gamesPerChar: number, oppChar: string) {
+  const chars = trainingChars();
   const stats: Record<string, Record<string, CardStat>> = {};
   for (const c of chars) stats[c] = {};
 
@@ -68,19 +68,19 @@ function run(gamesPerChar: number, oppChar: string, outputDir: string) {
     console.log(`  ${zoomChar}: done (${((Date.now() - start) / 1000).toFixed(1)}s)`);
   }
 
-  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
+  const slice: VsOppTable = { [oppChar]: {} };
   for (const char of chars) {
     const out: WeightData = {};
     for (const [name, s] of Object.entries(stats[char])) {
       const wr = s.total > 0 ? s.wins / s.total : 0;
       out[name] = [s.wins, s.total, wr];
     }
-    writeFileSync(`${outputDir}/${char}.json`, JSON.stringify(out, null, 2));
+    slice[oppChar][char] = out;
   }
-  console.log(`\n${played} games. Files in ${outputDir}.`);
+  mergeVsOpp("zoom", slice);
+  console.log(`\n${played} games recorded for opp=${oppChar}.`);
 }
 
 const games = parseInt(process.argv[2] || "20000", 10);
 const oppChar = process.argv[3] || "Shan";
-const dir = process.argv[4] || `client/src/engine/data/zoom_vs_${oppChar.toLowerCase()}`;
-run(games, oppChar, dir);
+run(games, oppChar);

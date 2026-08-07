@@ -15,6 +15,7 @@ const EFFECT_NAMES: Record<string, string> = {
   Pc: "+1 Hand Size",
   Pd: "+1 Perm Damage",
   Pm: "+1 Perm Money",
+  Bx: "Boxings",
 };
 
 /** Full-text descriptions for special abilities, keyed by code */
@@ -78,6 +79,10 @@ function parseCompound(effect: string, amount: string): string {
       parts.push(SPECIAL_TEXT[e]);
       continue;
     }
+    if (e === "discardDraw") {
+      parts.push(discardDrawText(a));
+      continue;
+    }
 
     const name = EFFECT_NAMES[e];
     if (!name) {
@@ -116,6 +121,14 @@ function riotText(_amount: string): string {
   return "Activate the top ability of one of your unused Allies";
 }
 
+/** Describe discardDraw effect */
+function discardDrawText(amount: string): string {
+  const n = parseInt(amount);
+  return n === 1
+    ? "Discard a card, then draw a card"
+    : `Discard ${n} cards, then draw ${n} cards`;
+}
+
 /** Top-level parser for an effect+amount pair, returns human text */
 function describeEffect(effect: string, amount: string): string {
   // Handle single-token special effects
@@ -124,6 +137,7 @@ function describeEffect(effect: string, amount: string): string {
   if (effect === "pull") return pullText(amount);
   if (effect === "push") return pushText(amount);
   if (effect === "riot") return riotText(amount);
+  if (effect === "discardDraw") return discardDrawText(amount);
   if (effect === "choose") return parseCompound(effect, amount);
 
   // Compound effects (D.H, M.special1, etc.)

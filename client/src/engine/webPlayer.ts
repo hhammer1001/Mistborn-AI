@@ -120,6 +120,18 @@ export class WebPlayer extends Player {
     throw new PromptNeeded("pull", options, "Choose a card to pull to top of deck");
   }
 
+  override discardIn(choices: Card[]): number {
+    if (choices.length === 0) return -1;
+    const resp = this._getQueueResponse("discard");
+    if (resp !== undefined) return Number(resp);
+
+    const options: PromptOption[] = choices.map((c, i) => ({
+      index: i, name: c.name, cardId: c.id, source: "hand",
+    }));
+    options.push({ index: -1, name: "Skip", source: "skip" });
+    throw new PromptNeeded("discard", options, "Choose a card to discard, then draw");
+  }
+
   override subdueIn(choices: Card[]): number {
     if (choices.length === 0) return -1;
     const resp = this._getResponse("subdue");

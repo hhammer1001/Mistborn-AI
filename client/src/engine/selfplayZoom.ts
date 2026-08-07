@@ -42,6 +42,7 @@ ZoomBot.lookaheadEnabled = false;
 // Mirror-only is empirically better.
 const ASYMMETRIC_RATIO = 0;
 import { resetCardIds } from "./card";
+import { trainingChars } from "./trainingChars";
 import type { Player } from "./player";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname } from "path";
@@ -63,7 +64,7 @@ function getOwnedCardNames(player: Player): Set<string> {
 }
 
 function runSelfPlay(gamesPerChar: number, outputDir: string) {
-  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+  const chars = trainingChars();
 
   const stats: Record<string, Record<string, CardStat>> = {};
   for (const c of chars) stats[c] = {};

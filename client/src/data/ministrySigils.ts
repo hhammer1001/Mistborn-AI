@@ -1,4 +1,5 @@
 import { METAL_ICONS } from "./metalIcons";
+import { CHARACTERS as ENGINE_CHARACTERS } from "../engine/types";
 
 const ATIUM_FLAT   = "/cards/atium token.png";
 const ATIUM_FLARED = "/ministry/atium-flared.png";
@@ -59,5 +60,11 @@ export function botLabel(t: string): string {
 export const VICTORY_TYPES = ["Mission", "Combat", "Confrontation", "Forfeit"] as const;
 export type VictoryType = (typeof VICTORY_TYPES)[number];
 
-export const CHARACTERS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"] as const;
-export const CHARACTER_OPTIONS = ["Random", ...CHARACTERS] as const;
+export { CHARACTERS } from "../engine/types";
+
+/** Sentinels accepted anywhere a character is chosen. Resolved by
+ *  `resolveChar` in App.tsx — never passed to the engine. */
+export const RANDOM_ANY = "Random";
+export const RANDOM_NEW = "Random (new)";
+
+export const CHARACTER_OPTIONS = [RANDOM_ANY, RANDOM_NEW, ...ENGINE_CHARACTERS] as const;

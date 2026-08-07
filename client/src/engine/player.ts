@@ -126,6 +126,8 @@ export class Player {
   ability1metal: string;
   ability1effect: string;
   ability1amount: string;
+  ability3effect: string;
+  ability3amount: string;
 
   // Effect dispatch table
   private missionFuncs: Record<string, (amount: number) => void>;
@@ -146,6 +148,8 @@ export class Player {
     this.ability1metal = charDef ? String(charDef.ability1Metal) : "0";
     this.ability1effect = charDef?.ability1Effect ?? "D";
     this.ability1amount = charDef?.ability1Amount ?? "1";
+    this.ability3effect = charDef?.ability3Effect ?? "D.Mi";
+    this.ability3amount = charDef?.ability3Amount ?? "3.3";
 
     this.missionFuncs = {
       D: (n) => this.damage(n),
@@ -161,6 +165,8 @@ export class Player {
       Pc: (n) => this.permDraw(n),
       Pd: (n) => this.permDamage(n),
       Pm: (n) => this.permMoney(n),
+      Bx: (n) => this.gainBoxings(n),
+      discardDraw: (n) => this.discardDraw(n),
       riot: (n) => this.riot(n),
       Mi: (n) => this.mission(n),
       seek: (n) => this.seek(n),
@@ -296,6 +302,7 @@ export class Player {
     }
   }
   gainAtium(amount: number) { this.atium += amount; }
+  gainBoxings(amount: number) { this.curBoxings += amount; }
   extraBurn(amount: number) { this.burns += amount; }
   permDraw(amount: number) { this.handSize += amount; }
   permMoney(amount: number) { this.pMoney += amount; }
@@ -320,6 +327,7 @@ export class Player {
   cloudAlly(_card: Card, _ally: Ally): boolean { return false; }
   eliminateIn(): number { return -1; }
   pullIn(): number { return -1; }
+  discardIn(_choices: Card[]): number { return -1; }
   subdueIn(_choices: Card[]): number { return -1; }
   soarIn(_choices: Card[]): number { return -1; }
   confrontationIn(_choices: Action[]): number { return -1; }
@@ -425,6 +433,36 @@ export class Player {
       const card = this.deck.discard[choice];
       this.deck.cards.unshift(card);
       this.deck.discard.splice(choice, 1);
+    }
+  }
+
+  /** Cards in hand that may legally be discarded. Mirrors the Keeper (special15)
+   *  filter: an Action that has already been burned or fed metal is committed
+   *  for the turn, and discarding spent Funding has to hand back its money. */
+  discardableHand(): Card[] {
+    const choices: Card[] = [];
+    for (const c of this.deck.hand) {
+      if (c instanceof Funding && this.curMoney < 1) continue;
+      if (c instanceof Action && (c.burned || c.metalUsed > 0)) continue;
+      if (this._active_card && c.id === this._active_card.id) continue;
+      choices.push(c);
+    }
+    return choices;
+  }
+
+  /** Kar I: discard a card, then draw a card. */
+  discardDraw(amount: number) {
+    for (let i = 0; i < amount; i++) {
+      const choices = this.discardableHand();
+      if (choices.length === 0) return;
+      const choice = this.discardIn(choices);
+      if (choice < 0 || choice >= choices.length) return;
+      const card = choices[choice];
+      if (card instanceof Funding) this.curMoney -= 1;
+      const idx = this.deck.hand.indexOf(card);
+      if (idx !== -1) this.deck.hand.splice(idx, 1);
+      this.deck.discard.push(card);
+      this.draw(1);
     }
   }
 
@@ -959,7 +997,7 @@ export class Player {
         break;
       }
       case "char_ability_3": {
-        this.resolve("D.Mi", "3.3");
+        this.resolve(this.ability3effect, this.ability3amount);
         this.charAbility3 = false;
         break;
       }

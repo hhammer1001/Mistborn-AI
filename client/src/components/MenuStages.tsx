@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { BOT_TYPES, BOT_TYPE_LABELS, BOT_TYPE_BLURBS, CHARACTER_OPTIONS, type BotType } from "../data/ministrySigils";
+import { BOT_TYPES, BOT_TYPE_LABELS, BOT_TYPE_BLURBS, CHARACTER_OPTIONS, RANDOM_ANY, RANDOM_NEW, type BotType } from "../data/ministrySigils";
+import { characterOptionLabel } from "../data/characterCards";
 import type { BotSetupConfig, FirstPlayerChoice } from "../hooks/useMinistryPrefs";
 import type { Room } from "../hooks/useLobby";
 import type { LandsBotKind } from "../lands/hooks/useLandsGame";
@@ -57,8 +58,10 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
   useEffect(() => { setDraft(config); }, [config]);
 
   const previewText = (c: BotSetupConfig) => {
-    const self = c.myChar === "Random"  ? "random"  : c.myChar;
-    const opp  = c.oppChar === "Random" ? "random"  : c.oppChar;
+    const preview = (v: string) =>
+      v === RANDOM_ANY ? "random" : v === RANDOM_NEW ? "random new" : v;
+    const self = preview(c.myChar);
+    const opp  = preview(c.oppChar);
     const first =
       c.firstPlayer === "you" ? "you first" :
       c.firstPlayer === "bot" ? "bot first" :
@@ -99,7 +102,7 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
               value={draft.myChar}
               onChange={(e) => setDraft({ ...draft, myChar: e.target.value })}
             >
-              {CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{characterOptionLabel(c)}</option>)}
             </select>
           </label>
           <label>Opponent Character
@@ -107,7 +110,7 @@ export function BotSetupView({ config, onBack, onQuickPlay, onStartCustom }: Bot
               value={draft.oppChar}
               onChange={(e) => setDraft({ ...draft, oppChar: e.target.value })}
             >
-              {CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{characterOptionLabel(c)}</option>)}
             </select>
           </label>
           <label>Who goes first

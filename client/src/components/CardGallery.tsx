@@ -40,6 +40,10 @@ const HEROES: Single[] = [
   { name: "Marsh — The Spy",         src: `${P}109539518916106846249A7A17D9C6BE1C03FF4CA5B6C5F9A8955B0722D3.jpg` },
   { name: "Shan — The Noble",        src: `${P}175380882799496743833A2ED5F67A4F055DBA77817F4E1E3182320AC66E.jpg` },
   { name: "Vin — The Prodigy",       src: "/cards/Vin%20Prodigy%20copy.png" },
+  { name: "Vin — The Empress",       src: "/cards/vin-empress.png" },
+  { name: "Zane — The Watcher",      src: "/cards/zane-watcher.png" },
+  { name: "Kar — The Inquisitor",    src: "/cards/kar-inquisitor.png" },
+  { name: "Elend — The Emperor",     src: "/cards/elend-emperor.png" },
 ];
 
 const MISSIONS: Sprite[] = [
@@ -225,14 +229,15 @@ const TRAINING: Record<string, Sprite> = {
 
 const FUNDING: Sprite = { name: "Funding", sheet: TRAIN_SHEET, col: 4, row: 0 };
 
-// Starter deck assignments (from engine/deck.py)
+// Starter deck assignments. Each character opens with the deck holding the
+// Training card in their own ability-I metal (see starterDeckGroup in deck.ts).
 const STARTER_DECKS = [
   {
-    label: "Kelsier & Shan",
+    label: "Kelsier, Shan, Zane & Kar",
     training: ["Tin Training", "Copper Training", "Zinc Training", "Steel Training"],
   },
   {
-    label: "Vin, Marsh & Prodigy",
+    label: "Vin, Marsh, Prodigy, Empress & Elend",
     training: ["Pewter Training", "Bronze Training", "Brass Training", "Iron Training"],
   },
 ];

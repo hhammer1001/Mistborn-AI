@@ -21,8 +21,9 @@ import { Game, type PlayerFactory } from "./game";
 import { createSquashV2Bot, SquashV2Bot } from "./squashV2Bot";
 import { createZoomBot, ZoomBot } from "./zoomBot";
 import { resetCardIds } from "./card";
+import { trainingChars } from "./trainingChars";
 import type { Player } from "./player";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { mergeVsOpp, type VsOppTable, type WeightData } from "./vsOppStore";
 
 // Disable lookahead for both during training (consistent with how the runtime
 // data is consumed — lookahead is added on top of clean trained weights).
@@ -40,8 +41,6 @@ interface CardStat {
   total: number;
 }
 
-type WeightData = Record<string, [number, number, number]>;
-
 function getOwnedCardNames(player: Player): Set<string> {
   const names = new Set<string>();
   for (const c of player.deck.hand) names.add(c.name);
@@ -52,13 +51,18 @@ function getOwnedCardNames(player: Player): Set<string> {
 }
 
 function runAsymmetric(gamesPerPair: number) {
-  const chars = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+  // Two independent selectors so a run can fill just the missing slice of the
+  // matrix. V2_CHARS picks the seat-0 SquashV2 characters, ZOOM_CHARS the
+  // seat-1 opponents; only the (opp, bot) pairs actually played get merged, so
+  // pairs trained in an earlier run survive untouched.
+  const v2Chars = trainingChars("V2_CHARS");
+  const zoomChars = trainingChars("ZOOM_CHARS");
 
   // stats[zoomChar][v2Char][cardName] = CardStat
   const stats: Record<string, Record<string, Record<string, CardStat>>> = {};
-  for (const z of chars) {
+  for (const z of zoomChars) {
     stats[z] = {};
-    for (const v of chars) stats[z][v] = {};
+    for (const v of v2Chars) stats[z][v] = {};
   }
 
   console.log(`\nAsymmetric training: SquashV2 (seat 0) vs Zoom (seat 1).`);
@@ -67,8 +71,8 @@ function runAsymmetric(gamesPerPair: number) {
   const startTime = Date.now();
   let gamesPlayed = 0;
 
-  for (const v2Char of chars) {
-    for (const zoomChar of chars) {
+  for (const v2Char of v2Chars) {
+    for (const zoomChar of zoomChars) {
       for (let i = 0; i < gamesPerPair; i++) {
         resetCardIds();
         try {
@@ -98,35 +102,31 @@ function runAsymmetric(gamesPerPair: number) {
       }
     }
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`  V2-${v2Char}: trained vs all 5 Zoom chars (${elapsed}s elapsed)`);
+    console.log(`  V2-${v2Char}: trained vs ${zoomChars.length} Zoom char(s) (${elapsed}s elapsed)`);
   }
 
-  // Write 5 directories, each with 5 files (one per V2 char).
-  const charLower: Record<string, string> = {
-    Kelsier: "kelsier", Shan: "shan", Vin: "vin", Marsh: "marsh", Prodigy: "prodigy",
-  };
-  for (const zoomChar of chars) {
-    const dir = `client/src/engine/data/squashV2_vs_${charLower[zoomChar]}`;
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    for (const v2Char of chars) {
+  // Merge one slice per opposing (Zoom) character, each holding one entry per V2 char.
+  const slice: VsOppTable = {};
+  for (const zoomChar of zoomChars) {
+    slice[zoomChar] = {};
+    for (const v2Char of v2Chars) {
       const charStats = stats[zoomChar][v2Char];
       const weights: WeightData = {};
       for (const [cardName, s] of Object.entries(charStats)) {
         const winRate = s.total > 0 ? s.wins / s.total : 0;
         weights[cardName] = [s.wins, s.total, winRate];
       }
-      const path = `${dir}/${v2Char}.json`;
-      writeFileSync(path, JSON.stringify(weights, null, 2));
+      slice[zoomChar][v2Char] = weights;
     }
-    console.log(`  Wrote ${dir}/ (5 files)`);
   }
+  mergeVsOpp("squashV2", slice);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\nTotal: ${gamesPlayed} games in ${elapsed}s`);
 
   console.log("\n=== Top cards per (V2-char, Zoom-char) pair (top 5 each) ===");
-  for (const v2Char of chars) {
-    for (const zoomChar of chars) {
+  for (const v2Char of v2Chars) {
+    for (const zoomChar of zoomChars) {
       const charStats = stats[zoomChar][v2Char];
       const entries = Object.entries(charStats)
         .filter(([, s]) => s.total >= 50)

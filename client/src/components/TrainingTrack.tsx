@@ -5,9 +5,13 @@ import { useUIScale } from "../hooks/useUIScale";
 const CHARACTER_COLORS: Record<string, string> = {
   Vin: "#e04040",
   Prodigy: "#e04040",
+  Empress: "#3f6fd0",  // Empress card frame is blue
   Kelsier: "#4a7abf",
   Shan: "#d4b55a",
   Marsh: "#9060c0",
+  Zane: "#e07a30",
+  Kar: "#c02828",
+  Elend: "#e0a832",
 };
 
 const TRAINING_MILESTONES: {
