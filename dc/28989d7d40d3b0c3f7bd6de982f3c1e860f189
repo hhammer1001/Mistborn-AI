@@ -1,0 +1,21 @@
+client/src/engine/player.ts
+  s_e3ed8d7ed9b3b7::t_97a58b442d860c 657-660
+client/src/engine/soarAllyResetTest.ts
+  s_e3ed8d7ed9b3b7::t_cf41e9fe6cf4d6 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "dc28989d7d40d3b0c3f7bd6de982f3c1e860f189",
+  "prompts": {},
+  "sessions": {
+    "s_e3ed8d7ed9b3b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f675c-62af-7223-9ac0-43c17e1c53d9",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
