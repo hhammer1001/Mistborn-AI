@@ -654,6 +654,10 @@ export class Player {
       this.curMoney = 0;
       this.curBoxings -= boxingsCost;
     }
+    // A Buy + Eliminate ally may have already spent an ability before it
+    // entered market trash. Soar returns the same card object, so reset its
+    // per-turn state before it can be drawn and auto-played again.
+    if (card instanceof Ally) card.reset();
     this.deck.discard.push(card);
     const idx = this.game.market.discard.indexOf(card);
     if (idx !== -1) this.game.market.discard.splice(idx, 1);
