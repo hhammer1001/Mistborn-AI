@@ -1,0 +1,192 @@
+client/src/engine/data/anvil_policy.json
+  s_e8cdb82e6dbab5::t_d84234ecc6b62a 2-72,74-689,691
+client/src/components/MenuStages.tsx
+  s_e8cdb82e6dbab5::t_cd9a6ec6f5e510 61-64
+  s_e8cdb82e6dbab5::t_1ff61b91abc8ff 2
+  s_e8cdb82e6dbab5::t_b5cf598bc7cc0b 3,105,113
+client/src/engine/selfplayTimed.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 24,53
+client/src/engine/vsOppStore.ts
+  s_e8cdb82e6dbab5::t_2488a528c1459d 1-51
+client/src/data/characterCards.ts
+  s_e8cdb82e6dbab5::t_3037fc10bee4d9 6
+  s_e8cdb82e6dbab5::t_58281e76c626c8 1-5,7-28
+  s_e8cdb82e6dbab5::t_86ccbf372fe8dc 29-36
+client/src/components/PlayerInfo.tsx
+  s_e8cdb82e6dbab5::t_462241cfd44e23 5
+client/tsconfig.app.json
+  s_e8cdb82e6dbab5::t_00bfdd27b73a37 58-59
+client/src/engine/trainingChars.ts
+  s_e8cdb82e6dbab5::t_d6e7f4c851a6f2 14,16
+  s_e8cdb82e6dbab5::t_6beb3f17e0f017 1-13,15,17-22,24-28
+  s_e8cdb82e6dbab5::t_59f780d548600f 23
+client/src/engine/selfplay.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 21,43
+client/src/engine/newCharSmoke.ts
+  s_e8cdb82e6dbab5::t_0bea448c2e336e 10,12,24
+  s_e8cdb82e6dbab5::t_4c8a28009104b0 1-9,11,14-23,25-48
+  s_e8cdb82e6dbab5::t_f57758559f0fd3 13
+client/src/engine/data/zoom_weights/Elend.json
+  s_e8cdb82e6dbab5::t_31ff4f7c3ded56 1-347
+client/src/engine/data/zoom_vs_opp.json
+  s_e8cdb82e6dbab5::t_910dee079e06dc 1
+client/src/engine/bot.ts
+  s_e8cdb82e6dbab5::t_d5747e8223596c 262-271
+client/src/engine/data/zoom_weights/Kar.json
+  s_e8cdb82e6dbab5::t_31ff4f7c3ded56 1-347
+client/src/engine/selfplayZoomTimed.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 27,55
+client/src/engine/selfplaySquashV2Timed.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 19,49
+client/src/data/ministrySigils.ts
+  s_e8cdb82e6dbab5::t_2d18c6c2c28410 2
+  s_e8cdb82e6dbab5::t_1adb7bfc381dc1 63
+  s_e8cdb82e6dbab5::t_91b2fc43c4065f 64-70
+client/src/engine/types.ts
+  s_e8cdb82e6dbab5::t_ec35f602def503 31-32,34-37,41-43
+  s_e8cdb82e6dbab5::t_8ebe3d80f896fe 144-146,154-155,162-163
+  s_e8cdb82e6dbab5::t_13437af7d494a2 156-161
+  s_9965cd46f229b1::t_7d5c80cac25847 164
+client/src/engine/anvilEvolve.ts
+  s_e8cdb82e6dbab5::t_0b008b73a59d97 48-51
+  s_e8cdb82e6dbab5::t_5cdb6314be1dcf 73
+  s_e8cdb82e6dbab5::t_0bea448c2e336e 46,52
+client/src/engine/selfplaySquashV2.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 22,49
+client/src/engine/selfplayZoom.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 45,67
+client/src/components/OpponentDetailPopup.tsx
+  s_e8cdb82e6dbab5::t_9db295991dcd86 7
+client/src/engine/selfplayZoomVsShan.ts
+  s_e8cdb82e6dbab5::t_e44503b75f6bcd 21,40
+  s_e8cdb82e6dbab5::t_d06b9893cc6442 71,78,80-81
+  s_e8cdb82e6dbab5::t_dcaec03fcd0ce3 23
+  s_e8cdb82e6dbab5::t_9547b4d6b9212a 39
+  s_e8cdb82e6dbab5::t_e0f34542320d25 86
+client/src/engine/webPlayer.ts
+  s_e8cdb82e6dbab5::t_a3fa20dbbc425e 123-134
+client/src/components/TrainingTrack.tsx
+  s_e8cdb82e6dbab5::t_62884a545512c8 8,12-14
+client/src/engine/data/zoom_weights/Empress.json
+  s_e8cdb82e6dbab5::t_31ff4f7c3ded56 1-347
+client/src/components/CardGallery.tsx
+  s_e8cdb82e6dbab5::t_75ce4ef541780b 43-46
+  s_e8cdb82e6dbab5::t_6f60050ddbaafc 232-233,236,240
+client/src/components/Lobby.tsx
+  s_e8cdb82e6dbab5::t_e143463cf72043 3-4
+  s_e8cdb82e6dbab5::t_6b623eb20fed44 205,208,210
+client/src/engine/data/zoom_weights/Zane.json
+  s_e8cdb82e6dbab5::t_31ff4f7c3ded56 1-347
+client/src/App.tsx
+  s_e8cdb82e6dbab5::t_5e437b0a218c1e 37-38
+  s_e8cdb82e6dbab5::t_bcb12a9951b21c 54-55,57-59,61-68,70
+client/src/engine/selfplaySquashV2VsZoom.ts
+  s_e8cdb82e6dbab5::t_f71e71e26a5eaa 24
+  s_e8cdb82e6dbab5::t_d04ed64178b017 54-59,63,65,74-75,105,110,112,128-129
+  s_e8cdb82e6dbab5::t_9976e4fff21fd0 108-109,111,119,122
+  s_e8cdb82e6dbab5::t_537555dce8ac76 26
+client/src/engine/squashBotEval.ts
+  s_e8cdb82e6dbab5::t_ff1c7380e85852 790-791
+  s_e8cdb82e6dbab5::t_c192a08cabb7a4 286-287
+  s_e8cdb82e6dbab5::t_fde3f2edbd7249 89-90,188-189,194-195
+  s_e8cdb82e6dbab5::t_18dd281059bf28 23-26,35-38,48-51,58-61,71-74,81-84,156-159,167-170,178-181,222-225,233-236,244-247
+  s_e8cdb82e6dbab5::t_b19d1fb065f23b 691-692
+  s_e8cdb82e6dbab5::t_fb7a2fd19a8670 86-88
+client/src/engine/player.ts
+  s_e8cdb82e6dbab5::t_2d66f73bcd9e85 305
+  s_e8cdb82e6dbab5::t_6251147568f066 330
+  s_e8cdb82e6dbab5::t_9365b50333fee0 439-468
+  s_e8cdb82e6dbab5::t_74b59e366b5db2 129-130
+  s_e8cdb82e6dbab5::t_7735cebd7fdd5f 168-169
+  s_e8cdb82e6dbab5::t_1d1ef14d572fde 151-152
+  s_e8cdb82e6dbab5::t_c9995196690b21 1000
+client/src/engine/deck.ts
+  s_e8cdb82e6dbab5::t_37cf0238ad43b4 82
+  s_e8cdb82e6dbab5::t_e03a6090090dd3 5,8-17
+  s_e8cdb82e6dbab5::t_b6202af795f20e 18
+client/src/engine/squashBot.ts
+  s_e8cdb82e6dbab5::t_c54bf8741ba47b 352
+  s_e8cdb82e6dbab5::t_3c1c5ea98552d3 565-576
+client/src/data/abilityText.ts
+  s_e8cdb82e6dbab5::t_e056bf771766a4 18
+  s_e8cdb82e6dbab5::t_007a0b9aac6f11 140
+  s_e8cdb82e6dbab5::t_eb0f90175c0477 82-85
+  s_e8cdb82e6dbab5::t_8c30ba5232b5d9 124-131
+client/src/engine/data/characters.ts
+  s_e8cdb82e6dbab5::t_3a9b9f950c7cb0 3-7,9-15,17-19,21-28
+  s_e8cdb82e6dbab5::t_b315666943a55d 16
+client/src/engine/data/squashV2_timing/Elend.json
+  s_c9acc8ba416f0b::t_cf4489b6a7f9a6 1-1432
+client/src/engine/data/squashV2_timing/Empress.json
+  s_c9acc8ba416f0b::t_9f9c4dc60facaa 1-1410
+client/src/engine/data/squashV2_timing/Kar.json
+  s_c9acc8ba416f0b::t_8447d5c963ea4c 1-1432
+client/src/engine/data/squashV2_timing/Zane.json
+  s_c9acc8ba416f0b::t_5c02f18bb74d30 1-1410
+client/src/engine/data/squashV2_vs_opp.json
+  s_c9acc8ba416f0b::t_4fff561e8d5f88 1
+client/src/engine/data/squashV2_weights/Elend.json
+  s_c9acc8ba416f0b::t_e9d84427df0f62 2-5,7-10,12-15,17-20,22-30,33-35,37-40,43-45,47-70,73-75,77-80,82-85,87-90,92-95,97-100,102-105,107-110,112-115,117-120,122-125,127-130,132-135,137-140,142-145,147-150,152-155,157-160,162-190,193-195,197-200,202-205,207-210,212-215,217-220,223-225,228-230,232-235,237-240,243-245,247-250,252-255,257-270,273,275,277-280,283-285,287-290,292-295,297-300,302-305,307-310,312-320,323-325,327-332,334-335,337,341-345
+client/src/engine/data/squashV2_weights/Empress.json
+  s_c9acc8ba416f0b::t_2cf6dd314f3237 1-347
+client/src/engine/data/squashV2_weights/Kar.json
+  s_c9acc8ba416f0b::t_d496d2ed0d8104 3-5,7-10,13-15,17-20,23-25,27-30,32-35,37-45,48-50,52-55,57-60,62-65,67-70,72-75,77-80,83-115,118-120,122-125,127-130,132-135,137-140,142-145,148-150,152-155,157-160,162-205,208-210,212-215,217-220,222-225,227-230,233-235,237-240,242-245,247-250,252-255,257-260,262-265,267-270,272-275,277-280,282-285,287-290,292-295,297-300,303-305,308-310,312-315,317-320,322-325,327-328,330,332-342,344-345
+client/src/engine/data/squashV2_weights/Zane.json
+  s_c9acc8ba416f0b::t_70bd7ced62fe91 2-5,7-10,12-15,17-20,22-25,27-30,32-35,37-40,42-45,47-50,52-55,57-60,62-65,68-70,72-75,77-80,82-85,87-90,93-95,97-100,102-105,107-110,112-115,117-120,122-125,127-150,152-155,157-160,162-165,167-170,172-175,177-200,203-220,223-225,227-230,232-235,237-240,242-245,247-250,253-255,257-260,262-265,267-270,272-275,277-280,282-285,287-290,292-295,297-300,302-305,307-315,318-322,324-325,327-330,332-335,337,339-340,342,345
+client/src/engine/data/squash_timing/Elend.json
+  s_c9acc8ba416f0b::t_f6d35350be579c 1-1432
+client/src/engine/data/squash_timing/Empress.json
+  s_c9acc8ba416f0b::t_8223ec6817208f 1-1410
+client/src/engine/data/squash_timing/Kar.json
+  s_c9acc8ba416f0b::t_8992c9729cb46f 1-1410
+client/src/engine/data/squash_timing/Zane.json
+  s_c9acc8ba416f0b::t_9e747d70291940 1-1432
+client/src/engine/data/squash_weights/Elend.json
+  s_c9acc8ba416f0b::t_6515b91e6c29cc 2-5,8-10,13-15,17-20,22-25,27-30,32-35,38-40,43-45,47-50,53-55,57-60,62-65,67-70,72-85,88-90,92-95,97-100,102-105,107-110,112-115,117-120,122-125,127-130,132-135,137-160,163-165,167-170,172-175,177-180,182-185,187-200,203-205,207-210,212-215,217-220,222-225,227-230,232-235,237-240,242-260,263-275,278-280,282-290,293-295,297-300,302-305,307-315,318-340,343-345
+client/src/engine/data/squash_weights/Empress.json
+  s_c9acc8ba416f0b::t_2e17e944027b00 2-11,13-15,17-40,43-45,47-50,52-55,57-85,88-90,93-95,97-100,102-105,107-110,112-115,117-120,122-125,127-130,132-135,137-140,143-145,147-155,158-160,162-165,167-170,172-175,177-180,182-185,187-190,192-195,197-200,202-205,208-210,212-215,217-220,222-225,227-230,232-235,237-240,242-245,247-250,252-255,257-260,262-265,267-270,272-275,277-280,282-285,287-290,292-295,298-300,302-305,307-310,312-315,317-330,333-335,337-338,340,342-345
+client/src/engine/data/squash_weights/Kar.json
+  s_c9acc8ba416f0b::t_3eae22d841088a 2-5,7-10,12-15,17-20,22-25,27-30,32-35,37-40,42-45,47-50,52-60,63-65,67-85,88-90,92-95,97-100,102-105,107-110,112-115,117-120,122-125,127-130,132-135,137-140,142-145,147-150,152-155,157-160,162-180,183-185,187-190,192-195,197-200,202-220,223-225,227-230,232-235,238-240,242-245,247-250,252-255,258-260,262-265,267-270,272-300,303-305,307-310,313-315,317-320,322-325,328-330,332-335,337,339-340,342-345
+client/src/engine/data/squash_weights/Zane.json
+  s_c9acc8ba416f0b::t_3e57cf668a4789 1-347
+client/src/engine/data/zoom_timing/Elend.json
+  s_c9acc8ba416f0b::t_b93880bc4e63c5 1-1432
+client/src/engine/data/zoom_timing/Empress.json
+  s_c9acc8ba416f0b::t_e119f753933052 1-1410
+client/src/engine/data/zoom_timing/Kar.json
+  s_c9acc8ba416f0b::t_393326dc2ed794 1-1410
+client/src/engine/data/zoom_timing/Zane.json
+  s_c9acc8ba416f0b::t_24f1265062286d 1-1410
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2a5b84d166ba4c3a7e7cf50935951dff72c8bb92",
+  "prompts": {},
+  "sessions": {
+    "s_9965cd46f229b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b2aa787-ef12-4a9b-b4c6-6bdbe492d8f1",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_c9acc8ba416f0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "498a7fe9-112f-43a1-bb4c-d4b69164dec2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_e8cdb82e6dbab5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acb93389-916c-4898-a6bf-0591d453ec4e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
