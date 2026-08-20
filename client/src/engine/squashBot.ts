@@ -8,6 +8,7 @@ import { Card, Action, Ally, Funding } from "./card";
 import { PlayerDeck } from "./deck";
 import type { Game } from "./game";
 import type { GameActionInternal } from "./types";
+import { MISSION_TIERS } from "./types";
 import type { Rng } from "./rng";
 import type { ActionAnnotation } from "./session";
 import {
@@ -343,9 +344,81 @@ export class SquashBot extends Player {
     return 40 + effectVal;
   }
 
+  /** Score for an action that would resolve to nothing. Far enough below
+   *  scoreEndTurn (0) that a subclass's additive knob can't lift it back. */
+  protected static readonly NO_OP = -1e6;
+
   protected scoreCharAbility1(snap: GameStateSnapshot): number {
-    const effectVal = estimateEffectValue(this.ability1effect, this.ability1amount, snap);
-    return 35 + effectVal;
+    const effect = this.ability1effect;
+
+    // The flat +35 below assumes ability I always accomplishes something,
+    // which holds for the original five (deal 2, gain 2, advance 1, ...) but
+    // not for abilities that read board state. Firing one of those into an
+    // empty board spends the once-per-turn use for zero value.
+    if (effect === "R") {
+      // Refresh needs a spent (2) or flared (4) token to act on.
+      if (!this.metalTokens.some((v) => v === 2 || v === 4)) return SquashBot.NO_OP;
+    } else if (effect === "pull") {
+      const buffer = dynamicBuffer(this.character, snap);
+      const best = this.deck.discard.reduce(
+        (m, c) => Math.max(m, this.cardRating(c, snap)), -Infinity);
+      if (best < buffer) return SquashBot.NO_OP;
+      // Pull sets the top of the deck, so it pays off at two moments.
+      // (1) Immediately before anything that draws: the draw then hits the
+      //     card we chose instead of a random one, and we get it this turn.
+      if (this.drawAvailableThisTurn()) return 45 + estimateEffectValue(effect, this.ability1amount, snap);
+      // (2) Otherwise at the end of the turn, feeding next turn's opening
+      //     hand — and by then the money is spent, so a card bought this
+      //     turn is sitting in the discard where the pull can reach it.
+      if (this.canStillBuyWorthwhile(snap)) return 1;
+    } else if (effect === "discardDraw") {
+      // Only worth a cycle if something in hand rates below the buy buffer.
+      const buffer = dynamicBuffer(this.character, snap);
+      const worst = this.discardableHand().reduce(
+        (m, c) => Math.min(m, this.cardRating(c, snap)), Infinity);
+      if (worst >= buffer) return SquashBot.NO_OP;
+    }
+
+    return 35 + estimateEffectValue(effect, this.ability1amount, snap);
+  }
+
+  /** True when something still playable this turn draws cards: an unspent
+   *  Action in hand, a ready Ally ability, or the next tier of a mission we
+   *  can still advance. Used to pull *before* the draw so the drawn card is
+   *  the one we chose. */
+  private drawAvailableThisTurn(): boolean {
+    const draws = (eff: string | undefined) => !!eff && eff.split(".").includes("C");
+
+    for (const card of this.deck.hand) {
+      if (!(card instanceof Action)) continue;
+      if (card.burned && card.metalUsed >= card.capacity) continue;
+      if (draws(card.data[3]) || draws(card.data[5])) return true;
+    }
+    for (const ally of this.allies) {
+      if (ally.available1 && draws(ally.data[3])) return true;
+      if (ally.available2 && draws(ally.data[5])) return true;
+    }
+    if (this.curMission > 0) {
+      for (const m of this.game.missions) {
+        const rank = m.playerRanks[this.turnOrder];
+        if (rank >= 12) continue;
+        const tiers = MISSION_TIERS[m.name] ?? [];
+        for (const t of tiers) {
+          // The next threshold this advance could cross.
+          if (t.threshold > rank && t.threshold <= rank + this.curMission) {
+            if (draws(t.reward) || draws(t.firstReward)) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /** True when the market still holds a card we can afford and would want. */
+  private canStillBuyWorthwhile(snap: GameStateSnapshot): boolean {
+    const buffer = dynamicBuffer(this.character, snap);
+    return this.game.market.hand.some(
+      (c) => c.cost <= this.curMoney && this.cardRating(c, snap) >= buffer);
   }
 
   protected scoreCharAbility3(snap: GameStateSnapshot): number {

@@ -1,0 +1,15 @@
+{
+  "seat": "second",
+  "character": "Elend",
+  "status": "done",
+  "accepted": false,
+  "deltas": {},
+  "knobs": {},
+  "valWinRate": 0.3611111111111111,
+  "valBlocks": [
+    0.3333333333333333,
+    0.3888888888888889
+  ],
+  "zeroWinRate": 0.3611111111111111,
+  "liftPp": 0
+}
