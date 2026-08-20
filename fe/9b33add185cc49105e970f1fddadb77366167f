@@ -1,0 +1,25 @@
+client/src/engine/anvilBench.ts
+  s_2618a74027de68::t_84d286390b1b0e 25,37-39
+client/src/engine/anvilBot.ts
+  s_2618a74027de68::t_febe6c532b757a 180-182,184-187,501,622
+  s_2618a74027de68::t_dc4a6fda742c92 183,192,196-199,213,215-221,499-500,505-506,620-621,634-635
+  s_2618a74027de68::t_84d286390b1b0e 188-191,193-195
+client/src/engine/BOT_NOTES.md
+  s_2618a74027de68::t_357dfbed2d956a 1318-1374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "fe9b33add185cc49105e970f1fddadb77366167f",
+  "prompts": {},
+  "sessions": {
+    "s_2618a74027de68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "51cb68ff-0fb2-4f3c-a9a3-ba37b769e2f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
