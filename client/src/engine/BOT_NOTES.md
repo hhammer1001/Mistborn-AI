@@ -1315,3 +1315,60 @@ responded 8.86 -> 9.93 and won 11/12 moving first. The arms race is the
 data engine working as designed.
 
 All gates at reference: seat1 39.1/38.8, seat0 72.5 exact, Squash flip 66.3.
+
+## The phase-0 veto bug (2026-08-20, from a live game): "did nothing on turn 1"
+
+Henry, playing Elend and going second, watched Anvil open with `Played 3
+fundings | End actions | Traded 2 money -> 1 boxing` — two Trainings left
+unburned, the whole turn passed.
+
+Cause: [finishTurnAndEvaluate](anvilBot.ts) only reaches the postOppTurn=1
+boundary when the opponent is a `SquashBot`; against a human `WebPlayer` it
+falls back to the own-turn-end phase (postOppTurn=0). **Every live game takes
+that fallback** — and the veto was never validated there. At phase 0 the
+model cannot see what the untaken turn costs, and it prefers the untouched
+board: on the reported opening it scored "end now" at P=0.716 against P=0.628
+for a turn that advanced a mission, dealt 2 damage and banked a boxing —
+strictly better on every feature that differed. Single-feature probe: the
+biggest driver is `myFirstRewardNear` 0 -> 1, worth **-5.7pp** on its own
+(the v3 mission-proximity features carry an inverted correlational response).
+
+Measured on 296 seeded openings, bot in seat 1 moving first (the live app's
+setup whenever Henry goes second — `useGame` pins the human to seat 0 and
+passes `firstPlayer: 1`):
+
+| bot char | turn-1 turns with no burn/flare |
+|---|---|
+| Kelsier, Prodigy (trained seat-1 policy) | 0/296 |
+| Shan, Vin, Marsh | 65-102/296 |
+| Empress, Zane, Kar, Elend (untrained) | 51-55/296 |
+
+Same openings against a simulatable opponent: **1/296**. The evolved knobs
+mask it, which is why it surfaced on the expansion characters first.
+
+**Fix — `phase0VetoMode = "keepTurn"`:** when the opponent's reply can't be
+simulated, `end_actions` is dropped from the veto's candidate set. The veto
+may still reorder the turn (all other candidates reach the same turn-end
+boundary, so they stay comparable) but may not end it. Turning the veto off
+entirely in the fallback was tried and is clearly worse — the veto earns its
+keep even at phase 0; it is only its "stop now" verdicts that are garbage.
+
+A/B vs Twonky (a real bot that is NOT a SquashBot, so it takes the same
+fallback a human does), Anvil-Elend seat 1 moving first, 300 games/range:
+
+| mode | seeds 90000 | seeds 50000 | turn-1 no-ops |
+|---|---|---|---|
+| full (pre-fix) | 62.0% | 64.0% | 16/300, 24/300 |
+| **keepTurn (shipped)** | **63.0%** | **64.3%** | 1/300, 1/300 |
+| off | 55.3% | 57.7% | 1/300, 1/300 |
+
+Bot-vs-bot is untouched by construction (the gate only reads
+`opp instanceof SquashBot`): vs Hulk all three modes return 26.0% and an
+identical 15/1532 no-op count over 150 games. No bench needs re-running.
+
+Open: the honest fix is data — `valueDataGen` only ever plays firstPlayer=0,
+so seat 1 is always `movesSecond=1` in training, and the live app's seat-1
+mover-first bot sits in a corner the model never saw. Forcing `movesSecond=1`
+on that state also removes the pathology (0/296), which is a hint, not a fix.
+Generating half the rows with firstPlayer=1 would let the veto run unrestricted
+against humans.

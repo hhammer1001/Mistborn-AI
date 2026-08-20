@@ -177,6 +177,26 @@ export function finishTurnAndEvaluate(bot: Player, game: Game): number {
   return 1000 * winProb(bot, game, 1);
 }
 
+/** True when the opponent's reply turn can be simulated, i.e. when
+ * finishTurnAndEvaluate reaches the postOppTurn=1 boundary the veto was
+ * validated on. False against a human (WebPlayer), where every candidate
+ * collapses to the own-turn-end phase (see finishTurnAndEvaluate). */
+export function oppReplySimulatable(bot: Player, game: Game): boolean {
+  return game.players[(bot.turnOrder + 1) % 2] instanceof SquashBot;
+}
+
+/** What the veto may do when the opponent's reply can't be simulated — i.e.
+ * in every live game, where the opponent is a human:
+ *   "full"     — unrestricted (pre-fix; threw away ~1 opening turn in 5)
+ *   "keepTurn" — the veto may reorder the turn but may not end it (shipped)
+ *   "off"      — no veto at all; play the heuristic
+ * "keepTurn" beat both alternatives vs a non-simulatable opponent
+ * (63.0/64.3% over two 300-game ranges, vs 62.0/64.0 full and 55.3/57.7 off)
+ * and is inert against bots. See BOT_NOTES "The phase-0 veto bug". */
+export type Phase0VetoMode = "full" | "keepTurn" | "off";
+let phase0VetoMode: Phase0VetoMode = "keepTurn";
+export function setPhase0VetoMode(mode: Phase0VetoMode): void { phase0VetoMode = mode; }
+
 /** Veto selection: compute rollout P(win) for the heuristic pick and the
  * other top-K candidates; return an alternative only when it beats the pick
  * by >= margin. Bounds model exploitation — the bot IS the heuristic except
@@ -190,8 +210,15 @@ function vetoSelect(
   margin: number,
   rank: RankFn,
   extraCandidate: GameActionInternal | null = null,
+  allowEnd = true,
 ): GameActionInternal {
-  const candidates = rank(actions, game).slice(0, topK);
+  let candidates = rank(actions, game).slice(0, topK);
+  // Without the opponent's reply the model cannot price the tempo given up
+  // by stopping early, and it systematically overrates the untouched hand:
+  // it rated "end the turn having done nothing" above a full opening turn
+  // that advanced a mission, dealt 2 damage and banked a boxing. Every other
+  // candidate reaches the same turn-end boundary, so those stay comparable.
+  if (!allowEnd) candidates = candidates.filter((c) => c.action.type !== "end_actions");
   if (!candidates.some((c) => c.action === heuristicPick)) {
     candidates.push({ action: heuristicPick, score: 0 });
   }
@@ -469,11 +496,14 @@ export class AnvilFirstBot extends SquashV3Bot {
   override selectAction(actions: GameActionInternal[], game: Game): GameActionInternal {
     const simulating = (this as Player & { _simulating?: boolean })._simulating;
     const margin = AnvilFirstBot.valueVetoMargin;
-    if (margin <= 0 || !valueModelAvailable() || this.turnOrder !== 0 || actions.length < 2 || simulating) {
+    const phase0 = !oppReplySimulatable(this, game);
+    if (margin <= 0 || !valueModelAvailable() || (phase0 && phase0VetoMode === "off")
+        || this.turnOrder !== 0 || actions.length < 2 || simulating) {
       return super.selectAction(actions, game);
     }
     const heuristicPick = super.selectAction(actions, game);
-    return vetoSelect(this, game, actions, heuristicPick, AnvilFirstBot.valueLeafTopK, margin, this.rankFn);
+    return vetoSelect(this, game, actions, heuristicPick, AnvilFirstBot.valueLeafTopK, margin, this.rankFn,
+      null, !phase0 || phase0VetoMode === "full");
   }
 
   protected override cardRating(card: Card, snap: GameStateSnapshot): number {
@@ -587,7 +617,9 @@ export class AnvilSecondBot extends ZoomBot {
         burst = findMissionBurstAction(this, game, actions, this.rankFn);
       }
     }
-    if (!this.valueLeafOn || margin <= 0 || !this.seatGateOk || actions.length < 2 || simulating) {
+    const phase0 = !oppReplySimulatable(this, game);
+    if (!this.valueLeafOn || margin <= 0 || !this.seatGateOk || (phase0 && phase0VetoMode === "off")
+        || actions.length < 2 || simulating) {
       // No veto to arbitrate — take completion-level bursts only.
       if (burst) {
         const strict = findMissionBurstAction(this, game, actions, this.rankFn, 100);
@@ -599,7 +631,8 @@ export class AnvilSecondBot extends ZoomBot {
     // the burst chain's first action joins the veto's candidate set — the
     // value model arbitrates between grind and burst.
     const heuristicPick = super.selectAction(actions, game);
-    return vetoSelect(this, game, actions, heuristicPick, AnvilSecondBot.valueLeafTopK, margin, this.rankFn, burst);
+    return vetoSelect(this, game, actions, heuristicPick, AnvilSecondBot.valueLeafTopK, margin, this.rankFn, burst,
+      !phase0 || phase0VetoMode === "full");
   }
 
   private rankFn: RankFn = (as, g) => this.scoreAndSortActions(as, g).scored;

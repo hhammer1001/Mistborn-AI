@@ -22,7 +22,7 @@ import { createZoomBot } from "./zoomBot";
 import { createSquashV2Bot } from "./squashV2Bot";
 import { createSquashV3Bot } from "./squashV3Bot";
 import { createHulkX90 } from "./hulkX90Bot";
-import { createAnvilBot, setAnvilPolicy, AnvilSecondBot, AnvilFirstBot, type AnvilDeltas, type AnvilKnobs } from "./anvilBot";
+import { createAnvilBot, setAnvilPolicy, setPhase0VetoMode, AnvilSecondBot, AnvilFirstBot, type AnvilDeltas, type AnvilKnobs, type Phase0VetoMode } from "./anvilBot";
 
 // Value-model integration is ON by default (shipped veto config). Override:
 //   ANVIL_VALUE_LEAF=0            — disable entirely (paired controls)
@@ -34,6 +34,9 @@ if (process.env.ANVIL_VALUE_LEAF === "0") {
   if (process.env.ANVIL_VL_TOPK) AnvilSecondBot.valueLeafTopK = parseInt(process.env.ANVIL_VL_TOPK, 10);
   if (process.env.ANVIL_VL_BLEND) { AnvilSecondBot.valueBlend = parseFloat(process.env.ANVIL_VL_BLEND); AnvilSecondBot.valueVetoMargin = 0; }
   if (process.env.ANVIL_VL_VETO) AnvilSecondBot.valueVetoMargin = parseFloat(process.env.ANVIL_VL_VETO);
+  // Only bites against a non-SquashBot opponent (V1/Random), which is the
+  // regime live games run in — see BOT_NOTES "The phase-0 veto bug".
+  if (process.env.ANVIL_VL_PHASE0) setPhase0VetoMode(process.env.ANVIL_VL_PHASE0 as Phase0VetoMode);
   if (process.env.ANVIL_VL_SEAT0) AnvilFirstBot.valueVetoMargin = parseFloat(process.env.ANVIL_VL_SEAT0);
   if (process.env.ANVIL_BE_DAMP) AnvilSecondBot.buyElimDamp = parseFloat(process.env.ANVIL_BE_DAMP);
   if (process.env.ANVIL_BURST === "1") { AnvilFirstBot.missionBurstEnabled = true; AnvilSecondBot.missionBurstEnabled = true; console.log("Mission-burst solver ON"); }
