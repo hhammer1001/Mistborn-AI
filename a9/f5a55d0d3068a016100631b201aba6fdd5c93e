@@ -1,0 +1,61 @@
+client/src/engine/data/anvil_evolve/first_Elend.json
+  s_352b7e5b91e8c0::t_b8992cacf2fb8f 1-15
+client/src/engine/data/anvil_evolve/first_Empress.json
+  s_a5351bd756cc4f::t_0629f9333ec0c5 1-80
+client/src/engine/data/anvil_evolve/first_Kar.json
+  s_504d7648faec5c::t_a45cdad7288e91 1-73
+client/src/engine/data/anvil_evolve/first_Zane.json
+  s_722f47dbaa52b4::t_77a15768650bbe 1-77
+client/src/engine/data/anvil_policy.json
+  s_e8cdb82e6dbab5::t_7213e4a0a638d5 356-415,418-474,789-854
+client/src/engine/squashBot.ts
+  s_e8cdb82e6dbab5::t_7472ab208990d4 11,347-350,352-421
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a9f5a55d0d3068a016100631b201aba6fdd5c93e",
+  "prompts": {},
+  "sessions": {
+    "s_352b7e5b91e8c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e95e4fa5-709a-4742-a98a-a09ed6764cf3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_504d7648faec5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c4eaa28-2573-41bd-abff-3198e8100bf8",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_722f47dbaa52b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ef71142-b053-486f-a999-a80d33be7e8d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_a5351bd756cc4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "47ddb080-04fc-421e-88fb-34f89be938f8",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    },
+    "s_e8cdb82e6dbab5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acb93389-916c-4898-a6bf-0591d453ec4e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
