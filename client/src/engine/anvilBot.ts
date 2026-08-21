@@ -343,21 +343,8 @@ function burstTargets(bot: Player, game: Game): { minGap: number; score: (ranksB
   // chasing even on unstarted missions — Henry's observed line: dump the
   // whole turn's mission output into a fresh mission, collect the money
   // tier, buy the bomb the same turn.
-  const rewardWeight = (code: string, amt: number): number => {
-    if (!code) return 0;
-    let w = 0;
-    const as_ = String(amt).split(".");
-    code.split(".").forEach((c, i) => {
-      const a = parseInt(as_[i] ?? as_[0] ?? "1", 10) || 1;
-      if (c === "M") w += 2.5 * a;
-      else if (c === "A") w += 3 * a;
-      else if (c === "T") w += 2 * a;
-      else if (c === "C") w += 2 * a;
-      else if (c === "Pc" || c === "Pd" || c === "Pm") w += 8;
-      else w += a;
-    });
-    return w;
-  };
+  const fund = fundingsInDeck(bot);
+  const rewardWeight = (code: string, amt: number): number => tierRewardWeight(code, amt, fund);
   const score = (before: number[], after: number[]): number => {
     let sc = 0;
     for (let mi = 0; mi < game.missions.length; mi++) {
@@ -467,6 +454,72 @@ export function findMissionBurstAction(
     self._simulating = wasSim;
   }
   return bestFirst;
+}
+
+// ── Deck-thinning context (Henry finding: the bot NEVER eliminated an own
+// card in 210+ recorded games — 758 "eliminate" log lines were all the
+// deck-neutral buy_eliminate. Henry trashes ~9/game and wins 79% of games
+// where he reaches Canton's first E tier; the bot averages rank 4.4 there.)
+
+const SELF_TRASHERS = new Set(["Con", "Deceive", "Dominate", "Pacify", "Soother", "Subdue"]);
+
+function fundingsInDeck(bot: Player): number {
+  let n = 0;
+  for (const pile of [bot.deck.hand, bot.deck.discard, bot.deck.cards]) {
+    for (const c of pile) if (c.constructor.name === "Funding") n++;
+  }
+  return n;
+}
+
+/** Bonus for firing an effect that ELIMINATES while dead Fundings remain:
+ * each removal permanently densifies every future draw. Tunable. */
+export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5 };
+
+function eBoost(bot: Player, effectStr: string | undefined): number {
+  if (!effectStr || !effectStr.split(".").includes("E")) return 0;
+  const f = fundingsInDeck(bot);
+  return f >= 2 ? ThinningConfig.effectBoost : f >= 1 ? ThinningConfig.effectBoost / 2 : 0;
+}
+
+/** Value of a mission tier's reward contents, funding-aware for E. Shared by
+ * the burst solver's target scoring and Anvil's mission-advance scoring —
+ * the heuristic scorer historically ignored what tiers PAY, which is how
+ * the bot ended up climbing Skaa's refresh tiers over Canton's eliminate
+ * tiers (Henry's read: the E mission was "certainly the difference"). */
+export function tierRewardWeight(code: string, amt: number, fundings: number): number {
+  if (!code) return 0;
+  let w = 0;
+  const as_ = String(amt).split(".");
+  code.split(".").forEach((c, i) => {
+    const a = parseInt(as_[i] ?? as_[0] ?? "1", 10) || 1;
+    if (c === "M") w += 2.5 * a;
+    else if (c === "A") w += 3 * a;
+    else if (c === "T") w += 2 * a;
+    else if (c === "C") w += 2 * a;
+    else if (c === "E") w += (fundings >= 2 ? ThinningConfig.burstEWeight : 1) * a;
+    else if (c === "Pc" || c === "Pd" || c === "Pm") w += 8;
+    else w += a;
+  });
+  return w;
+}
+
+/** Anvil mission-selection bonus: value the nearest uncrossed tier's reward
+ * contents, discounted by distance. Divergence runs 1+3: mission SELECTION
+ * was the largest systematic Henry-vs-bot gap. Tunable via ThinningConfig. */
+export function missionRewardBonus(bot: Player, game: Game, missionName: string): number {
+  const m = game.missions.find((mi) => mi.name === missionName);
+  if (!m) return 0;
+  const my = m.playerRanks[bot.turnOrder];
+  const fund = fundingsInDeck(bot);
+  const top = Math.max(...m.playerRanks);
+  for (const t of m.tiers) {
+    if (my < t.threshold) {
+      let w = tierRewardWeight(t.reward, t.rewardAmount, fund);
+      if (top < t.threshold) w += tierRewardWeight(t.firstReward, t.firstRewardAmount, fund) * 0.7;
+      return (ThinningConfig.missionRewardScale * w) / Math.max(1, t.threshold - my);
+    }
+  }
+  return 0;
 }
 
 // The two seat classes carry identical one-line overrides delegating to the
@@ -702,18 +755,26 @@ export class AnvilSecondBot extends ZoomBot {
   }
 
   protected override cardRating(card: Card, snap: GameStateSnapshot): number {
-    return super.cardRating(card, snap) + kDelta("second", this.character, card.name);
+    let r = super.cardRating(card, snap) + kDelta("second", this.character, card.name);
+    // Self-trashers gain value while dead Fundings dilute the deck.
+    if (SELF_TRASHERS.has(card.name) && fundingsInDeck(this) >= 3) r += ThinningConfig.buyBoost;
+    return r;
   }
 
   // ── Heuristic-assumption knobs ──
   protected override scoreMissionAdvance(a: GameActionInternal & { type: "advance_mission" }, s: GameStateSnapshot): number {
-    return super.scoreMissionAdvance(a, s) * kMult("second", this.character, "missionMult") + kAdd("second", this.character, "missionAdd");
+    return super.scoreMissionAdvance(a, s) * kMult("second", this.character, "missionMult") + kAdd("second", this.character, "missionAdd")
+      + missionRewardBonus(this, this.game, a.mission.name);
   }
   protected override scoreUseMetal(a: GameActionInternal & { type: "use_metal" }, s: GameStateSnapshot): number {
-    return super.scoreUseMetal(a, s) + kAdd("second", this.character, "useMetalAdd");
+    const nextTier = a.card.metalUsed + 1;
+    const eff = [a.card.data[3], a.card.data[5], a.card.data[7]][nextTier - 1];
+    return super.scoreUseMetal(a, s) + kAdd("second", this.character, "useMetalAdd") + eBoost(this, eff);
   }
   protected override scoreAllyAbility(a: GameActionInternal & { type: "ally_ability_1" | "ally_ability_2" }, s: GameStateSnapshot, tier: number): number {
-    return super.scoreAllyAbility(a, s, tier) + kAdd("second", this.character, "allyAdd");
+    const ally = a.card as { data?: string[] };
+    const eff = tier === 1 ? ally.data?.[3] : ally.data?.[5];
+    return super.scoreAllyAbility(a, s, tier) + kAdd("second", this.character, "allyAdd") + eBoost(this, eff);
   }
   protected override scoreCharAbility1(s: GameStateSnapshot): number {
     return super.scoreCharAbility1(s) + kAdd("second", this.character, "charAbilityAdd");

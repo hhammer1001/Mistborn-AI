@@ -1147,9 +1147,12 @@ export class GameSession {
         // Persistent attribution: which player owned this card before the action?
         const before = this._playerCardsBefore;
         if (before) {
-          if (before[0].has(c.id))      this.players[0].eliminatedCardNames.push(c.name);
-          else if (before[1].has(c.id)) this.players[1].eliminatedCardNames.push(c.name);
-          else this.players[playerIndex].eliminatedCardNames.push(c.name); // bought-and-eliminated from market
+          // Deck-owned cards are recorded by Player.eliminate itself (covers
+          // bots too); only the bought-and-eliminated market card — which
+          // never passes through a player deck — is attributed here.
+          if (!before[0].has(c.id) && !before[1].has(c.id)) {
+            this.players[playerIndex].eliminatedCardNames.push(c.name);
+          }
         }
         // Human-readable log entry skips the buy_eliminate target.
         if (c.id !== excludeId) eliminatedNames.push(c.name);

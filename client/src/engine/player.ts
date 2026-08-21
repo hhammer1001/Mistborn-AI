@@ -422,7 +422,12 @@ export class Player {
     for (let i = 0; i < amount; i++) {
       const choice = this.eliminateIn();
       if (choice === -1) break;
-      this.game.market.discard.push(this.deck.eliminate(choice));
+      const removed = this.deck.eliminate(choice);
+      // Record here (single self-deck elimination path) so BOT eliminations
+      // count too — the session's diff-based recording only covers human
+      // actions, which made bot eliminatedCounts read 0 forever.
+      this.eliminatedCardNames.push(removed.name);
+      this.game.market.discard.push(removed);
     }
   }
 

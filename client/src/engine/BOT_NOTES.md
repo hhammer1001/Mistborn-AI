@@ -1372,3 +1372,33 @@ mover-first bot sits in a corner the model never saw. Forcing `movesSecond=1`
 on that state also removes the pathology (0/296), which is a hint, not a fix.
 Generating half the rows with firstPlayer=1 would let the veto run unrestricted
 against humans.
+
+## Iteration: deck thinning + reward-aware mission selection (Henry's E-mission finding)
+
+Henry: "bots can't use trashing cards effectively; I won both seats by
+climbing the eliminating mission (Canton) over the refreshing one (Skaa)."
+
+**Measurement first — and a stats bug.** eliminatedCounts read 0 for bots in
+ALL 210+ recorded games. Root cause: recording only happened in the session's
+human-action diff; bot turns bypass it. FIXED at the engine level
+(Player.eliminate records; session keeps only buy-eliminate attribution).
+True numbers: bot ~3.7 deck-eliminations/game vs Henry ~8-9. Canton: Henry
+avg rank 10.0, 79% winrate at tier>=5; bot 4.4 avg vs Henry (but ~7 vs bots
+— partly REACTIVE avoidance: Henry dominates the race and oppLead penalties
+push the bot off).
+
+**Shipped (AnvilSecond, gates at reference 39.4/39.2 seat1, 72.5 seat0):**
+- Recording fix (both players' eliminations now count).
+- missionRewardBonus in scoreMissionAdvance: nearest uncrossed tier's reward
+  CONTENTS valued (tierRewardWeight, funding-aware E, first-to-tier x0.7,
+  distance-discounted, ThinningConfig.missionRewardScale=1.5). The heuristic
+  scorer had never looked at what tiers pay.
+- E-effect boost (+8 while >=2 Fundings), self-trasher buy boost (+2.5 at
+  >=3 Fundings), burst-target E weighting.
+
+**Honest effect size vs bots: ~nil** (elims 3.44->3.59/game, Canton flat,
+wins 24->25/80). Score boosts don't create E opportunities; vs bots the
+opportunity structure is unchanged. The mechanisms exist for the vs-Henry
+dynamics (his games are the test). If his Canton edge persists, next lever
+is the oppLead penalty interacting with reward-rich missions — the bot
+concedes exactly the missions most worth contesting.
