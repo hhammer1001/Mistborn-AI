@@ -1,0 +1,25 @@
+client/src/engine/player.ts
+  s_bdb5d65f96d656::t_f78c84d6684457 425-430
+client/src/engine/session.ts
+  s_bdb5d65f96d656::t_f78c84d6684457 1150-1155
+client/src/engine/anvilBot.ts
+  s_bdb5d65f96d656::t_8ec5c07864235f 346-347,459-524,758-761,766-767,770-772,775-777
+client/src/engine/BOT_NOTES.md
+  s_bdb5d65f96d656::t_d4789b0bd0a068 1375-1404
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "00ff0898b4bbace3a08068a7565d5c17badf553b",
+  "prompts": {},
+  "sessions": {
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
