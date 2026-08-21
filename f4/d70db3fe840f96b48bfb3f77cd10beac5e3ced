@@ -1,0 +1,21 @@
+client/src/engine/anvilBot.ts
+  s_bdb5d65f96d656::t_509278e34f42db 476,766-773,775
+client/src/engine/BOT_NOTES.md
+  s_bdb5d65f96d656::t_b6133dd091f0d3 1405-1425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "f4d70db3fe840f96b48bfb3f77cd10beac5e3ced",
+  "prompts": {},
+  "sessions": {
+    "s_bdb5d65f96d656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3bf263a-596f-412c-9c9e-68fefadb6d51",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Henry Hammer <henry@brmlabs.co>"
+    }
+  }
+}
