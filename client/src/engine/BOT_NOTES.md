@@ -1402,3 +1402,24 @@ opportunity structure is unchanged. The mechanisms exist for the vs-Henry
 dynamics (his games are the test). If his Canton edge persists, next lever
 is the oppLead penalty interacting with reward-rich missions — the bot
 concedes exactly the missions most worth contesting.
+
+## Correction + commitment gradient (Henry's challenge)
+
+RETRACTION: the previous section's "reactive avoidance" claim (Henry
+dominates Canton, oppLead penalty pushes the bot off) was WRONG. Henry
+challenged it; the data agrees with him:
+- Early (t<=7) total-mission leads are even (bot 65 / Henry 76 / even 69).
+- The bot's LAST Canton advance happens while it is AHEAD more often than
+  behind (23 vs 19) — abandonment, not pressure.
+- Final-rank histograms: Henry is bimodal (0 or 12; 47/68 completions);
+  the bot smears across ranks 1-6 with 26 never-starteds. Mechanism: after
+  a tier crossing the proximity bonus vanishes and any mission with a
+  closer tier outbids continuing — "closest tier wins" dithering.
+
+SHIPPED: commitment gradient in AnvilSecond.scoreMissionAdvance —
++ThinningConfig.commitScale (1.0) x own rank on the mission, so invested
+progress raises the priority of finishing (echoes the campaign-one lesson:
+commitment > accuracy). Bench-neutral vs bots (32/80 both configs; gates
+39.x/38.9 seat1, 72.5 seat0 exact) — like the rest of the thinning suite,
+the dynamics it targets only express against Henry-style commit-and-finish
+opponents. His games are the test.

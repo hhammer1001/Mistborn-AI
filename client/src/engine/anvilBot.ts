@@ -473,7 +473,7 @@ function fundingsInDeck(bot: Player): number {
 
 /** Bonus for firing an effect that ELIMINATES while dead Fundings remain:
  * each removal permanently densifies every future draw. Tunable. */
-export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5 };
+export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5, commitScale: 1.0 };
 
 function eBoost(bot: Player, effectStr: string | undefined): number {
   if (!effectStr || !effectStr.split(".").includes("E")) return 0;
@@ -763,8 +763,16 @@ export class AnvilSecondBot extends ZoomBot {
 
   // ── Heuristic-assumption knobs ──
   protected override scoreMissionAdvance(a: GameActionInternal & { type: "advance_mission" }, s: GameStateSnapshot): number {
+    // Commitment gradient: invested progress raises the priority of
+    // FINISHING. Henry's Canton histogram is bimodal (0 or 12); the bot's
+    // smeared across 1-6 — after a tier crossing the proximity bonus
+    // vanishes and "closest tier elsewhere" wins, so it dribbles and
+    // wanders. It stalls from AHEAD (23 vs 19), so this is self-inflicted
+    // dithering, not opp pressure. Echoes the oldest doctrine lesson:
+    // commitment > accuracy.
+    const commit = ThinningConfig.commitScale * Math.min(a.mission.playerRanks[this.turnOrder], 11);
     return super.scoreMissionAdvance(a, s) * kMult("second", this.character, "missionMult") + kAdd("second", this.character, "missionAdd")
-      + missionRewardBonus(this, this.game, a.mission.name);
+      + missionRewardBonus(this, this.game, a.mission.name) + commit;
   }
   protected override scoreUseMetal(a: GameActionInternal & { type: "use_metal" }, s: GameStateSnapshot): number {
     const nextTier = a.card.metalUsed + 1;
