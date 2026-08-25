@@ -22,7 +22,8 @@ import type { Player } from "./player";
 import { Action, Funding } from "./card";
 import weightsJson from "./data/value_weights.json";
 
-const CHARS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+import { CHARACTERS } from "./types";
+const CHARS = [...CHARACTERS]; // full roster incl. expansion characters
 const DAMAGE_ENGINE_CARDS = new Set(["House War", "Crushing Blow", "Maelstrom", "Ruin"]);
 const MISSION_ENGINE_CARDS = new Set(["Pierce", "Unveil", "Pursue", "Hyperaware", "Strategize"]);
 
@@ -42,8 +43,8 @@ export const VALUE_FEATURE_NAMES: string[] = [
   "missionsILead", "myClosing", "oppClosing",
   "myAlliesInPlay", "myAllyHP", "myDefenderHP",
   "oppAlliesInPlay", "oppAllyHP", "oppDefenderHP",
-  "charK", "charS", "charV", "charM", "charP",
-  "oppCharK", "oppCharS", "oppCharV", "oppCharM", "oppCharP",
+  ...CHARS.map((c) => "char" + c),
+  ...CHARS.map((c) => "oppChar" + c),
   "postOppTurn",
   // v3: mission threshold proximity — the dimension of Henry's mission
   // selection the model previously couldn't see (divergence runs 1+3).

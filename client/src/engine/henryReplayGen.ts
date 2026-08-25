@@ -27,7 +27,7 @@ import type { Game } from "./game";
 import type { Player } from "./player";
 import { resetCardIds } from "./card";
 import { SquashV3Bot } from "./squashV3Bot";
-import { AnvilSecondBot } from "./anvilBot";
+import { AnvilSecondBot, ThinningConfig } from "./anvilBot";
 import { featurize } from "./valueModel";
 
 const APP_ID = "f31200dd-1c19-4cb6-9187-2e4cf731bb55";
@@ -239,17 +239,28 @@ async function replayAll(): Promise<void> {
     let res = replayMatch(m, mps, false);
     if (!res.ok) {
       // Era ladder: bot features ship over time; recordings replay with the
-      // era's config. Attempt 2 = pre-burst-solver era (burst + bank verdict
-      // + buy-elim damp all absent). Attempt 3 = pre-SquashV3 era.
+      // era's config, tried newest -> oldest.
+      //   rung 2: pre-thinning-suite (E boosts, mission reward bonus,
+      //           commitment gradient absent)
+      //   rung 3: pre-burst-solver era (also no bank verdict / damp)
+      //   rung 4: pre-SquashV3 era
+      const saved = { ...ThinningConfig };
       const b = AnvilSecondBot.missionBurstEnabled;
       const bv = AnvilSecondBot.bankVerdictEnabled;
       const bd = AnvilSecondBot.buyElimDamp;
-      AnvilSecondBot.missionBurstEnabled = false;
-      AnvilSecondBot.bankVerdictEnabled = false;
-      AnvilSecondBot.buyElimDamp = 1.0;
       try {
+        ThinningConfig.effectBoost = 0; ThinningConfig.buyBoost = 0;
+        ThinningConfig.burstEWeight = 1; ThinningConfig.missionRewardScale = 0;
+        ThinningConfig.commitScale = 0;
         res = replayMatch(m, mps, false);
+        if (!res.ok) {
+          AnvilSecondBot.missionBurstEnabled = false;
+          AnvilSecondBot.bankVerdictEnabled = false;
+          AnvilSecondBot.buyElimDamp = 1.0;
+          res = replayMatch(m, mps, false);
+        }
       } finally {
+        Object.assign(ThinningConfig, saved);
         AnvilSecondBot.missionBurstEnabled = b;
         AnvilSecondBot.bankVerdictEnabled = bv;
         AnvilSecondBot.buyElimDamp = bd;

@@ -1423,3 +1423,38 @@ commitment > accuracy). Bench-neutral vs bots (32/80 both configs; gates
 39.x/38.9 seat1, 72.5 seat0 exact) — like the rest of the thinning suite,
 the dynamics it targets only express against Henry-style commit-and-finish
 opponents. His games are the test.
+
+## Full-roster value model (Henry's challenge #2: expansion characters)
+
+Henry pushed back on the claim that expansion characters (Empress, Zane,
+Kar, Elend) fell back to generic play. He was right on 2 of 3 layers:
+evolved POLICIES and per-char WEIGHTS were already complete for all 9
+characters (the arc-3 full-roster evolution). The one real gap was the
+VALUE MODEL: valueModel.ts hardcoded the 5 base characters, so (a) the
+one-hot features couldn't represent expansion chars, and (b) valueDataGen
+never sampled them (plus a leftover `% 5` in char sampling that would have
+silently excluded them even after the roster import — caught pre-run).
+
+Fixed: CHARS now imports CHARACTERS from types.ts (61 -> 73 features incl.
+v3 threshold features), datagen regenerated from scratch (60k games /
+~2.4M rows, seedBase 121000001, full-roster sampling), retrained MLP-48
+with Henry-row weighting.
+
+Era ladder rung added to henryReplayGen in the same round: pre-thinning-
+suite config (ThinningConfig neutralized) tried before the pre-burst rung —
+the thinning changes had orphaned recordings again (36/943 replayable;
+the new rung recovers to 94/943, 3590 rows). That mattered: the first
+retrain (36 matches) came out ~1pp soft on the seat1 gates (38.2/37.6);
+retraining with the recovered rows pulled them back to reference.
+
+Final results (shipped weights):
+- Held-out quality held on the harder full-roster distribution: acc 78.0%,
+  AUC 0.863 (base-only model: 78.0% / 0.864).
+- NEW expansion-char probe (Anvil as Empress/Zane/Kar/Elend vs V3 base
+  chars, seat 1, seeds 12500000001+, n=200): veto OFF 16.0% -> ON 29.5%.
+  The veto is worth +13.5pp on expansion chars, vs ~+5-7pp on base chars —
+  the old model ran blind to character identity in these matchups (one-hot
+  vector had no slot for them, so they featurized as "no character").
+  These are the reference numbers for future full-roster gate runs.
+- Base-char gates all at reference: seat1 V3 39.6 @3.7B / 38.8 @4.1B
+  (refs 39.3 / 38.6-39.6), seat0 Zoom 72.5.

@@ -31,7 +31,8 @@ if (process.env.ANVIL_VALUE_LEAF === "1") {
   console.log("[dagger] value-leaf ENABLED for pool Anvil bots");
 }
 
-const CHARS = ["Kelsier", "Shan", "Vin", "Marsh", "Prodigy"];
+import { CHARACTERS } from "./types";
+const CHARS = [...CHARACTERS]; // full roster — the value model must see expansion characters
 
 const shard = parseInt(process.argv[2] || "0", 10);
 const GAMES = parseInt(process.argv[3] || "4000", 10);
@@ -97,8 +98,8 @@ const t0 = Date.now();
 
 for (let i = 0; i < GAMES; i++) {
   const pool = POOL[i % POOL.length];
-  const c0 = CHARS[(i * 7 + shard) % 5];
-  let c1 = CHARS[(i * 3 + 1 + shard * 2) % 5];
+  const c0 = CHARS[(i * 7 + shard) % CHARS.length];
+  let c1 = CHARS[(i * 3 + 1 + shard * 2) % CHARS.length];
   if (c1 === c0) c1 = CHARS[(CHARS.indexOf(c1) + 1) % 5];
   const seed = SEED_BASE + shard * 50_000_000 + i * 101;
   const rows: Row[] = [];
