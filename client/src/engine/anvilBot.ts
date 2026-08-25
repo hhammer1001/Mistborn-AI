@@ -473,12 +473,26 @@ function fundingsInDeck(bot: Player): number {
 
 /** Bonus for firing an effect that ELIMINATES while dead Fundings remain:
  * each removal permanently densifies every future draw. Tunable. */
-export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5, commitScale: 1.0 };
+export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5, commitScale: 1.0, fuelGuard: 8 };
 
 function eBoost(bot: Player, effectStr: string | undefined): number {
   if (!effectStr || !effectStr.split(".").includes("E")) return 0;
   const f = fundingsInDeck(bot);
   return f >= 2 ? ThinningConfig.effectBoost : f >= 1 ? ThinningConfig.effectBoost / 2 : 0;
+}
+
+/** Penalty for burn_card on a card whose USE ability eliminates: burning the
+ * trasher as fuel forfeits its E for this whole deck cycle. Greedy action
+ * order made the use_metal eBoost unreachable — burn Con (+1 mission) fires
+ * before a brass token exists, so "use Con" is never a legal candidate.
+ * (Twin pair seed 3991251187: the bot burned Con 4x/game, 0 elims, final
+ * hands were 4 Fundings + Training; Henry trashed 5/6 Fundings and won both
+ * seats.) The guard flips the ordering: burn the plain same-metal card
+ * first, then use the trasher.  Scaled like eBoost, off when nothing dead
+ * remains to trash. */
+function trasherFuelGuard(bot: Player, card: { data?: string[] }): number {
+  const scale = ThinningConfig.fuelGuard / ThinningConfig.effectBoost;
+  return -scale * eBoost(bot, card.data?.[3]);
 }
 
 /** Value of a mission tier's reward contents, funding-aware for E. Shared by
@@ -802,7 +816,7 @@ export class AnvilSecondBot extends ZoomBot {
     return super.scoreBurnMetal(a, s) + kAdd("second", this.character, "burnMetalAdd");
   }
   protected override scoreBurnCard(a: GameActionInternal & { type: "burn_card" }, s: GameStateSnapshot): number {
-    return super.scoreBurnCard(a, s) + kAdd("second", this.character, "burnCardAdd");
+    return super.scoreBurnCard(a, s) + kAdd("second", this.character, "burnCardAdd") + trasherFuelGuard(this, a.card);
   }
   protected override scoreEndTurn(s: GameStateSnapshot): number {
     return super.scoreEndTurn(s) + kAdd("second", this.character, "endTurnAdd");

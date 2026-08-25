@@ -249,10 +249,15 @@ async function replayAll(): Promise<void> {
       const bv = AnvilSecondBot.bankVerdictEnabled;
       const bd = AnvilSecondBot.buyElimDamp;
       try {
+        // rung 1.5: pre-fuelGuard (thinning suite without the burn guard)
+        ThinningConfig.fuelGuard = 0;
+        res = replayMatch(m, mps, false);
+        if (!res.ok) {
         ThinningConfig.effectBoost = 0; ThinningConfig.buyBoost = 0;
         ThinningConfig.burstEWeight = 1; ThinningConfig.missionRewardScale = 0;
         ThinningConfig.commitScale = 0;
         res = replayMatch(m, mps, false);
+        }
         if (!res.ok) {
           AnvilSecondBot.missionBurstEnabled = false;
           AnvilSecondBot.bankVerdictEnabled = false;

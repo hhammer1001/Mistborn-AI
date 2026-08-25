@@ -1458,3 +1458,41 @@ Final results (shipped weights):
   These are the reference numbers for future full-roster gate runs.
 - Base-char gates all at reference: seat1 V3 39.6 @3.7B / 38.8 @4.1B
   (refs 39.3 / 38.6-39.6), seat0 Zoom 72.5.
+
+## Twin-seed case study 3 (seed 3991251187): the veto suppresses thinning
+
+Henry won both seats (Empress/Elend, first expansion-char twin pair). His
+Empress game: 12 eliminations, 7-card final deck, [12,12,12]. The bot,
+same seed: 0 elims, 15-card deck, [11,12,0] — its turn-6 hand was four
+Fundings and a Training, and it spent turns 5-15 buying boxings.
+
+Ruled OUT: the Soother gap. Henry's Soother (ally: +2 mission / eliminate
+2 per activation — 6 of his 12 elims) was never buyable by the bot; refill
+timing put it in front of Henry both games and he took it on sight. The
+bot even killed it twice. Also confirmed working: the commitment gradient
+— bot mission lines were [11,12,0] and [12,12,6], concentrated, not the
+old 1-6 smear.
+
+Ruled IN: Con. Bought t1/t2 both games, then burned for +1 mission 4x per
+game; its eliminate ability fired once in 41 turns (t21, too late).
+Deterministic replay of the recorded games, crossing veto x guard:
+- guard=0 veto=ON reproduces the recording exactly -> live config confirmed.
+- guard=0 veto=OFF: the bot USES Con (t5/t8). The heuristic eBoost already
+  prefers using the trasher — it was the VALUE VETO overriding toward burn.
+  The model trained on bot-vs-bot data where nobody thins; funding-removal
+  P(win) credit is off-distribution, mission points dominate, so the veto
+  steers away from eliminations. "Solvers propose, model disposes" fails
+  when the model has never seen the move class it's judging.
+- guard=8 veto=ON: Con's ability fires at the previously-burned turns.
+
+SHIPPED: ThinningConfig.fuelGuard (8) — scoreBurnCard penalty on burning a
+card whose USE ability eliminates, while dead Fundings remain. Symmetric
+to eBoost, zero when nothing remains to trash. AnvilSecond only. Gates:
+39.4/39.3 seat1 (refs 39.3/38.6-39.6), 72.5 seat0. Bench elim rate ~flat
+(3.57 -> 3.67/game) — like the rest of the suite, expresses vs Henry, not
+vs bots. Era ladder got rung 1.5 (fuelGuard=0) for pre-guard recordings.
+
+NEXT (structural): DAgger the thinning behavior into the value model —
+regenerate value_data now that the bot can thin, so trajectories with
+funding-removal exist in training and the veto stops fighting the
+heuristic on E-effects.
