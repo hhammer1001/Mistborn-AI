@@ -19,7 +19,7 @@ import { resetCardIds } from "./card";
 import { createSquashV3Bot } from "./squashV3Bot";
 import { createZoomBot } from "./zoomBot";
 import { createSquashBot } from "./squashBot";
-import { createAnvilBot, AnvilSecondBot } from "./anvilBot";
+import { createAnvilBot, AnvilSecondBot, ThinningConfig } from "./anvilBot";
 import { featurize } from "./valueModel";
 
 // DAgger iteration: with ANVIL_VALUE_LEAF=1, the Anvil bots in the pool use
@@ -29,6 +29,14 @@ import { featurize } from "./valueModel";
 if (process.env.ANVIL_VALUE_LEAF === "1") {
   AnvilSecondBot.valueLeafEnabled = true;
   console.log("[dagger] value-leaf ENABLED for pool Anvil bots");
+}
+// DAgger for thinning: ANVIL_FUELGUARD=<n> makes pool Anvil bots actually
+// fire trashers (burn-guard on), so states downstream of eliminations exist
+// in training with honest labels — without this the model never sees
+// thinning and (correctly, for its distribution) vetoes it.
+if (process.env.ANVIL_FUELGUARD) {
+  ThinningConfig.fuelGuard = parseFloat(process.env.ANVIL_FUELGUARD);
+  console.log(`[dagger] fuelGuard=${ThinningConfig.fuelGuard} for pool Anvil bots`);
 }
 
 import { CHARACTERS } from "./types";

@@ -9,7 +9,7 @@ const CH = [...BASE_CHARACTERS];
 const shard = parseInt(process.argv[2], 10);
 const CAND = JSON.parse(process.argv[3]) as Record<string, number>;
 const BASE = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5, commitScale: 1.0, fuelGuard: 0 };
-const RANGES = [7900000001, 8300000001];
+const RANGES = process.env.THIN_RANGES ? process.env.THIN_RANGES.split(",").map(Number) : [7900000001, 8300000001];
 const N = 350;
 function play(seed: number, i: number, cfg: Record<string, number>): boolean {
   Object.assign(ThinningConfig, cfg);

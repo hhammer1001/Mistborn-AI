@@ -1548,3 +1548,28 @@ NaN when effectBoost=0 (the all-zero anchor went 0-for-420 seven times) and
 Infinity in era-ladder rung 2 after rung 1.5 set fuelGuard=8. Now computed
 directly with its own funding gate; rung 2 explicitly zeroes fuelGuard.
 Harnesses kept: thinningSearch.ts (CEM), thinValidate.ts (paired flips).
+
+### DAgger round (thinning trajectories in value data): closes the question
+
+Henry approved the DAgger route. 8 new shards (40k games, 1.65M rows) with
+ANVIL_FUELGUARD=8 so pool Anvils actually fire trashers; retrained on the
+combined 4.2M rows (60k guard-off + 40k guard-on games).
+
+Findings:
+1. The "model is blind to thinning" diagnosis was WRONG in the static
+   sense: sensitivity probe (4000 mid-game states, fundingCount -1/6,
+   deckSize -1/20) shows the PRE-DAgger model already credited eliminating
+   a Funding at +3.5pp P(win) (DAgger models: +4.0 to +4.7pp). The veto's
+   burn-over-use preference comes from rollout dynamics, not state values.
+2. Guard A/B under DAgger models, always on fresh ranges: round 1 (4
+   epochs) 65/53 flips (+0.29pp, p=0.27) but gates -0.8pp; round 2 (7
+   epochs) gates recovered to reference (39.3/38.7/72.5) and the guard went
+   EXACTLY 66/66 flips, 0.00pp. Pooled across all three A/Bs: 198/195.
+3. VERDICT: bot thinning is flat vs bots regardless of what the value
+   model knows. The bench cannot measure this axis, full stop. The only
+   remaining test bed is Henry's live games.
+
+Weights: restored to the pre-thinning file (its gates and expansion-probe
+references are the validated ones; the DAgger weights measured no gain).
+Kept: ANVIL_FUELGUARD datagen env, thinSensitivity.ts, THIN_RANGES env on
+thinValidate.ts, and the 8 DAgger shards locally for future rounds.
