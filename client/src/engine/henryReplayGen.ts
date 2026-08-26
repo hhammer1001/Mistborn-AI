@@ -255,7 +255,7 @@ async function replayAll(): Promise<void> {
         if (!res.ok) {
         ThinningConfig.effectBoost = 0; ThinningConfig.buyBoost = 0;
         ThinningConfig.burstEWeight = 1; ThinningConfig.missionRewardScale = 0;
-        ThinningConfig.commitScale = 0;
+        ThinningConfig.commitScale = 0; ThinningConfig.fuelGuard = 0;
         res = replayMatch(m, mps, false);
         }
         if (!res.ok) {

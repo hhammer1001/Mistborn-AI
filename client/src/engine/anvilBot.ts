@@ -498,8 +498,14 @@ function eBoost(bot: Player, effectStr: string | undefined): number {
  * unjustified. Knob kept for a live A/B vs Henry, where his own thinning
  * demonstrably wins. */
 function trasherFuelGuard(bot: Player, card: { data?: string[] }): number {
-  const scale = ThinningConfig.fuelGuard / ThinningConfig.effectBoost;
-  return -scale * eBoost(bot, card.data?.[3]);
+  // NOTE: computed directly, NOT as a ratio of eBoost — dividing by
+  // effectBoost NaN/Inf-poisoned every score when effectBoost was 0 (found
+  // when the CEM search's all-zero anchor went 0-for-420 seven times).
+  if (ThinningConfig.fuelGuard === 0) return 0;
+  const eff = card.data?.[3];
+  if (!eff || !eff.split(".").includes("E")) return 0;
+  const f = fundingsInDeck(bot);
+  return -(f >= 2 ? ThinningConfig.fuelGuard : f >= 1 ? ThinningConfig.fuelGuard / 2 : 0);
 }
 
 /** Value of a mission tier's reward contents, funding-aware for E. Shared by

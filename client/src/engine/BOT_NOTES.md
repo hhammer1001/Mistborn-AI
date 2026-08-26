@@ -1519,3 +1519,32 @@ Process note for future thinning-suite work: "bench-neutral + expresses
 vs Henry" is a hypothesis, not a result. Paired-seed flip asymmetry is
 cheap (~10 min) and should gate every behavior change, including ones
 aimed at Henry-style dynamics.
+
+### Joint thinning-knob search (Henry: "with the right SET of changes it
+### could be better overall")
+
+CEM over all 6 ThinningConfig dims at once (pop 14, 7 gens, 420 games/eval,
+CRN within generation, committed + all-zero + running-mean anchors every
+gen), fitness vs V3 seat 1. The mean drifted back to ~committed values
+(buyBoost 3.3, fuelGuard 1.8, rest ≈ defaults); per-gen "bests" of +0.3 to
++2.6pp are max-of-14 order statistics at sigma 2.4pp.
+
+Paired-flip validation on fresh ranges (7.9B/8.3B, 4200 pairs each):
+- CEM final mean vs committed: -0.21pp, flips 83/92, p=0.55. NOT shipped.
+- All-zero suite vs committed: -0.29pp, flips 201/213, p=0.59.
+
+The second line is the important one: THE ENTIRE THINNING SUITE IS A COIN
+FLIP VS BOTS — it changes ~10% of game outcomes and they split evenly.
+There is no joint basin to find on this bench: neither side of a bot-vs-bot
+game can convert deck density into wins or punish bloat. The suite's value
+is exactly the Henry-expression hypothesis, now with cleaner boundaries:
+bench gates can only show these knobs are not harmful, never that they
+help. Ways to actually resolve it: (a) DAgger — regen value data with
+thinning trajectories so the model can learn whether density converts;
+(b) measure on Henry's games directly (twin pairs / config A-B by match).
+
+Bug found by the search: trasherFuelGuard computed fuelGuard/effectBoost —
+NaN when effectBoost=0 (the all-zero anchor went 0-for-420 seven times) and
+Infinity in era-ladder rung 2 after rung 1.5 set fuelGuard=8. Now computed
+directly with its own funding gate; rung 2 explicitly zeroes fuelGuard.
+Harnesses kept: thinningSearch.ts (CEM), thinValidate.ts (paired flips).
