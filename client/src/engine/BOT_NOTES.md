@@ -1496,3 +1496,26 @@ NEXT (structural): DAgger the thinning behavior into the value model —
 regenerate value_data now that the bot can thin, so trajectories with
 funding-removal exist in training and the veto stops fighting the
 heuristic on E-effects.
+
+### fuelGuard postscript: tested, then defaulted OFF
+
+Henry (correctly) asked whether the guard was tested POSITIVE, not just
+bench-neutral. Paired-seed A/B (same seed with guard 0 vs 8, AnvilSecond
+vs V3, 4200 pairs across ranges 5.3B/6.7B): outcome diverged in 567 games,
+winner flipped in 143 — 67 to WINS vs 76 to LOSSES (sign test p=0.50,
+pooled -0.21pp). Not positive; slightly negative point estimate.
+
+Reframe: the value veto was RIGHT for bot play. In its training
+distribution (and per this A/B), burning a trasher's +1 mission is worth
+as much as the elimination — the veto suppressing thinning was a correct
+learned judgment, and the guard was an unjustified heuristic override.
+Whether BOT thinning pays against Henry-style opponents is still open (his
+own thinning wins, but he also exploits density with burst/reward lines
+the bot lacks). fuelGuard now defaults 0; era rung 1.5 covers the brief
+guard-on era. To resolve it properly: DAgger — regen value data with
+thinning trajectories present and let the model, not a heuristic, decide.
+
+Process note for future thinning-suite work: "bench-neutral + expresses
+vs Henry" is a hypothesis, not a result. Paired-seed flip asymmetry is
+cheap (~10 min) and should gate every behavior change, including ones
+aimed at Henry-style dynamics.

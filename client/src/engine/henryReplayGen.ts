@@ -249,8 +249,8 @@ async function replayAll(): Promise<void> {
       const bv = AnvilSecondBot.bankVerdictEnabled;
       const bd = AnvilSecondBot.buyElimDamp;
       try {
-        // rung 1.5: pre-fuelGuard (thinning suite without the burn guard)
-        ThinningConfig.fuelGuard = 0;
+        // rung 1.5: brief fuelGuard-on era (2026-08-25, reverted same day)
+        ThinningConfig.fuelGuard = 8;
         res = replayMatch(m, mps, false);
         if (!res.ok) {
         ThinningConfig.effectBoost = 0; ThinningConfig.buyBoost = 0;

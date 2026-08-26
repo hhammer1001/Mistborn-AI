@@ -473,7 +473,7 @@ function fundingsInDeck(bot: Player): number {
 
 /** Bonus for firing an effect that ELIMINATES while dead Fundings remain:
  * each removal permanently densifies every future draw. Tunable. */
-export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5, commitScale: 1.0, fuelGuard: 8 };
+export const ThinningConfig = { effectBoost: 8, buyBoost: 2.5, burstEWeight: 2.5, missionRewardScale: 1.5, commitScale: 1.0, fuelGuard: 0 };
 
 function eBoost(bot: Player, effectStr: string | undefined): number {
   if (!effectStr || !effectStr.split(".").includes("E")) return 0;
@@ -489,7 +489,14 @@ function eBoost(bot: Player, effectStr: string | undefined): number {
  * hands were 4 Fundings + Training; Henry trashed 5/6 Fundings and won both
  * seats.) The guard flips the ordering: burn the plain same-metal card
  * first, then use the trasher.  Scaled like eBoost, off when nothing dead
- * remains to trash. */
+ * remains to trash.
+ *
+ * DEFAULT 0 after a paired-seed A/B (4200 pairs, 2 ranges, vs V3 seat 1):
+ * 143 winner flips split 67 to-win / 76 to-loss (sign p=0.50, -0.21pp
+ * pooled). Vs bots the mission tempo given up cancels the density gained —
+ * the value veto had learned that correctly, and overriding it was
+ * unjustified. Knob kept for a live A/B vs Henry, where his own thinning
+ * demonstrably wins. */
 function trasherFuelGuard(bot: Player, card: { data?: string[] }): number {
   const scale = ThinningConfig.fuelGuard / ThinningConfig.effectBoost;
   return -scale * eBoost(bot, card.data?.[3]);
